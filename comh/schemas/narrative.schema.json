@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "narrative",
+  "description": "Medium-agnostic story structure. Gate 2 artifact: ordered beats + claims registry. No layout, word counts, page numbers, or visual fields.",
+  "type": "object",
+  "required": ["version", "claims", "story"],
+  "additionalProperties": true,
+  "properties": {
+    "version": { "const": 1 },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "statement", "evidence", "status"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "pattern": "^C[0-9]{2,}$" },
+          "statement": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" } },
+          "status": {
+            "type": "string",
+            "description": "Known: supported, partial, background, assumption, needs_research. Unknown values are warned, not rejected."
+          },
+          "importance": { "type": "string", "description": "e.g. primary, supporting, minor (open vocabulary)." }
+        }
+      }
+    },
+    "story": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "purpose", "message"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "pattern": "^S[0-9]{2,}$" },
+          "purpose": {
+            "type": "string",
+            "description": "Open vocabulary communication move, e.g. establish_problem, demonstrate_effect, concede_limit."
+          },
+          "message": { "type": "string", "description": "The one sentence this beat should land in the audience's head." },
+          "claims": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

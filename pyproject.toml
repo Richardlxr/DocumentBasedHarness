@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "communication-harness"
+version = "0.1.0"
+description = "Evidence -> narrative -> projections. A communication harness that turns source material into reports and presentations through explicit, traceable artifacts."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  # vendored docx_harness requirements (compiler: Markdown/MyST -> DOCX)
+  "latex2mathml>=3.81,<4",
+  "mathml2omml>=0.0.2,<0.1",
+  "myst-parser>=4.0,<5",
+  "Pillow>=11,<13",
+  "pydantic>=2.10,<3",
+  "python-docx>=1.1,<2",
+  # harness runtime
+  "PyYAML>=6,<7",
+  "jsonschema>=4,<6",
+  "python-pptx>=1.0,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "ruff>=0.12,<1",
+]
+
+[project.scripts]
+comh = "comh.cli:main"
+docx-harness = "docx_harness.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["comh*", "docx_harness*"]
+
+[tool.setuptools.package-data]
+"docx_harness.project" = ["resources/*"]
+"comh" = ["schemas/*.json"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

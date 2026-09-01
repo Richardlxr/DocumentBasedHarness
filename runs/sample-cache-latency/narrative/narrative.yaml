@@ -1,0 +1,53 @@
+version: 1
+
+claims:
+  - id: C01
+    statement: cache partitioning 将标准负载下的 P99 latency 从 220ms 降至 180ms，降幅 18.2%
+    evidence: [E001, E002, E003]
+    status: supported
+    importance: primary
+  - id: C02
+    statement: 标准负载吞吐不受影响（12400 → 12300 QPS，差异在噪声区间内）
+    evidence: [E004]
+    status: supported
+    importance: supporting
+  - id: C03
+    statement: 高负载下 P99 改善有限（约 3.2%），瓶颈推测在磁盘 IO 而非缓存命中率
+    evidence: [E005, E008]
+    status: partial
+    importance: primary
+  - id: C04
+    statement: 实验结论可信——同硬件、固定负载生成器回放线上流量模型、标准负载 12 轮与高负载 6 轮重复
+    evidence: [E006]
+    status: supported
+    importance: supporting
+  - id: C05
+    statement: 按租户哈希的缓存分区隔离了热租户对缓存份额的挤占，这是标准负载下尾延迟改善的机制
+    evidence: [E007]
+    status: supported
+    importance: supporting
+
+story:
+  - id: S01
+    purpose: establish_problem
+    message: 尾延迟（P99）抖动是客户当前线上体验的第一痛点
+  - id: S02
+    purpose: establish_credibility
+    message: 我们在受控环境用固定负载与多轮重复实验验证了 cache partitioning
+    claims: [C04]
+  - id: S03
+    purpose: demonstrate_effect
+    message: 标准负载下 P99 latency 降低 18.2%，吞吐不受影响
+    claims: [C01, C02]
+  - id: S04
+    purpose: concede_limit
+    message: 高负载下改善有限，瓶颈可能在磁盘 IO 而非缓存
+    claims: [C03]
+  - id: S05
+    purpose: explain_mechanism
+    message: 租户级分区隔离了缓存挤占，这正是标准负载见效的原因
+    claims: [C05]
+  - id: S06
+    purpose: recommend
+    message: 建议进入 staging 灰度，同时立高负载瓶颈专项验证磁盘 IO 假设
+    claims: [C03]

@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "deck_plan",
+  "description": "Presentation projection. Content-complete: the renderer is pure code. Visual intent lives here; pixel layout does not.",
+  "type": "object",
+  "required": ["version", "deck"],
+  "additionalProperties": true,
+  "properties": {
+    "version": { "const": 1 },
+    "deck": {
+      "type": "object",
+      "required": ["title", "pages"],
+      "additionalProperties": true,
+      "properties": {
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "style": {
+          "type": "object",
+          "description": "Open object declaring this deck's style/template intent (e.g. {template: ..., palette_hint: ...}). Code passes it through without interpreting; the tier-1 renderer ignores it, richer renderers consume it.",
+          "additionalProperties": true
+        },
+        "pages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "page_role", "title"],
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string", "pattern": "^P[0-9]{2,}$" },
+              "beat": { "type": "string", "description": "Story beat ID (Sxx). Optional for covers; multi-beat merges need merge_rationale." },
+              "page_role": {
+                "type": "string",
+                "description": "Known roles with validator rules: cover, agenda, section_divider, content, closing, appendix. Unknown roles are treated as content."
+              },
+              "title": { "type": "string", "description": "Message-style title: what the audience should remember from this page." },
+              "support_points": { "type": "array", "items": { "type": "string" } },
+              "visual": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "intent": { "type": "string", "description": "Free-form visual intent; the renderer decides how to realize it." },
+                  "asset_refs": {
+                    "type": "array",
+                    "description": "Image assets for this page. Plain path strings (relative to run root) or objects {ref, caption, evidence} — caption renders with the image, evidence links the figure into the ID chain. Figures must not be a traceability blind spot.",
+                    "items": {
+                      "anyOf": [
+                        { "type": "string" },
+                        {
+                          "type": "object",
+                          "required": ["ref"],
+                          "additionalProperties": true,
+                          "properties": {
+                            "ref": { "type": "string", "description": "Path relative to run root." },
+                            "caption": { "type": "string" },
+                            "evidence": { "type": "string", "description": "Evidence ID backing this figure." }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "notes": { "type": "string", "description": "Speaker notes. First-class content, not an afterthought." },
+              "density_hint": { "type": "string" },
+              "demotions": {
+                "type": "array",
+                "description": "Audit of content cut from this page and where it went.",
+                "items": {
+                  "type": "object",
+                  "required": ["content", "to"],
+                  "additionalProperties": true,
+                  "properties": {
+                    "content": { "type": "string" },
+                    "to": { "type": "string", "description": "notes | appendix | report_only" }
+                  }
+                }
+              },
+              "emphasis": { "type": "array", "items": { "type": "string" }, "description": "Semantic emphasis (future animation vocabulary; renderers may ignore)." },
+              "reveal": { "type": "array", "items": { "type": "string" }, "description": "Semantic reveal order (future animation vocabulary; renderers may ignore)." },
+              "merge_rationale": { "type": "string", "description": "Required when one page merges multiple beats." }
+            }
+          }
+        }
+      }
+    }
+  }
+}

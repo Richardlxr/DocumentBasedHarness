@@ -1,0 +1,71 @@
+version: 1
+
+sources:
+  - id: SRC01
+    path: sources/results.csv
+    kind: csv
+    note: 各配置的延迟/吞吐汇总，每行一个配置档
+  - id: SRC02
+    path: sources/notes.md
+    kind: markdown
+    note: 实验条件、方案说明与高负载推测
+
+items:
+  - id: E001
+    kind: datum
+    content: 标准负载下 baseline 配置的 P99 latency 为 220ms（12 轮稳定值）
+    value: {number: 220, unit: ms, label: baseline P99（标准负载）}
+    source: {source: SRC01, locator: "config=baseline, col=p99_ms"}
+    observed_at: "2026-08-28"
+    tags: [latency, baseline]
+
+  - id: E002
+    kind: datum
+    content: 标准负载下 partitioned 配置的 P99 latency 为 180ms（12 轮稳定值）
+    value: {number: 180, unit: ms, label: partitioned P99（标准负载）}
+    source: {source: SRC01, locator: "config=partitioned, col=p99_ms"}
+    observed_at: "2026-08-28"
+    tags: [latency, partitioned]
+
+  - id: E003
+    kind: datum
+    content: cache partitioning 使标准负载 P99 latency 从 220ms 降至 180ms，降幅 18.2%
+    value: {number: 18.2, unit: "%", label: P99 降幅（标准负载）}
+    source: {source: derived, locator: "derived:(E001,E002)"}
+    tags: [derived]
+
+  - id: E004
+    kind: datum
+    content: 标准负载吞吐从 12400 QPS 变为 12300 QPS，差异在重复轮噪声区间内
+    value: {number: 12400, unit: QPS, label: baseline 吞吐（标准负载）}
+    source: {source: SRC01, locator: "col=throughput_qps, rows baseline/partitioned"}
+
+  - id: E005
+    kind: datum
+    content: 高负载下 baseline P99 为 940ms，partitioned 为 910ms，改善约 3.2%
+    value: {number: 940, unit: ms, label: baseline P99（高负载）}
+    source: {source: SRC01, locator: "config=baseline_highload 与 partitioned_highload, col=p99_ms"}
+    observed_at: "2026-08-28"
+    tags: [latency, highload]
+
+  - id: E009
+    kind: table
+    content: 标准负载结果汇总——p50 从 85ms 降至 82ms，P99 从 220ms 降至 180ms，吞吐从 12400 变为 12300 QPS
+    source: {source: SRC01, locator: "rows baseline/partitioned, cols p50_ms/p99_ms/throughput_qps"}
+
+  - id: E006
+    kind: fact
+    content: 实验条件——同硬件 3 节点集群、缓存层 256GB、固定负载生成器回放线上流量模型；标准负载重复 12 轮、高负载重复 6 轮
+    source: {source: SRC02, locator: "测试床 一节"}
+    tags: [method]
+
+  - id: E007
+    kind: fact
+    content: cache partitioning 按租户哈希将共享缓存划分为独立分区，避免热租户键集合挤占其他租户份额
+    source: {source: SRC02, locator: "被验证的改动 一节"}
+
+  - id: E008
+    kind: assumption
+    content: 高负载场景的尾延迟瓶颈推测在磁盘 IO 而非缓存命中率（两配置命中率已接近饱和）；尚未单独验证
+    source: {source: SRC02, locator: "高负载场景的观察与推测 一节"}
+    tags: [unverified]

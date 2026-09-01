@@ -1,0 +1,5 @@
+config,p50_ms,p99_ms,throughput_qps,runs
+baseline,85,220,12400,12
+partitioned,82,180,12300,12
+baseline_highload,210,940,4100,6
+partitioned_highload,205,910,4300,6

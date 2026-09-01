@@ -1,0 +1,11 @@
+count:
+  error: 0
+  warn: 0
+  info: 1
+findings:
+- artifact: brief
+  check: hard-constraint
+  severity: info
+  verdict: pass
+  detail: 'constraint ''不要黑底'' enforced: deck renderer uses a light theme'
+  owning_artifact: deck_plan

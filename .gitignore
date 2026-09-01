@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+# per-run generated outputs and machine-local state (see runs/*/ template)
+runs/*/build/
+runs/*/.workspace/

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "report_plan",
+  "description": "Report projection: a writing contract. The prose itself is written by the model into documents/report.md per this contract.",
+  "type": "object",
+  "required": ["version", "sections"],
+  "additionalProperties": true,
+  "properties": {
+    "version": { "const": 1 },
+    "source": { "type": "string", "description": "Canonical report source path relative to run root.", "default": "documents/report.md" },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "heading", "beats"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "pattern": "^R[0-9]{2,}$" },
+          "heading": { "type": "string", "description": "Heading intent. Reports may merge/split beats; sections may reorder relative to the story." },
+          "beats": { "type": "array", "items": { "type": "string" }, "description": "Story beat IDs (Sxx) expanded by this section." },
+          "claims": { "type": "array", "items": { "type": "string" } },
+          "evidence": { "type": "array", "items": { "type": "string" }, "description": "Evidence IDs to cite inline." },
+          "depth": { "type": "string", "description": "Open vocabulary, e.g. brief, detailed, exhaustive." },
+          "must_include": { "type": "array", "items": { "type": "string" } },
+          "merge_rationale": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,109 @@
+version: 1
+
+deck:
+  title: Cache Partitioning 实验汇报
+  subtitle: P99 latency 验证结果与上线建议
+  style:
+    template: tier1-light
+    palette_hint: 石板蓝 + 蓝色强调，低饱和，客户技术评审场合
+  pages:
+    - id: P01
+      page_role: cover
+      title: Cache Partitioning 实验汇报
+      support_points: [P99 latency 验证结果与上线建议]
+      notes: |
+        开场（故事感，软性要求）：从上周客户反馈的卡顿工单切入，一句话点出
+        "大家感受到的慢，主要是最慢的那 1% 请求"。然后进入正题。
+
+    - id: P02
+      page_role: agenda
+      title: 今天讲四件事
+      support_points: [为什么做缓存分区, 怎么验证的, 发现了什么, 建议怎么走]
+      notes: 快速过，10 秒内。
+
+    - id: P03
+      page_role: content
+      beat: S01
+      title: 尾延迟抖动是客户线上体验的第一痛点
+      support_points:
+        - 用户感知的"慢"主要来自 P99 长尾请求，而非平均延迟
+        - 缓存命中率随热租户波动，是主要可疑因素
+      notes: 这里不展开工单数据（本次材料未包含），口头补充一两个客户例子即可。
+      visual: {intent: 一条延迟分布示意，圈出 P99 长尾}
+
+    - id: P04
+      page_role: content
+      beat: S02
+      title: 受控环境、固定负载、标准负载 12 轮与高负载 6 轮重复
+      support_points:
+        - 3 节点同规格集群，负载生成器回放线上流量模型
+        - 每组配置多轮重复，报告分位数取轮间稳定值
+      notes: 强调与线上流量分布对齐，这是客户最容易质疑的点。
+      visual: {intent: 实验设置示意：负载生成器 → 3 节点集群}
+
+    - id: P05
+      page_role: content
+      beat: S03
+      title: 标准负载下 P99 降低 18.2%，吞吐不受影响
+      support_points:
+        - "P99：220ms → 180ms"
+        - "吞吐：12400 → 12300 QPS，差异在噪声区间内"
+      visual:
+        intent: 基线 vs 分区后的 P99 双柱对比图，差异高亮
+        asset_refs:
+          - ref: assets/p99-comparison.png
+            caption: 标准负载 P99 对比（数据：E001/E002）
+            evidence: E003
+      emphasis: [P99 降低 18.2%（本页唯一大数字）]
+      reveal: [先出基线柱, 再出分区柱, 最后出降幅标注]
+      demotions:
+        - content: 逐轮 P99 时序图与轮间波动区间
+          to: appendix
+        - content: p50 与 CPU/内存占用明细
+          to: report_only
+      notes: |
+        讲解口径：先给结论数字，再解释对比条件（同负载、同硬件）。
+        被问细节时引用附录与报告的逐轮数据。
+
+    - id: P06
+      page_role: content
+      beat: S04
+      title: 高负载下改善有限：瓶颈可能在磁盘 IO，不在缓存
+      support_points:
+        - "P99：940ms → 910ms（约 3.2%）"
+        - 两配置缓存命中率已接近饱和，分区收益空间受限
+      visual: {intent: 双场景对比：标准负载 vs 高负载的改善幅度并排}
+      notes: |
+        明确说这是推测（E008 为 assumption）：磁盘 IO 假设尚未单独验证，
+        是下一阶段专项的内容。诚实呈现比硬撑更能建立信任。
+      demotions:
+        - content: 高负载下命中率与 IO 等待的原始观测记录
+          to: report_only
+
+    - id: P07
+      page_role: content
+      beat: S05
+      title: 租户级分区隔离了缓存挤占——这正是标准负载见效的原因
+      support_points:
+        - 按租户哈希划分独立分区，热租户无法挤占他人份额
+        - 机制与观察一致：命中率波动被消除，长尾随之收敛
+      visual: {intent: 分区前后缓存结构示意：共享池 vs 租户分区}
+      notes: 如果客户问"为什么高负载没用"，回到 P06 的机制边界解释。
+
+    - id: P08
+      page_role: closing
+      beat: S06
+      title: 建议：进入 staging 灰度，同时立高负载瓶颈专项
+      support_points:
+        - 灰度验证真实流量下的 P99 收益与回归风险
+        - 专项验证磁盘 IO 假设（当前明确标注为推测）
+      notes: 结束语回到开场痛点，形成闭环。
+      visual: {intent: 两步走时间线：灰度 → 专项结论 → 全量决策}
+
+    - id: P09
+      page_role: appendix
+      title: 附录：实验配置明细
+      support_points:
+        - 标准负载 12 轮 / 高负载 6 轮，同硬件与负载生成器
+        - 逐轮时序与波动区间见报告"实验结果"一节
+      notes: 备查页，正常不讲。

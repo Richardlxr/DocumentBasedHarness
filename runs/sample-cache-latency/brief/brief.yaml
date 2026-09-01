@@ -1,0 +1,41 @@
+version: 1
+
+language: zh-CN
+
+audience:
+  description: 客户方技术负责人与架构师，熟悉存储系统但不了解我们的缓存分区实现
+  expertise: senior-infrastructure
+  prior_knowledge: 理解通用缓存概念与分位数指标；不了解该集群的分区方案
+
+objective: 让客户认可 cache partitioning 已验证的收益与边界，并批准进入 staging 灰度
+delivery_context: 45 分钟线上客户评审会宣讲，会后 deck 与报告邮件转发给未到场者
+
+media:
+  - {medium: pptx, surface: presentation}
+  - {medium: markdown, surface: report}
+
+takeaways:
+  - cache partitioning 在标准负载下把 P99 latency 降低 18.2%，吞吐不受影响
+  - 高负载下改善有限（约 3.2%），瓶颈推测在磁盘 IO——这是下一阶段要验证的假设，不是结论
+  - 建议进入 staging 灰度，同时立高负载瓶颈专项
+
+constraints:
+  hard:
+    - 不要黑底
+    - 必须包含:局限性
+  soft:
+    - 数据页专业一点，但开场希望有一点故事感
+
+spec:
+  dimensions:
+    technical_rigor: high
+    storytelling: medium
+    evidence_density: high
+    visual_creativity: low
+    honesty_tone: explicit-about-limits
+
+open_questions:
+  - question: 客户是否在意硬件成本影响？
+    answer: 本阶段改动纯软件，不涉及硬件变更，无需展开
+  - question: 高负载场景在客户环境占比多少？
+    answer: 用户不清楚，按"少数但关键"处理，在局限性中说明

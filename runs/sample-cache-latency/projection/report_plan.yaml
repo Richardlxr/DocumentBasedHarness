@@ -1,0 +1,45 @@
+version: 1
+
+source: documents/report.md
+
+sections:
+  - id: R01
+    heading: 背景与问题
+    beats: [S01]
+    claims: []
+    evidence: []
+    depth: brief
+    must_include: [客户体验痛点]
+
+  - id: R02
+    heading: 实验方法
+    beats: [S02]
+    claims: [C04]
+    evidence: [E006]
+    depth: detailed
+    must_include: [测试床, 负载模型, 重复轮次]
+
+  - id: R03
+    heading: 实验结果
+    beats: [S03, S05]
+    claims: [C01, C02, C05]
+    evidence: [E001, E002, E003, E004, E007]
+    depth: detailed
+    must_include: [结果汇总表, 逐轮波动说明]
+    merge_rationale: 结果与机制合并呈现——证据相邻，读者需要"数字 + 为什么"一起读
+
+  - id: R04
+    heading: 局限性
+    beats: [S04]
+    claims: [C03]
+    evidence: [E005, E008]
+    depth: detailed
+    must_include: [未验证假设, 高负载场景占比未知]
+
+  - id: R05
+    heading: 建议与下一步
+    beats: [S06]
+    claims: []
+    evidence: []
+    depth: brief
+    must_include: [下一步]
