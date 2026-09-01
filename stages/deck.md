@@ -67,8 +67,9 @@
       verb: highlight
   ```
   纯字符串仍然允许（自由备注，renderer 忽略）。地址在 validate 期确定性解析——
-  写错名字/越界会直接报 error。当前 pptx renderer 尚不消费步骤对象；HTML surface
-  和 PPTX 动画词汇表将执行同一份语义。
+  写错名字/越界会直接报 error。**HTML surface（`comh render deck-html`）已执行这份
+  语义**（reveal.js fragment：出场顺序/点击步进/强调高亮）；PPTX 动画词汇表后续接入
+  同一份语义。
 - 所有数字必须来自 evidence（派生数字先落库，见 stages/evidence.md）。
 
 ## 收尾

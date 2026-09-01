@@ -38,6 +38,7 @@ include = ["comh*", "docx_harness*"]
 [tool.setuptools.package-data]
 "docx_harness.project" = ["resources/*"]
 "comh" = ["schemas/*.json"]
+"comh.render" = ["web/*"]
 
 [tool.pytest.ini_options]
 addopts = "-q"

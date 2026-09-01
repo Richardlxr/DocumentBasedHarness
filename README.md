@@ -46,13 +46,17 @@ python -m venv .venv
 .venv/bin/comh confirm narrative      # Gate 2：用户确认故事逻辑链
 .venv/bin/comh validate all           # 引用链 + 数字一致性 + 硬约束 → qa/findings.yaml
 .venv/bin/comh render deck            # projection/deck_plan.yaml → build/deck.pptx
+.venv/bin/comh render deck-html       # 同一份 deck_plan → build/deck.html（reveal.js 单文件，含动画）
 .venv/bin/comh render report          # documents/report.md → build/report.docx（经 docx_harness）
 
 # 诊断工具：抽出某个页面/章节的完整引用链切片（修复循环取证用）
 .venv/bin/comh evidence-pack deck P03
 ```
 
-交付以 **Markdown 报告为主、DOCX 为辅**；展示以 **PPTX 为主、HTML 为辅（后续）**。
+交付以 **Markdown 报告为主、DOCX 为辅**；展示以 **PPTX 为主、HTML 为辅**——HTML
+surface 是 reveal.js 单文件（离线可开），`reveal`/`emphasis` 的 fragment 语义在网页上
+直接执行：出场顺序、点击步进、强调高亮；主题 token 映射为 CSS 变量，图表用确定性
+CSS 柱（数值同样从 evidence 渲染时取）。
 
 ## 图形（mermaid → 确定性布局 → PNG）
 

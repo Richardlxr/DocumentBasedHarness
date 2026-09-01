@@ -25,7 +25,7 @@ import yaml
 from .artifacts import ARTIFACT_KEYS, load_artifact, validate_schema
 from .evidence_pack import build_pack, format_pack
 from .manifest import DERIVATION, GATE_OF_ARTIFACT, Manifest, RunError, find_run_root
-from .render import render_deck, render_report
+from .render import render_deck, render_html_deck, render_report
 from .scaffold import init_run
 from .validate import _BACKGROUND_FORBIDS_DARK, run_all, write_findings
 
@@ -192,7 +192,34 @@ def cmd_render(args: argparse.Namespace) -> int:
         canonical = manifest.data["artifacts"]["report_md"]["path"]
         print(f"rendered report → {output}; canonical deliverable: {canonical} (md-first)")
         return 0
-    raise RunError("render target must be 'deck' or 'report'")
+    if args.target == "deck-html":
+        manifest.require_gate("narrative")
+        manifest.require_fresh("deck_plan")
+        plan, findings = load_artifact(run_root, "deck_plan")
+        if findings:
+            raise RunError("deck_plan fails schema validation; run `comh validate all`")
+        brief, _ = load_artifact(run_root, "brief")
+        brief = brief or {}
+        evidence, _ = load_artifact(run_root, "evidence")
+        allow_dark = not any(
+            _BACKGROUND_FORBIDS_DARK.search(c)
+            for c in brief.get("constraints", {}).get("hard", [])
+        )
+        output = run_root / manifest.data["build"].get("deck_html", "build/deck.html")
+        result = render_html_deck(
+            plan, run_root, output,
+            language=brief.get("language", "en"),
+            evidence=evidence,
+            allow_dark=allow_dark,
+        )
+        for finding in result.findings:
+            print(f"  [△] render: {finding.detail}")
+        print(
+            f"rendered html deck → {output} (theme: {result.theme}, "
+            f"transition: {result.transition or 'default'}) — single file, opens offline"
+        )
+        return 0
+    raise RunError("render target must be 'deck', 'deck-html' or 'report'")
 
 
 def cmd_evidence_pack(args: argparse.Namespace) -> int:
@@ -246,7 +273,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_validate)
 
     p = add("render", "render a final artifact")
-    p.add_argument("target", choices=["deck", "report"])
+    p.add_argument("target", choices=["deck", "report", "deck-html"])
     p.set_defaults(func=cmd_render)
 
     p = add("evidence-pack", "ID-chain slice for a deck page / report section / beat")
