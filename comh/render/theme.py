@@ -164,6 +164,63 @@ def select_theme(
     return ThemeChoice(theme, str(requested))
 
 
+def background_is_light(color: RGBColor) -> bool:
+    """Perceived luminance test (ITU-R 601 weights) on a background color."""
+    r, g, b = (int(str(color)[i : i + 2], 16) for i in (0, 2, 4))
+    return (299 * r + 587 * g + 114 * b) / 1000 >= 128
+
+
+def merge_tokens(theme: DeckTheme, override: dict | None) -> DeckTheme:
+    """Apply ``deck.style.tokens_override`` (same shape as theme.yaml sections)
+    on top of a theme. Colors accept hex strings; sizes accept ints; fonts
+    accept [title, body]. Unknown keys are ignored — tokens are vocabulary."""
+    if not override:
+        return theme
+    import dataclasses
+
+    changes: dict = {}
+    colors = override.get("colors") or {}
+    for key in ("background", "text", "muted", "accent", "accent_soft", "card_fill", "card_line"):
+        if key in colors:
+            changes[key] = _rgb(str(colors[key]).lstrip("#").upper())
+    sizes = override.get("sizes") or {}
+    for key, field_name in _SIZE_FIELDS.items():
+        if key in sizes:
+            changes[field_name] = int(sizes[key])
+    fonts = override.get("fonts") or {}
+    if "latin" in fonts and isinstance(fonts["latin"], (list, tuple)) and fonts["latin"]:
+        latin = [str(f) for f in fonts["latin"]] + ["Calibri", "Calibri"]
+        changes["latin_fonts"] = (latin[0], latin[1])
+    return dataclasses.replace(theme, **changes) if changes else theme
+
+
+def resolve_style(
+    style: dict | None, *, allow_dark: bool = True, run_root: Path | None = None
+) -> ThemeChoice:
+    """Template selection + token override + luminance-based light pinning.
+
+    This is the single resolution path shared by the renderer and the
+    validator: a brief that forbids dark backgrounds pins the *effective*
+    background (after overrides), not just the template name — recoloring a
+    light theme to midnight via tokens_override is caught deterministically.
+    """
+    style = style or {}
+    choice = select_theme(style, allow_dark=allow_dark, run_root=run_root)
+    if choice.forced_light:
+        return choice
+    merged = merge_tokens(choice.theme, style.get("tokens_override"))
+    if not allow_dark and not background_is_light(merged.background):
+        # the override made the effective background dark; the pin wins, so the
+        # whole override is dropped (not partially applied) and the original
+        # light theme renders
+        return ThemeChoice(choice.theme, choice.requested, forced_light=True)
+    return ThemeChoice(
+        theme=merged,
+        requested=choice.requested,
+        fallback_reason=choice.fallback_reason,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class RenderTheme:
     """Theme + language resolved into concrete fonts for one render."""
@@ -189,7 +246,7 @@ def render_theme(
     allow_dark: bool = True,
     run_root: Path | None = None,
 ) -> RenderTheme:
-    choice = select_theme(style, allow_dark=allow_dark, run_root=run_root)
+    choice = resolve_style(style, allow_dark=allow_dark, run_root=run_root)
     title_font, body_font = fonts_for(choice.theme, language)
     return RenderTheme(
         theme=choice.theme,

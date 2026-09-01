@@ -64,6 +64,10 @@ class RenderResult:
     theme: str
     transition: str | None
     findings: list[Finding] = field(default_factory=list)
+    # page_id -> {element address -> shape_id}; the animation pass consumes it
+    shape_map: dict[str, dict[str, int]] = field(default_factory=dict)
+    # page_id -> slide index (for the animation pass)
+    slide_index: dict[str, int] = field(default_factory=dict)
 
 
 def render_deck(
@@ -95,19 +99,24 @@ def render_deck(
     prs.slide_width = _SLIDE_W
     prs.slide_height = _SLIDE_H
 
-    for page in plan["deck"]["pages"]:
+    for slide_number, page in enumerate(plan["deck"]["pages"]):
         role = page.get("page_role", "content")
+        page_id = page.get("id", f"P{slide_number + 1:02d}")
         slide = prs.slides.add_slide(prs.slide_layouts[6])
         _paint_background(slide, theme.theme.background)
+        shapes: dict[str, int] = {}
         if role == "cover":
-            _render_cover(slide, page, theme, result)
+            _render_cover(slide, page, theme, result, shapes)
         elif role in ("agenda", "section_divider", "closing"):
-            _render_banner(slide, page, theme, result)
+            _render_banner(slide, page, theme, result, shapes)
         else:
-            _render_content(slide, page, run_root, theme, result, evidence)
+            _render_content(slide, page, run_root, theme, result, evidence, shapes)
+        result.shape_map[page_id] = shapes
+        result.slide_index[page_id] = slide_number
         _add_notes(slide, page)
 
     _apply_transition(prs, plan, result)
+    _apply_animations(prs, plan, result)
     output.parent.mkdir(parents=True, exist_ok=True)
     prs.save(output)
     return result
@@ -204,7 +213,9 @@ def _fmt(number: float) -> str:
 # -- page kinds --------------------------------------------------------------
 
 
-def _render_cover(slide, page: dict, theme: RenderTheme, result: RenderResult) -> None:
+def _render_cover(
+    slide, page: dict, theme: RenderTheme, result: RenderResult, shapes: dict
+) -> None:
     t = theme.theme
     points = page.get("support_points", [])
     joined = "  ·  ".join(p[0] for p in (_point_parts(x) for x in points))
@@ -216,6 +227,7 @@ def _render_cover(slide, page: dict, theme: RenderTheme, result: RenderResult) -
         findings=result.findings,
     )
     box = _textbox(slide, Inches(1.0), Inches(2.4), Inches(_BODY_W), Inches(2.4))
+    shapes["title"] = box.shape_id
     _set(
         box.text_frame.paragraphs[0], page["title"],
         size=size, font=theme.title_font, color=t.text, bold=True,
@@ -225,7 +237,9 @@ def _render_cover(slide, page: dict, theme: RenderTheme, result: RenderResult) -
         _set(paragraph, joined, size=t.body_size, font=theme.body_font, color=t.muted)
 
 
-def _render_banner(slide, page: dict, theme: RenderTheme, result: RenderResult) -> None:
+def _render_banner(
+    slide, page: dict, theme: RenderTheme, result: RenderResult, shapes: dict
+) -> None:
     t = theme.theme
     accent = slide.shapes.add_shape(1, Inches(0.9), Inches(2.35), Inches(1.2), Pt(6))
     accent.fill.solid()
@@ -243,6 +257,7 @@ def _render_banner(slide, page: dict, theme: RenderTheme, result: RenderResult) 
         findings=result.findings,
     )
     box = _textbox(slide, Inches(1.0), Inches(2.7), Inches(_BODY_W), Inches(2.4))
+    shapes["title"] = box.shape_id
     _set(
         box.text_frame.paragraphs[0], page["title"],
         size=size, font=theme.title_font, color=t.text, bold=True,
@@ -257,7 +272,7 @@ def _render_banner(slide, page: dict, theme: RenderTheme, result: RenderResult) 
 
 def _render_content(
     slide, page: dict, run_root: Path, theme: RenderTheme,
-    result: RenderResult, evidence: dict | None,
+    result: RenderResult, evidence: dict | None, shapes: dict,
 ) -> None:
     t = theme.theme
     page_id = page["id"]
@@ -272,6 +287,7 @@ def _render_content(
         family=theme.title_font, findings=result.findings,
     )
     title = _textbox(slide, Inches(_MARGIN_X), Inches(0.45), Inches(_BODY_W), Inches(1.15))
+    shapes["title"] = title.shape_id
     _set(
         title.text_frame.paragraphs[0], page["title"],
         size=size, font=theme.title_font, color=t.text, bold=True,
@@ -283,21 +299,21 @@ def _render_content(
 
     content_top = _BODY_TOP
     if cards:
-        _render_metric_cards(slide, cards, theme, result, evidence, page_id)
+        _render_metric_cards(slide, cards, theme, result, evidence, page_id, shapes)
         content_top = _BODY_TOP + 1.65
 
     body_width = _BODY_W
     if chart_spec is not None:
         _add_chart(
             slide, page_id, chart_spec, t, result, evidence,
-            x=6.55, y=content_top, w=5.9, h=_BODY_BOTTOM - content_top,
+            x=6.55, y=content_top, w=5.9, h=_BODY_BOTTOM - content_top, shapes=shapes,
         )
         body_width = 5.35
     elif diagram_spec is not None:
-        _add_diagram(slide, page_id, diagram_spec, theme, result, run_root)
+        _add_diagram(slide, page_id, diagram_spec, theme, result, run_root, shapes)
         body_width = 5.35
     else:
-        _add_figure(slide, page, run_root, theme, result)
+        _add_figure(slide, page, run_root, theme, result, shapes)
         body_width = 5.35 if _has_figure(page, run_root) else _BODY_W
 
     points = page.get("support_points", [])
@@ -305,12 +321,12 @@ def _render_content(
         _render_points(
             slide, points, page_id=page_id, x=_MARGIN_X, y=content_top,
             width_in=body_width, height_in=_BODY_BOTTOM - content_top,
-            theme=theme, findings=result.findings,
+            theme=theme, findings=result.findings, shapes=shapes,
         )
 
     callout = page.get("callout")
     if callout:
-        _render_callout(slide, callout, theme, result, page_id)
+        _render_callout(slide, callout, theme, result, page_id, shapes)
 
 
 def _has_figure(page: dict, run_root: Path) -> bool:
@@ -331,13 +347,15 @@ def _fit_image(slide, png: Path, *, x: float, y: float, max_w: float, max_h: flo
     with Image.open(png) as image:
         width_px, height_px = image.size
     scale = min(max_w / max(width_px, 1), max_h / max(height_px, 1))
-    slide.shapes.add_picture(
+    picture = slide.shapes.add_picture(
         str(png), Inches(x), Inches(y), Inches(width_px * scale), Inches(height_px * scale)
     )
+    return picture.shape_id
 
 
 def _add_diagram(
-    slide, page_id: str, spec: dict, theme: RenderTheme, result: RenderResult, run_root: Path
+    slide, page_id: str, spec: dict, theme: RenderTheme, result: RenderResult,
+    run_root: Path, shapes: dict,
 ) -> None:
     from docx_harness.errors import DocumentError
 
@@ -348,7 +366,7 @@ def _add_diagram(
         png = diagram_png(mermaid, run_root)
     except DocumentError as error:
         raise RuntimeError(f"page {page_id} diagram failed to compile: {error}") from error
-    _fit_image(
+    shapes["visual"] = _fit_image(
         slide, png, x=6.55, y=_BODY_TOP,
         max_w=5.9, max_h=_BODY_BOTTOM - _BODY_TOP,
     )
@@ -364,7 +382,7 @@ def _add_diagram(
 
 
 def _add_figure(
-    slide, page: dict, run_root: Path, theme: RenderTheme, result: RenderResult
+    slide, page: dict, run_root: Path, theme: RenderTheme, result: RenderResult, shapes: dict,
 ) -> None:
     for entry in _asset_entries(page):
         image = run_root / entry["ref"]
@@ -378,7 +396,10 @@ def _add_figure(
                 )
             )
             continue
-        slide.shapes.add_picture(str(image), Inches(6.55), Inches(_BODY_TOP), width=Inches(5.9))
+        picture = slide.shapes.add_picture(
+            str(image), Inches(6.55), Inches(_BODY_TOP), width=Inches(5.9)
+        )
+        shapes["visual"] = picture.shape_id
         caption = entry.get("caption")
         if caption:
             box = _textbox(slide, Inches(6.55), Inches(6.05), Inches(5.9), Inches(0.4))
@@ -393,7 +414,7 @@ def _add_figure(
 
 def _render_metric_cards(
     slide, cards: list, theme: RenderTheme, result: RenderResult,
-    evidence: dict | None, page_id: str,
+    evidence: dict | None, page_id: str, shapes: dict,
 ) -> None:
     t = theme.theme
     items = {item["id"]: item for item in (evidence or {}).get("items", [])}
@@ -415,6 +436,7 @@ def _render_metric_cards(
         shape = slide.shapes.add_shape(
             _ROUNDED, Inches(left), Inches(_BODY_TOP), Inches(width), Inches(1.45)
         )
+        shapes[f"metric_cards[{index}]"] = shape.shape_id
         shape.fill.solid()
         shape.fill.fore_color.rgb = t.card_fill
         shape.line.color.rgb = t.card_line
@@ -443,6 +465,7 @@ def _render_metric_cards(
 def _render_points(
     slide, points: list, *, page_id: str, x: float, y: float,
     width_in: float, height_in: float, theme: RenderTheme, findings: list[Finding],
+    shapes: dict,
 ) -> None:
     t = theme.theme
     detail_size = t.detail_size
@@ -482,6 +505,7 @@ def _render_points(
     extra_gap = max(0.0, min(leftover / max(len(points), 1), 26.0))
 
     box = _textbox(slide, Inches(x), Inches(y), Inches(width_in), Inches(height_in))
+    shapes["support_points"] = box.shape_id
     first = True
     for entry in points:
         point, detail = _point_parts(entry)
@@ -505,13 +529,15 @@ def _render_points(
 
 
 def _render_callout(
-    slide, callout: dict, theme: RenderTheme, result: RenderResult, page_id: str
+    slide, callout: dict, theme: RenderTheme, result: RenderResult,
+    page_id: str, shapes: dict,
 ) -> None:
     t = theme.theme
     text = str(callout.get("text", ""))
     band = slide.shapes.add_shape(
         _ROUNDED, Inches(_MARGIN_X), Inches(6.1), Inches(_BODY_W), Inches(0.85)
     )
+    shapes["callout"] = band.shape_id
     band.fill.solid()
     band.fill.fore_color.rgb = t.card_fill
     band.line.color.rgb = t.card_line
@@ -540,7 +566,7 @@ def _render_callout(
 
 def _add_chart(
     slide, page_id: str, spec: dict, t, result: RenderResult,
-    evidence: dict | None, *, x: float, y: float, w: float, h: float,
+    evidence: dict | None, *, x: float, y: float, w: float, h: float, shapes: dict,
 ) -> None:
     chart_type = str(spec.get("type", "column")).lower()
     if chart_type not in _CHART_TYPES:
@@ -573,6 +599,7 @@ def _add_chart(
         _CHART_TYPES[chart_type],
         Inches(x), Inches(y), Inches(w), Inches(h), data,
     )
+    shapes["visual"] = frame.shape_id
     chart = frame.chart
     chart.has_legend = False
     if spec.get("title"):
@@ -611,3 +638,118 @@ def _apply_transition(prs: Presentation, plan: dict, result: RenderResult) -> No
         transition.append(child)
         element.append(transition)  # CT_Slide: after cSld/clrMapOvr, before timing
     result.transition = tag
+
+
+# -- pptx animations (experimental, opt-in via style.animations) -------------
+#
+# python-pptx has no animation API; this injects minimal <p:timing> trees for
+# the two entrance verbs PowerPoint accepts most reliably (appear, fade_in).
+# Every step is click-triggered (with_previous joins the current click group).
+# Emphasis verbs and per-paragraph granularity are HTML-only for now and
+# produce info findings. OFF by default: set deck.style.animations to true and
+# verify in a real PowerPoint before trusting it (timing XML is the documented
+# corruption risk of this format).
+
+_PPTX_VERBS = {"appear": 1, "fade_in": 10}  # entrance presetIDs
+
+
+def _el(parent, tag: str, **attrs):
+    element = parent.makeelement(qn(f"p:{tag}"), {k: str(v) for k, v in attrs.items()})
+    parent.append(element)
+    return element
+
+
+def _effect_group(parent, shape_ids: list[int], fade: bool, counter: iter) -> None:
+    """One <p:par> click group containing entrance effects for each shape."""
+    outer = _el(parent, "par")
+    outer_ct = _el(outer, "cTn", id=next(counter), fill="hold")
+    _el(_el(outer_ct, "stCondLst"), "cond", delay="indefinite")
+    inner = _el(_el(outer_ct, "childTnLst"), "par")
+    inner_ct = _el(inner, "cTn", id=next(counter), fill="hold")
+    _el(_el(inner_ct, "stCondLst"), "cond", delay="0")
+    effects = _el(_el(inner_ct, "childTnLst"), "par")
+    for position, shape_id in enumerate(shape_ids):
+        # first effect in a click group is clickEffect; the rest animate with it
+        node_type = "clickEffect" if position == 0 else "withEffect"
+        effect = _el(
+            effects, "cTn", id=next(counter), fill="hold", grpId="0",
+            nodeType=node_type, presetID="10" if fade else "1",
+            presetClass="entr", presetSubtype="0",
+        )
+        _el(_el(effect, "stCondLst"), "cond", delay="0")
+        behaviors = _el(effect, "childTnLst")
+        visible = _el(behaviors, "set")
+        set_ctn = _el(
+            _el(_el(visible, "cBhvr"), "cTn", id=next(counter), dur="1", fill="hold"),
+            "stCondLst",
+        )
+        _el(set_ctn, "cond", delay="0")
+        behavior = visible.find(qn("p:cBhvr"))
+        _el(_el(behavior, "tgtEl"), "spTgt", spid=shape_id)
+        names = _el(_el(behavior, "attrNameLst"), "attrName")
+        names.text = "style.visibility"
+        _el(visible, "to").append(visible.makeelement(qn("p:strVal"), {"val": "visible"}))
+        if fade:
+            anim = _el(behaviors, "animEffect", transition="in", filter="fade")
+            _el(_el(anim, "cBhvr"), "cTn", id=next(counter), dur="500")
+            _el(_el(anim.find(qn("p:cBhvr")), "tgtEl"), "spTgt", spid=shape_id)
+
+
+def _apply_animations(prs: Presentation, plan: dict, result: RenderResult) -> None:
+    style = plan.get("deck", {}).get("style") or {}
+    if not style.get("animations"):
+        return
+    for page in plan.get("deck", {}).get("pages", []):
+        page_id = page.get("id")
+        shapes = result.shape_map.get(page_id) or {}
+        steps = [s for s in (page.get("reveal") or []) if isinstance(s, dict)]
+        if not steps:
+            continue
+        groups: list[tuple[list[int], bool]] = []
+        for step in steps:
+            verb = str(step.get("verb", "fade_in"))
+            fade = verb == "fade_in"
+            if verb not in _PPTX_VERBS:
+                result.findings.append(
+                    Finding(
+                        "deck_plan", "animation", "info", "pass",
+                        f"page {page_id}: verb '{verb}' executes on the HTML surface only "
+                        f"(pptx v1: appear/fade_in)", "deck_plan",
+                    )
+                )
+            targets: list[int] = []
+            for address in step.get("elements") or []:
+                address = str(address)
+                if address.startswith("support_points"):
+                    result.findings.append(
+                        Finding(
+                            "deck_plan", "animation", "info", "pass",
+                            f"page {page_id}: '{address}' animates as the whole points block "
+                            f"in pptx v1 (paragraph-level is HTML-only)", "deck_plan",
+                        )
+                    )
+                shape_id = shapes.get(address) or shapes.get(address.split("[")[0])
+                if shape_id is not None and shape_id not in targets:
+                    targets.append(shape_id)
+            if not targets:
+                continue
+            if step.get("trigger") == "with_previous" and groups:
+                groups[-1][0].extend(targets)
+            else:
+                groups.append((targets, fade))
+        if not groups:
+            continue
+        slide = prs.slides[result.slide_index[page_id]]
+        timing = _el(slide._element, "timing")  # noqa: SLF001
+        tn_list = _el(_el(timing, "tnLst"), "par")
+        root = _el(tn_list, "cTn", id=1, dur="indefinite", restart="never", nodeType="tmRoot")
+        seq = _el(_el(_el(root, "childTnLst"), "seq"), "cTn", concurrent="1", nextAc="seek")
+        main = _el(seq, "cTn", id=2, dur="indefinite", nodeType="mainSeq")
+        counter = iter(range(3, 3 + 64 * len(groups)))
+        holder = _el(main, "childTnLst")
+        for targets, fade in groups:
+            _effect_group(holder, targets, fade, counter)
+        prev = _el(seq, "prevCondLst")
+        _el(_el(_el(prev, "cond", evt="onPrev", delay="0"), "tgtEl"), "sldTgt")
+        nxt = _el(seq, "nextCondLst")
+        _el(_el(_el(nxt, "cond", evt="onNext", delay="0"), "tgtEl"), "sldTgt")

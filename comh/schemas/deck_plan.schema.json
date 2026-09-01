@@ -37,7 +37,7 @@
         "subtitle": { "type": "string" },
         "style": {
           "type": "object",
-          "description": "Open object declaring this deck's style/template intent (e.g. {template: ..., palette_hint: ...}). Code passes it through without interpreting; the tier-1 renderer ignores it, richer renderers consume it.",
+          "description": "Open object declaring this deck's style/template intent. Code passes unknown keys through; consumed keys: template (theme name), transition (fade|push|wipe|cut), animations (experimental pptx timing, needs PowerPoint verification), tokens_override (same shape as theme.yaml sections: colors/fonts/sizes).",
           "additionalProperties": true
         },
         "pages": {

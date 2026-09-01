@@ -1,35 +1,55 @@
 # DocumentBasedHarness
 
-基于文档与材料的 Communication / Document Authoring Harness。
+**把原始材料编译成说服力的沟通编译器。**
 
-核心思想：**所有输出媒介都不直接从源材料生成**。材料先变成可追溯的证据（evidence），
-证据支撑论断（claim），论断组织成故事（narrative），故事再投影成不同媒介的计划
-（projection），最后才渲染成成品。Report 和 Presentation 是同一个 narrative 的两种
-投影，而不是互相压缩的产物。
+Sources in. Conviction out.
+
+你手里有一堆 CSV、实验日志、论文、截图和半成品笔记，六周后要站在客户面前讲清
+一件事。普通的做法是打开 PPT 开始搬字——然后数字对不上、逻辑断裂、报告和幻灯片
+各说各话。这个项目换一条路：
 
 ```text
-sources → evidence → brief ─Gate1─→ narrative ─Gate2─→ projection → authoring → render → qa → deliver
-(材料)    (事实库)   (沟通契约)      (故事结构)           (两份计划)    (写正文)     (编译)   (质检)  (成品)
-                    ▲                  ▲                   ▲             ▲           ▲              │
-                    └──────────────────┴──── 修复循环：投诉→诊断→定位归属层→修复提案→修 ←──────────┘
+sources ──► evidence ──► brief ─Gate1─► narrative ─Gate2─► projection ──► render
+ 材料        事实库       沟通契约      故事结构          两份计划        成品
+                          （你拍板）    （你拍板）                        pptx / html / docx / md
+                ▲                                                          │
+                └──────────── 修复循环：诊断 → 定位归属层 → 修复 ←──────────┘
 ```
 
-每层的产物都是磁盘上人类可读、可编辑、可版本化的 artifact（YAML / Markdown），
-层与层之间靠 ID 引用链连接：`page → beat → claim → evidence → source`。
-任何一个数字、任何一个论断都能沿链回溯到源材料。
+**报告和幻灯片不是互相压缩的版本，它们是同一个故事的两个投影。** 事实先变成
+可追溯的证据，证据支撑论断，论断排成故事；你在两个关卡拍板之后，同一份故事
+投影成 PPTX、可动画的 HTML、Markdown 报告（DOCX 自动编译）。每一个出现在成品里
+的数字，都能沿 ID 链一路回溯到源文件的某一行。
 
-## 仓库组成
+---
 
-| 目录 | 职责 |
-| --- | --- |
-| `comh/` | 沟通层 runtime：run 状态机 CLI、artifact schema、校验器、deck/report 渲染 |
-| `docx_harness/` | 搬入的确定性 Markdown/MyST → DOCX 编译器（原样保留，独立演进，见 `docs/compiler/`） |
-| `stages/` | 每个 stage 的模型指令（progressive disclosure，模型判断力的注入点） |
-| `references/` | 词汇库：叙事模式、slide craft。提供参考，不是能力边界 |
-| `themes/` | 主题包（数据）：palette、字号、字体；run 可自带 `themes/` 覆盖仓库级 |
-| `skill/` | Agent Skill 打包入口 |
-| `runs/<name>/` | 一次沟通任务的工作区（artifact 全部版本化） |
-| `tests/` | `tests/runtime/`（沟通层）+ `tests/compiler/`（编译器契约测试） |
+## 为什么它不一样
+
+- **证据是一等公民。** `page → beat → claim → evidence → source` 全链 ID 引用。
+  图表和大数字卡片在**渲染时**直接从证据库取数——数字物理上不可能漂移。从图上
+  估读的数值被显式标注为 estimated，纯估读撑起的结论会被校验器点名。
+- **两个 Gate，硬执行。** 沟通契约（给谁看、要什么效果）和故事逻辑链都要你确认，
+  CLI 拒绝放行未确认的下游——对齐不靠模型自觉。
+- **改了哪层，只重做哪层。** 每层产物记录上游指纹；材料一变全链自动标脏，
+  但内容没变的层重存即恢复、Gate 存活。质检 finding 全部标注归属层。
+- **动画是语义，不是特效。** "先出结论、再出证据、最后出 so-what" 写在
+  deck_plan 里（fragment 模型），HTML 执行它，PPTX（实验性）执行同一份语义。
+- **词汇，不是边界。** 主题是 yaml 数据、叙事模式是 markdown 参考——模型可以
+  混合、改写、无视、创造。硬约束（"不要黑底"）落到亮度级的确定性检查上。
+
+## 三十秒 workflow
+
+| 阶段 | 谁干活 | 产出 |
+|---|---|---|
+| intake | 你 | `sources/` 里丢材料 |
+| evidence | 模型 | `evidence.yaml`：带出处的事实，数字带结构化锚点 |
+| **brief** → Gate 1 | 模型推断，**你拍板** | 受众、目标、硬约束、期望带走什么 |
+| **narrative** → Gate 2 | 模型设计，**你拍板** | beats（每个一句话 message）+ claims（诚实标注证据状态） |
+| projection | 模型 | `deck_plan.yaml` + `report_plan.yaml`（同一故事的两种组装） |
+| render | 纯代码 | `deck.pptx` / `deck.html`（含动画）/ `report.md` + `report.docx` |
+| qa | 代码 + 模型 | 引用链、数字一致性、逻辑、标题、读者测试 |
+
+完整走一遍（含命令和样例）见 **[用户指南](docs/user-guide.md)**。
 
 ## 快速开始
 
@@ -37,51 +57,55 @@ sources → evidence → brief ─Gate1─→ narrative ─Gate2─→ projectio
 python -m venv .venv
 .venv/bin/pip install -e '.[dev]'
 
-# 初始化一个 run 工作区
-.venv/bin/comh init-run runs/demo
+# 开一个任务工作区，把材料丢进 sources/
+.venv/bin/comh init-run runs/my-report
 
-# ……模型按 stages/*.md 逐阶段产出 artifact，期间用 CLI 记录状态与过 Gate：
+# ……按 stages/*.md 逐阶段产出，用 CLI 记录状态、过 Gate、验证、渲染：
 .venv/bin/comh save evidence
-.venv/bin/comh confirm brief          # Gate 1：用户确认沟通契约
-.venv/bin/comh confirm narrative      # Gate 2：用户确认故事逻辑链
-.venv/bin/comh validate all           # 引用链 + 数字一致性 + 硬约束 → qa/findings.yaml
-.venv/bin/comh render deck            # projection/deck_plan.yaml → build/deck.pptx
-.venv/bin/comh render deck-html       # 同一份 deck_plan → build/deck.html（reveal.js 单文件，含动画）
-.venv/bin/comh render report          # documents/report.md → build/report.docx（经 docx_harness）
-
-# 诊断工具：抽出某个页面/章节的完整引用链切片（修复循环取证用）
-.venv/bin/comh evidence-pack deck P03
+.venv/bin/comh confirm brief          # Gate 1：你确认沟通契约
+.venv/bin/comh confirm narrative      # Gate 2：你确认故事逻辑链
+.venv/bin/comh validate all           # 0 error 才算数
+.venv/bin/comh render deck            # → build/deck.pptx（主题、卡片、图表、实测防溢出）
+.venv/bin/comh render deck-html       # → build/deck.html（reveal.js 单文件，动画开箱即用）
+.venv/bin/comh render report          # → build/report.docx（md 是正主，docx 是编译副产物）
 ```
 
-交付以 **Markdown 报告为主、DOCX 为辅**；展示以 **PPTX 为主、HTML 为辅**——HTML
-surface 是 reveal.js 单文件（离线可开），`reveal`/`emphasis` 的 fragment 语义在网页上
-直接执行：出场顺序、点击步进、强调高亮；主题 token 映射为 CSS 变量，图表用确定性
-CSS 柱（数值同样从 evidence 渲染时取）。
+现场demo（场景 A：缓存实验 → 客户汇报）就在 `runs/sample-cache-latency/`，
+`open runs/sample-cache-latency/build/deck.html` 直接看。
 
-## 图形（mermaid → 确定性布局 → PNG）
+## 能力一览
 
-deck 的 `visual.diagram` 和 report 的 ```` ```mermaid ```` 走同一条编译链：真实字体
-测量、碰撞校验的确定性布局，再由 draw.io Desktop CLI 导出 PNG（按内容哈希缓存）。
-图语法在 `comh validate` 时干跑检查（纯 Python，不需要 CLI）；导出 PNG 需要 CLI：
+| | |
+|---|---|
+| **主题** | `themes/*.yaml`（palette/字号/字体）；run 可自带主题覆盖仓库级；`tokens_override` 按次微调；brief 禁深色 → 亮度级强制浅色 |
+| **页面结构** | 展开式要点（加粗导语+浅色展开）、大数字卡片（证据取数）、原生图表（证据取数）、底部结论条、mermaid 示意图（确定性布局）、图片带图注与溯源 |
+| **布局** | 真实字形度量 → 确定性换行 → 字号自适应；装不下出 finding，不静默溢出 |
+| **动画** | `reveal`/`emphasis` 步骤（元素寻址在验证期解析）；HTML 全量执行；PPTX appear/fade_in（实验性，需真机验证后开 `animations: true`） |
+| **报告** | Markdown 为正主；docx-harness 确定性编译 DOCX（原生公式/表格/mermaid），方言写错带行号报错=免费质检 |
+| **质检** | ID 链完整性、数字一致性（含日期/序号降噪）、beat 覆盖、硬约束、图语法干跑、估读诚实性、Gate 有效性 |
+| **修复循环** | `evidence-pack` 一条命令切出某页的完整溯源切片；六问诊断定归属层；两次修不好自动升级换假设 |
 
-```bash
-# macOS（已装 draw.io Desktop；版本与上游 pin 不一致时显式放行）
-export DRAWIO_CLI="/Applications/draw.io.app/Contents/MacOS/draw.io"
-export DRAWIO_ACCEPT_VERSION=30.0.4
-# Linux：.venv/bin/docx-harness install-drawio（安装上游钉死的 26.0.16）
-```
+## 用户与开发者
+
+- **使用者**：[docs/user-guide.md](docs/user-guide.md) —— 从材料到成品的完整走法，
+  含修复循环和常见任务。
+- **AI 操作者**：`skill/SKILL.md` 路由 → `stages/*.md` 是每个阶段的判断力来源。
+- **架构与纪律**：`AGENTS.md`；编译器内部设计：`docs/compiler/`。
 
 ## 设计原则
 
-1. Content logic before visual design。
-2. Report ≠ 字更多的 Presentation；Presentation ≠ 字更少的 Report——它们是同一个
-   narrative 的不同投影。
-3. Libraries provide vocabulary, not boundaries——`references/` 和 preset 只提供词汇，
-   模型可以混合、改写、无视、创造。
-4. User hard constraints > 用户明确偏好 > 已确认的 spec > 模型推断 > preset 默认。
-5. 持久化显式的推理 artifact，不保存隐藏 Chain-of-Thought。
-6. Evidence → Claim → Narrative → Projection → Artifact，每一步可回溯。
-7. 修复在归属层进行：质检 finding 必须标注 owning artifact；上游变更只把下游标脏，
-   不自动重新生成。
+1. Content logic before visual design.
+2. Report ≠ 字更多的 Presentation；两者是同一 narrative 的投影。
+3. Libraries provide vocabulary, not boundaries.
+4. User hard constraints > 用户偏好 > 已确认 spec > 模型推断 > preset。
+5. 持久化显式推理 artifact，不保存隐藏 Chain-of-Thought。
+6. Evidence → Claim → Narrative → Projection → Artifact，每步可回溯。
+7. 修复在归属层进行；上游变更只标脏，不自动重生成。
+8. 观众是最终消费者——优化他们理解了什么，不是你想倒什么。
 
-详细设计见 `docs/`（编写中）与 `AGENTS.md`。
+## 环境备注
+
+- 图形（mermaid → PNG）渲染需要 draw.io CLI；macOS：
+  `export DRAWIO_CLI="/Applications/draw.io.app/Contents/MacOS/draw.io"`
+  （版本与上游 pin 不符时再加 `DRAWIO_ACCEPT_VERSION=<你的版本>`，显式放行）。
+- 测试与 lint：`.venv/bin/pytest && .venv/bin/ruff check .`

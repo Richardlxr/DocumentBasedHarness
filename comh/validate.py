@@ -427,25 +427,25 @@ def validate_hard_constraints(
 
     for constraint in hard:
         if _BACKGROUND_FORBIDS_DARK.search(constraint):
-            from .render.theme import select_theme
+            from .render.theme import resolve_style
 
             style = (artifacts.get("deck_plan") or {}).get("deck", {}).get("style")
-            choice = select_theme(style, allow_dark=False)
+            choice = resolve_style(style, allow_dark=False)
             if choice.forced_light:
                 findings.append(
                     Finding(
                         "brief", "hard-constraint", "error", "fail",
-                        f"constraint '{constraint}' but deck.style.template "
-                        f"'{choice.requested}' is dark; pick a light template "
-                        f"(renderer would force light anyway)", "deck_plan",
+                        f"constraint '{constraint}' but the effective deck background is dark "
+                        f"(template '{choice.requested}' or its tokens_override); pick a light "
+                        f"palette — the renderer would force light anyway", "deck_plan",
                     )
                 )
             else:
                 findings.append(
                     Finding(
                         "brief", "hard-constraint", "info", "pass",
-                        f"constraint '{constraint}' enforced: light theme "
-                        f"'{choice.theme.name}' selected", "deck_plan",
+                        f"constraint '{constraint}' enforced: light background "
+                        f"'{choice.theme.background}' effective", "deck_plan",
                     )
                 )
         match = _MUST_INCLUDE.search(constraint)
