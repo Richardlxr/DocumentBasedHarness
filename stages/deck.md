@@ -33,6 +33,11 @@
   - **数据图优先用 `visual.chart`**：`{type: bar|column|line, series: [{label,
     value_from: Exxx}]}`。数值在渲染时直接从 evidence 的 `value.number` 取——图上的
     数字物理上不可能和证据库漂移。前提：被引用的 evidence 条目必须有 `value`。
+  - **示意图用 `visual.diagram`**：`{mermaid: <flowchart 源>, caption, evidence?}`。
+    mermaid 经编译器的确定性布局链（真实字体测量、碰撞校验）编译成 PNG，按内容哈希
+    缓存。当前只支持 flowchart/graph 子集（subgraph、sequence 等会失败）——
+    `comh validate` 会干跑图语法，错误在验证期就报出来。渲染需要 draw.io CLI
+    （`DRAWIO_CLI` 指向 draw.io Desktop）。
   - 已有图片用 `asset_refs`，**引用图片时用对象形式 `{ref, caption, evidence}`**——
     caption 随图渲染，evidence 把图挂进溯源链。图不是溯源的盲区。
 

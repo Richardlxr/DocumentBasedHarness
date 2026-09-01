@@ -283,12 +283,45 @@ def validate_visuals(artifacts: dict[str, dict | None]) -> list[Finding]:
 
     for page in deck.get("deck", {}).get("pages", []):
         page_id = page["id"]
+        # Known visual subkeys placed at page level are a silent footgun in an
+        # open schema: the renderer would never see them. Surface the typo.
+        for stray in ("chart", "diagram", "asset_refs"):
+            if stray in page:
+                findings.append(
+                    Finding(
+                        "deck_plan", "schema", "warn", "fail",
+                        f"page {page_id} has '{stray}' at page level; it belongs under "
+                        f"'visual' and the renderer ignores misplaced keys", "deck_plan",
+                    )
+                )
         chart = (page.get("visual") or {}).get("chart")
         if chart:
             for entry in chart.get("series", []):
                 check_value_ref(page_id, str(entry.get("value_from", "")), "chart series")
         for card in page.get("metric_cards") or []:
             check_value_ref(page_id, str(card.get("value_from", "")), "metric card")
+        diagram = (page.get("visual") or {}).get("diagram")
+        if diagram:
+            if diagram.get("evidence") and diagram["evidence"] not in evidence_items:
+                findings.append(
+                    Finding(
+                        "deck_plan", "ref-integrity", "error", "fail",
+                        f"page {page_id} diagram references missing evidence "
+                        f"'{diagram['evidence']}'", "evidence",
+                    )
+                )
+            # Dry-run mermaid → DrawioDocument (pure Python, no draw.io CLI) so
+            # bad diagram syntax fails at validation, not at render time.
+            from .render.diagrams import dry_convert
+
+            error = dry_convert(str(diagram.get("mermaid", "")))
+            if error:
+                findings.append(
+                    Finding(
+                        "deck_plan", "diagram", "error", "fail",
+                        f"page {page_id} diagram does not compile: {error}", "deck_plan",
+                    )
+                )
         callout = page.get("callout")
         if callout and callout.get("evidence") and callout["evidence"] not in evidence_items:
             findings.append(

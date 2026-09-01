@@ -104,6 +104,17 @@
                       }
                     }
                   },
+                  "diagram": {
+                    "type": "object",
+                    "description": "Native diagram compiled from mermaid through the deterministic layout chain (measured glyphs, collision-checked) into PNG. Currently the flowchart/graph subset; subgraph and non-flowchart types fail loudly at validation time.",
+                    "required": ["mermaid"],
+                    "additionalProperties": true,
+                    "properties": {
+                      "mermaid": { "type": "string", "description": "Mermaid flowchart source." },
+                      "caption": { "type": "string" },
+                      "evidence": { "type": "string", "description": "Evidence backing the diagram's content." }
+                    }
+                  },
                   "asset_refs": {
                     "type": "array",
                     "description": "Image assets for this page. Plain path strings (relative to run root) or objects {ref, caption, evidence} — caption renders with the image, evidence links the figure into the ID chain. Figures must not be a traceability blind spot.",

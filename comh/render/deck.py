@@ -54,7 +54,7 @@ _LINE_SPACING = 1.25
 _PT_PER_IN = 72.0
 _MARGIN_X = 0.9
 _BODY_W = 11.53
-_BODY_TOP = 2.0
+_BODY_TOP = 1.85
 _BODY_BOTTOM = 5.95
 
 
@@ -259,20 +259,22 @@ def _render_content(
 ) -> None:
     t = theme.theme
     page_id = page["id"]
-    chart_spec = (page.get("visual") or {}).get("chart")
+    visual = page.get("visual") or {}
+    chart_spec = visual.get("chart")
+    diagram_spec = visual.get("diagram")
     cards = page.get("metric_cards") or []
 
     size = _fit_or_report(
         page["title"], page_id=page_id, element="title",
-        width_in=_BODY_W, height_in=1.4, max_size=t.content_title_size, min_size=20,
+        width_in=_BODY_W, height_in=1.15, max_size=t.content_title_size, min_size=20,
         family=theme.title_font, findings=result.findings,
     )
-    title = _textbox(slide, Inches(_MARGIN_X), Inches(0.5), Inches(_BODY_W), Inches(1.4))
+    title = _textbox(slide, Inches(_MARGIN_X), Inches(0.45), Inches(_BODY_W), Inches(1.15))
     _set(
         title.text_frame.paragraphs[0], page["title"],
         size=size, font=theme.title_font, color=t.text, bold=True,
     )
-    underline = slide.shapes.add_shape(1, Inches(_MARGIN_X), Inches(1.62), Inches(0.7), Pt(5))
+    underline = slide.shapes.add_shape(1, Inches(_MARGIN_X), Inches(1.55), Inches(0.7), Pt(5))
     underline.fill.solid()
     underline.fill.fore_color.rgb = t.accent
     underline.line.fill.background()
@@ -288,6 +290,9 @@ def _render_content(
             slide, page_id, chart_spec, t, result, evidence,
             x=6.55, y=content_top, w=5.9, h=_BODY_BOTTOM - content_top,
         )
+        body_width = 5.35
+    elif diagram_spec is not None:
+        _add_diagram(slide, page_id, diagram_spec, theme, result, run_root)
         body_width = 5.35
     else:
         _add_figure(slide, page, run_root, theme, result)
@@ -317,10 +322,50 @@ def _asset_entries(page: dict) -> list[dict]:
     ]
 
 
+def _fit_image(slide, png: Path, *, x: float, y: float, max_w: float, max_h: float) -> None:
+    """Place a PNG inside the (max_w, max_h) box, preserving aspect ratio."""
+    from PIL import Image
+
+    with Image.open(png) as image:
+        width_px, height_px = image.size
+    scale = min(max_w / max(width_px, 1), max_h / max(height_px, 1))
+    slide.shapes.add_picture(
+        str(png), Inches(x), Inches(y), Inches(width_px * scale), Inches(height_px * scale)
+    )
+
+
+def _add_diagram(
+    slide, page_id: str, spec: dict, theme: RenderTheme, result: RenderResult, run_root: Path
+) -> None:
+    from docx_harness.errors import DocumentError
+
+    from .diagrams import diagram_png
+
+    mermaid = str(spec.get("mermaid", ""))
+    try:
+        png = diagram_png(mermaid, run_root)
+    except DocumentError as error:
+        raise RuntimeError(f"page {page_id} diagram failed to compile: {error}") from error
+    _fit_image(
+        slide, png, x=6.55, y=_BODY_TOP,
+        max_w=5.9, max_h=_BODY_BOTTOM - _BODY_TOP,
+    )
+    caption = spec.get("caption")
+    if caption:
+        box = _textbox(slide, Inches(6.55), Inches(6.05), Inches(5.9), Inches(0.4))
+        paragraph = box.text_frame.paragraphs[0]
+        paragraph.alignment = PP_ALIGN.CENTER
+        _set(
+            paragraph, caption, size=theme.theme.caption_size,
+            font=theme.body_font, color=theme.theme.muted,
+        )
+
+
 def _add_figure(
     slide, page: dict, run_root: Path, theme: RenderTheme, result: RenderResult
 ) -> None:
     for entry in _asset_entries(page):
+        image = run_root / entry["ref"]
         image = run_root / entry["ref"]
         if not image.is_file():
             result.findings.append(

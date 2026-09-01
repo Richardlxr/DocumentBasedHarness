@@ -172,9 +172,17 @@ class DrawioCli:
         if self._version_validated:
             return
         reported = self.version()
-        if DRAWIO_VERSION not in reported:
+        accepted = DRAWIO_VERSION
+        override = os.environ.get("DRAWIO_ACCEPT_VERSION")
+        if override:
+            # Vendored deviation (communication-harness): explicitly accept a
+            # locally installed draw.io version that differs from the upstream
+            # pin. The default stays the exact upstream check; the opt-in keeps
+            # a version mismatch loud instead of silent.
+            accepted = override
+        if accepted not in reported:
             raise DocumentError(
-                f"draw.io CLI version {DRAWIO_VERSION} is required, but executable reported: "
+                f"draw.io CLI version {accepted} is required, but executable reported: "
                 f"{reported or '<empty>'}"
             )
         self._version_validated = True

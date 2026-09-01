@@ -19,8 +19,9 @@
 
 用 docx-harness 的 Markdown/MyST 方言写 `documents/report.md`：
 
-- 普通 Markdown：标题、段落、列表、表格、图片、链接。**当前阶段不使用 mermaid 图、
-  `test-case` 等 directive**（图形链路后接）；公式用 `$...$` / `$$...$$`。
+- 普通 Markdown：标题、段落、列表、表格、图片、链接。公式用 `$...$` / `$$...$$`；
+  示意图用 ```` ```mermaid ```` fenced 块（flowchart/graph 子集，确定性编译；
+  需要 `DRAWIO_CLI` 指向 draw.io Desktop）。
 - 插图纪律：`![图说明（数据来源：E001/E002）](../assets/p99-comparison.png)` ——
   caption 与证据标注写在图片语法里，报告里的图和 deck 里的图同样不许成为溯源盲区。
 - 方言写错编译器会带行号报错——把编译错误当免费质检，改完重编译。

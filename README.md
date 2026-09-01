@@ -53,6 +53,19 @@ python -m venv .venv
 
 交付以 **Markdown 报告为主、DOCX 为辅**；展示以 **PPTX 为主、HTML 为辅（后续）**。
 
+## 图形（mermaid → 确定性布局 → PNG）
+
+deck 的 `visual.diagram` 和 report 的 ```` ```mermaid ```` 走同一条编译链：真实字体
+测量、碰撞校验的确定性布局，再由 draw.io Desktop CLI 导出 PNG（按内容哈希缓存）。
+图语法在 `comh validate` 时干跑检查（纯 Python，不需要 CLI）；导出 PNG 需要 CLI：
+
+```bash
+# macOS（已装 draw.io Desktop；版本与上游 pin 不一致时显式放行）
+export DRAWIO_CLI="/Applications/draw.io.app/Contents/MacOS/draw.io"
+export DRAWIO_ACCEPT_VERSION=30.0.4
+# Linux：.venv/bin/docx-harness install-drawio（安装上游钉死的 26.0.16）
+```
+
 ## 设计原则
 
 1. Content logic before visual design。

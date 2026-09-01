@@ -30,9 +30,9 @@ class DeckTheme:
     cover_title_size: int = 44
     banner_title_size: int = 36
     content_title_size: int = 32
-    body_size: int = 21
+    body_size: int = 22
     body_size_wide: int = 24
-    detail_size: int = 16
+    detail_size: int = 17
     caption_size: int = 13
     card_value_size: int = 34
     card_label_size: int = 13
