@@ -27,7 +27,7 @@ from .evidence_pack import build_pack, format_pack
 from .manifest import DERIVATION, GATE_OF_ARTIFACT, Manifest, RunError, find_run_root
 from .render import render_deck, render_report
 from .scaffold import init_run
-from .validate import run_all, write_findings
+from .validate import _BACKGROUND_FORBIDS_DARK, run_all, write_findings
 
 
 def _resolve_run(args: argparse.Namespace) -> Path:
@@ -141,10 +141,46 @@ def cmd_render(args: argparse.Namespace) -> int:
         if findings:
             raise RunError("deck_plan fails schema validation; run `comh validate all`")
         brief, _ = load_artifact(run_root, "brief")
-        language = (brief or {}).get("language", "en")
+        brief = brief or {}
+        evidence, _ = load_artifact(run_root, "evidence")
+        allow_dark = not any(
+            _BACKGROUND_FORBIDS_DARK.search(c)
+            for c in brief.get("constraints", {}).get("hard", [])
+        )
         output = run_root / manifest.data["build"]["deck"]
-        render_deck(plan, run_root, output, language=language)
-        print(f"rendered deck → {output} (language: {language})")
+        result = render_deck(
+            plan, run_root, output,
+            language=brief.get("language", "en"),
+            evidence=evidence,
+            allow_dark=allow_dark,
+        )
+        report_path = run_root / "qa" / "render-deck.yaml"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            yaml.safe_dump(
+                {
+                    "output": str(result.output),
+                    "theme": result.theme,
+                    "transition": result.transition,
+                    "count": {
+                        s: sum(1 for f in result.findings if f.severity == s)
+                        for s in ("error", "warn", "info")
+                    },
+                    "findings": [f.as_dict() for f in result.findings],
+                },
+                allow_unicode=True,
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        for finding in result.findings:
+            print(f"  [△] render: {finding.detail}")
+        print(
+            f"rendered deck → {output} (theme: {result.theme}, "
+            f"transition: {result.transition or 'none'})"
+        )
+        if result.findings:
+            print(f"render report → {report_path}")
         return 0
     if args.target == "report":
         manifest.require_fresh("report_plan")

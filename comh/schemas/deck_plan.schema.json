@@ -40,6 +40,30 @@
                 "additionalProperties": true,
                 "properties": {
                   "intent": { "type": "string", "description": "Free-form visual intent; the renderer decides how to realize it." },
+                  "chart": {
+                    "type": "object",
+                    "description": "Native chart drawn from the evidence store at render time. Values are pulled by value_from reference, so chart numbers cannot drift from evidence.",
+                    "required": ["series"],
+                    "additionalProperties": true,
+                    "properties": {
+                      "type": { "type": "string", "description": "bar | column | line (renderer warns on unknown)" },
+                      "title": { "type": "string" },
+                      "series_name": { "type": "string", "description": "Defaults to the evidence unit." },
+                      "series": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "object",
+                          "required": ["value_from"],
+                          "additionalProperties": true,
+                          "properties": {
+                            "label": { "type": "string", "description": "Category label; defaults to the evidence ID." },
+                            "value_from": { "type": "string", "description": "Evidence ID whose value.number is plotted." }
+                          }
+                        }
+                      }
+                    }
+                  },
                   "asset_refs": {
                     "type": "array",
                     "description": "Image assets for this page. Plain path strings (relative to run root) or objects {ref, caption, evidence} — caption renders with the image, evidence links the figure into the ID chain. Figures must not be a traceability blind spot.",

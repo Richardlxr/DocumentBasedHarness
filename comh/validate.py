@@ -225,6 +225,39 @@ def validate_coverage(artifacts: dict[str, dict | None]) -> list[Finding]:
     return findings
 
 
+def validate_charts(artifacts: dict[str, dict | None]) -> list[Finding]:
+    """Charts may only plot structured evidence: value_from must resolve to an
+    item carrying value.number. Values are pulled at render time, so chart
+    numbers cannot drift — this check only guarantees the references are real."""
+    findings: list[Finding] = []
+    deck = artifacts.get("deck_plan") or {}
+    evidence_items = {i["id"]: i for i in (artifacts.get("evidence") or {}).get("items", [])}
+    for page in deck.get("deck", {}).get("pages", []):
+        spec = (page.get("visual") or {}).get("chart")
+        if not spec:
+            continue
+        for entry in spec.get("series", []):
+            ref = entry.get("value_from", "")
+            item = evidence_items.get(ref)
+            if item is None:
+                findings.append(
+                    Finding(
+                        "deck_plan", "ref-integrity", "error", "fail",
+                        f"page {page['id']} chart series references missing evidence '{ref}'",
+                        "evidence",
+                    )
+                )
+            elif (item.get("value") or {}).get("number") is None:
+                findings.append(
+                    Finding(
+                        "deck_plan", "chart", "error", "fail",
+                        f"page {page['id']} chart: evidence '{ref}' has no value.number; "
+                        f"charts plot structured data only", "evidence",
+                    )
+                )
+    return findings
+
+
 def validate_hard_constraints(
     artifacts: dict[str, dict | None], report_md_text: str | None
 ) -> list[Finding]:
@@ -236,14 +269,25 @@ def validate_hard_constraints(
 
     for constraint in hard:
         if _BACKGROUND_FORBIDS_DARK.search(constraint):
-            from .render.deck import THEME_IS_LIGHT
+            from .render.theme import select_theme
 
-            if THEME_IS_LIGHT:
+            style = (artifacts.get("deck_plan") or {}).get("deck", {}).get("style")
+            choice = select_theme(style, allow_dark=False)
+            if choice.forced_light:
+                findings.append(
+                    Finding(
+                        "brief", "hard-constraint", "error", "fail",
+                        f"constraint '{constraint}' but deck.style.template "
+                        f"'{choice.requested}' is dark; pick a light template "
+                        f"(renderer would force light anyway)", "deck_plan",
+                    )
+                )
+            else:
                 findings.append(
                     Finding(
                         "brief", "hard-constraint", "info", "pass",
-                        f"constraint '{constraint}' enforced: deck renderer uses a light theme",
-                        "deck_plan",
+                        f"constraint '{constraint}' enforced: light theme "
+                        f"'{choice.theme.name}' selected", "deck_plan",
                     )
                 )
         match = _MUST_INCLUDE.search(constraint)
@@ -281,6 +325,7 @@ def run_all(run_root: Path) -> list[Finding]:
         findings += validate_claims(artifacts)
         findings += validate_numbers(artifacts, report_md_text)
         findings += validate_coverage(artifacts)
+        findings += validate_charts(artifacts)
     if artifacts.get("brief") is not None:
         findings += validate_hard_constraints(artifacts, report_md_text)
 
@@ -315,6 +360,7 @@ def write_findings(run_root: Path, findings: list[Finding]) -> Path:
 __all__ = [
     "run_all",
     "write_findings",
+    "validate_charts",
     "validate_claims",
     "validate_coverage",
     "validate_hard_constraints",

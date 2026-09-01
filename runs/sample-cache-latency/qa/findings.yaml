@@ -7,5 +7,5 @@ findings:
   check: hard-constraint
   severity: info
   verdict: pass
-  detail: 'constraint ''不要黑底'' enforced: deck renderer uses a light theme'
+  detail: 'constraint ''不要黑底'' enforced: light theme ''slate-tech'' selected'
   owning_artifact: deck_plan

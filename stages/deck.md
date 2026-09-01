@@ -20,13 +20,16 @@
 - `beat`：引用 `Sxx`。一 beat 拆多页可以；多 beat 并一页必须写 `merge_rationale`。
 - `support_points`：每页 2-4 个支撑点，短句。密度按 `spec.dimensions` 和
   `density_hint` 自己判断，没有死字数规则。
-- `visual.intent`：用自然语言描述视觉意图（"对比前后 P99 的双柱图"、"架构示意"），
-  具体像素留给 renderer。`asset_refs` 引用 `assets/` 里的已有图片；**引用图片时用
-  对象形式 `{ref, caption, evidence}`**——caption 会随图渲染，evidence 把这张图挂进
-  溯源链。图不是溯源的盲区：页面上每张图都应该能回答"这图哪来的"。
-- `deck.style`：声明这套 deck 的风格/模板意图（`{template: ..., palette_hint: ...}`
-  或任何你觉得有用的键）。当前 renderer 不消费它；视觉升级后的 renderer 会读。
-  同 emphasis/reveal 一样：语义先立位，消费后到。
+- `visual.intent`：用自然语言描述视觉意图，具体像素留给 renderer。落到具体载体时：
+  - **数据图优先用 `visual.chart`**：`{type: bar|column|line, series: [{label,
+    value_from: Exxx}]}`。数值在渲染时直接从 evidence 的 `value.number` 取——图上的
+    数字物理上不可能和证据库漂移。前提：被引用的 evidence 条目必须有 `value`。
+  - 已有图片用 `asset_refs`，**引用图片时用对象形式 `{ref, caption, evidence}`**——
+    caption 随图渲染，evidence 把图挂进溯源链。图不是溯源的盲区。
+- `deck.style`：`template` 选主题（内置 `tier1-light` / `slate-tech` / `midnight`，
+  未知名字回退默认并出 finding）；`transition` 选转场（`fade|push|wipe|cut`）；
+  其余键（如 `palette_hint`）自由写，代码透传。注意：brief 禁深色时选 midnight 主题
+  会被校验器打回、渲染器强制浅色——硬约束赢。
 - `notes`：演讲备注是一等内容。被你从页面上拿掉的细节、过渡话术、预备的问答，写进
   notes。
 - `demotions[]`：凡是从本 beat 里裁掉、去了别处的信息，登记 `{content, to}`，

@@ -4,8 +4,9 @@ deck:
   title: Cache Partitioning 实验汇报
   subtitle: P99 latency 验证结果与上线建议
   style:
-    template: tier1-light
-    palette_hint: 石板蓝 + 蓝色强调，低饱和，客户技术评审场合
+    template: slate-tech
+    palette_hint: 石板蓝 + 靛蓝强调，低饱和，客户技术评审场合
+    transition: fade
   pages:
     - id: P01
       page_role: cover
@@ -50,10 +51,12 @@ deck:
         - "吞吐：12400 → 12300 QPS，差异在噪声区间内"
       visual:
         intent: 基线 vs 分区后的 P99 双柱对比图，差异高亮
-        asset_refs:
-          - ref: assets/p99-comparison.png
-            caption: 标准负载 P99 对比（数据：E001/E002）
-            evidence: E003
+        chart:
+          type: column
+          title: P99 latency（标准负载）
+          series:
+            - {label: baseline, value_from: E001}
+            - {label: partitioned, value_from: E002}
       emphasis: [P99 降低 18.2%（本页唯一大数字）]
       reveal: [先出基线柱, 再出分区柱, 最后出降幅标注]
       demotions:
