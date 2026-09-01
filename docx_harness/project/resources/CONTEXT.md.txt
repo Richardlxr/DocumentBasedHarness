@@ -1,0 +1,17 @@
+# Workspace context
+
+## Current state
+
+- Managed Project initialized; replace this note with current document status.
+
+## Verified
+
+- Not yet verified.
+
+## Open questions
+
+- None recorded.
+
+## Next actions
+
+- Render the example, run Project tests, and create the initial Git commit.

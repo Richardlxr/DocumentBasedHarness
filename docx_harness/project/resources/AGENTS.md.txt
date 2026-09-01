@@ -1,0 +1,21 @@
+# Managed document Project guidance
+
+This directory is a managed document Project and an independent Git repository. The parent
+`docx-harness` checkout is a toolchain dependency and must ignore this directory.
+
+At the start of every session, read `.workspace/CONTEXT.md` and `.workspace/references.toml` when
+they exist. They are local, Git-ignored memory. External paths are evidence sources, not
+authorization to modify other repositories. Before ending material work, update local context and
+promote durable decisions into versioned documents or tests.
+
+- Keep canonical Markdown and editable diagram sources in `documents/`; do not maintain an
+  external canonical copy.
+- Keep generated DOCX, PDF, PNG, draw.io exports, and caches in `build/`.
+- Record reproducible release inputs in `references/source-revisions.toml`; keep machine-specific
+  absolute paths only in `.workspace/references.toml`.
+- Put project-only directives, profiles, and lifecycle hooks in `extensions.py` or adjacent local
+  modules. Local imports from `extensions.py` must be package-relative, for example
+  `from .captions import finalize_document`.
+- Use `configure_document`, `finalize_document`, and `validate_document` hooks for in-memory DOCX
+  customization. Do not reopen the generated DOCX for ordinary post-processing.
+- Keep generated files out of Git and never store credentials in workspace references.

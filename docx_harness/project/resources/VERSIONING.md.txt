@@ -1,0 +1,9 @@
+# Versioning
+
+This managed Project uses its own Git history. Version Markdown, editable diagrams, templates,
+Project Python code, tests, configuration, and reproducible reference snapshots. Do not version
+`build/`, caches, previews, or `.workspace/`.
+
+Use annotated semantic-version tags for formal releases. Record the exact parent `docx-harness`
+commit and all factual source repository commits in release notes or
+`references/source-revisions.toml`.

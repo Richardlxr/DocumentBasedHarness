@@ -1,0 +1,17 @@
+"""Project-owned directives, profiles, and in-memory DOCX lifecycle hooks."""
+
+from docx_harness.extension import ExtensionRegistry, default_registry
+
+
+def create_registry() -> ExtensionRegistry:
+    registry = default_registry()
+    # Add project-specific DirectiveExtension objects here.
+    return registry
+
+
+# Optional factories and hooks:
+# def create_diagram_registry() -> DiagramConverterRegistry: ...
+# def create_table_profile() -> TableFormatProfile: ...
+# def configure_document(document, context) -> None: ...
+# def finalize_document(document, context) -> None: ...
+# def validate_document(document, context) -> None: ...

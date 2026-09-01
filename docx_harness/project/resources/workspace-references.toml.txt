@@ -1,0 +1,10 @@
+schema = 1
+updated_at = ""
+
+# [[references]]
+# id = "source-repository"
+# kind = "repository"
+# path = "/absolute/path/to/repository"
+# status = "active"
+# purpose = "Why this source matters"
+# entrypoints = ["AGENTS.md"]

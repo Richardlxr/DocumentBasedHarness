@@ -1,0 +1,5 @@
+# Workspace references
+
+`.workspace/references.toml` records machine-local absolute paths to repositories, directories, and
+temporary files. `.workspace/CONTEXT.md` records concise cross-session status. Both files are
+ignored by Git. Stable decisions belong in versioned documents, tests, or source revision records.

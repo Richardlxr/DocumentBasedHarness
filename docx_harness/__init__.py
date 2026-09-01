@@ -1,0 +1,98 @@
+"""Deterministic, extensible Markdown/MyST to DOCX rendering."""
+
+from .compiler import compile_file, compile_text
+from .diagrams import (
+    CN_OFFICIAL_DIAGRAM_FONTS,
+    CN_OFFICIAL_DIAGRAM_STYLE,
+    SWISS_TECHNICAL_DIAGRAM_STYLE,
+    DiagramArtifact,
+    DiagramArtifactBuilder,
+    DiagramConverterRegistry,
+    DiagramExportProfile,
+    DiagramLayoutEngine,
+    DiagramLayoutPolicy,
+    DiagramSource,
+    DiagramStyleProfile,
+    DrawioCli,
+    DrawioDocument,
+    FontMetrics,
+    LayoutEdgeInput,
+    LayoutNodeInput,
+    LayoutResult,
+    cn_official_diagram_style,
+    create_mermaid_flowchart_converter,
+    default_diagram_registry,
+    install_drawio,
+)
+from .lifecycle import RenderContext, RenderHooks
+from .presets import available_template_presets, describe_template_presets
+from .project import (
+    ProjectConfig,
+    ProjectRuntime,
+    ProjectValidationReport,
+    init_project,
+    init_workspace,
+    load_project,
+    load_project_runtime,
+    render_project,
+    validate_project,
+)
+from .renderers.fields import append_word_field, request_field_update
+from .style_import import analyze_docx, extract_template
+from .table_builder import TableCellSpec, TableRowSpec, TableSpec, build_table
+from .table_format import TableBorderProfile, TableCellMargins, TableFormatProfile
+from .table_layout import TableLayoutPolicy
+from .template import TemplateConfig, create_template
+
+__all__ = [
+    "TemplateConfig",
+    "CN_OFFICIAL_DIAGRAM_FONTS",
+    "CN_OFFICIAL_DIAGRAM_STYLE",
+    "SWISS_TECHNICAL_DIAGRAM_STYLE",
+    "DiagramArtifact",
+    "DiagramArtifactBuilder",
+    "DiagramConverterRegistry",
+    "DiagramExportProfile",
+    "DiagramLayoutEngine",
+    "DiagramLayoutPolicy",
+    "DiagramSource",
+    "DrawioCli",
+    "DrawioDocument",
+    "DiagramStyleProfile",
+    "FontMetrics",
+    "LayoutEdgeInput",
+    "LayoutNodeInput",
+    "LayoutResult",
+    "ProjectConfig",
+    "ProjectRuntime",
+    "ProjectValidationReport",
+    "RenderContext",
+    "RenderHooks",
+    "TableBorderProfile",
+    "TableCellMargins",
+    "TableCellSpec",
+    "TableFormatProfile",
+    "TableLayoutPolicy",
+    "TableRowSpec",
+    "TableSpec",
+    "available_template_presets",
+    "analyze_docx",
+    "append_word_field",
+    "build_table",
+    "compile_file",
+    "compile_text",
+    "cn_official_diagram_style",
+    "create_mermaid_flowchart_converter",
+    "create_template",
+    "describe_template_presets",
+    "default_diagram_registry",
+    "extract_template",
+    "init_project",
+    "init_workspace",
+    "install_drawio",
+    "load_project",
+    "load_project_runtime",
+    "render_project",
+    "request_field_update",
+    "validate_project",
+]

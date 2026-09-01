@@ -1,0 +1,8 @@
+/build/
+/.workspace/
+/.pytest_cache/
+/.ruff_cache/
+/.codegraph/
+__pycache__/
+*.py[cod]
+.~lock.*#

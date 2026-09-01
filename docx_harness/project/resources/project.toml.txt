@@ -1,0 +1,15 @@
+version = 1
+name = "__PROJECT_NAME__"
+
+# Provenance only: records the initializer used to create the versioned template.
+template_preset = "__TEMPLATE_PRESET__"
+
+template = "templates/base.docx"
+extensions = "extensions.py"
+documents = "documents"
+build = "build"
+source = "documents/example.md"
+output = "build/example.docx"
+
+# Optional style evidence. Remove this field together with the file when it has no maintenance value.
+style_manifest = "style-manifest.json"

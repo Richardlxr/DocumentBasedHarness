@@ -1,0 +1,4 @@
+schema = 1
+status = "development"
+
+# Add one [[repositories]] record per reproducible release input.

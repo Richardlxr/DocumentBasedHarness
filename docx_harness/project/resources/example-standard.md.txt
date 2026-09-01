@@ -1,0 +1,10 @@
+# __PROJECT_TITLE__
+
+普通 Markdown 会使用核心 renderer。
+
+:::{test-case} 示例测试用例
+:id: TC-EXAMPLE-001
+:priority: P1
+
+在 `extensions.py` 中注册新的语义 directive，并为它提供类型、validator 和 renderer。
+:::
