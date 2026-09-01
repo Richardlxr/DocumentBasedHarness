@@ -55,6 +55,10 @@
                 "description": "Known roles with validator rules: cover, agenda, section_divider, content, closing, appendix. Unknown roles are treated as content."
               },
               "title": { "type": "string", "description": "Message-style title: what the audience should remember from this page." },
+              "kicker": {
+                "type": "string",
+                "description": "Small accent eyebrow above the title, e.g. '背景 · 为什么关注' or 'RESULTS'. Optional editorial furniture."
+              },
               "support_points": {
                 "type": "array",
                 "description": "Page body. Plain strings, or {point, detail} objects: bold lead-in phrase plus a lighter explanation line — the standard way to elaborate without piling on bullets.",

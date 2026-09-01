@@ -135,22 +135,44 @@ def _section(
         body = _content(page, theme, result, run_root, evidence, orders)
     notes = page.get("notes")
     aside = f'<aside class="notes">{html.escape(str(notes))}</aside>' if notes else ""
-    return f"    <section>{body}{aside}</section>"
+    footer = ""
+    if page.get("page_role") != "cover":
+        footer = (
+            f'<div class="footer"><span class="muted">'
+            f'{html.escape(plan.get("deck", {}).get("title", ""))}'
+            f'</span><span class="muted footer-num">{page.get("id", "")[1:]}</span></div>'
+        )
+    return f"    <section>{body}{footer}{aside}</section>"
 
 
 def _cover(page: dict, orders: dict) -> str:
     points = " · ".join(_point_text(entry)[0] for entry in page.get("support_points", []))
-    subtitle = f'<p class="muted">{html.escape(points)}</p>' if points else ""
+    subtitle = f'<p class="cover-meta muted">{html.escape(points)}</p>' if points else ""
     return (
-        f'<h1{_fragment_attrs("title", orders)}>{html.escape(page["title"])}</h1>{subtitle}'
+        f'<h1 class="cover-title">{html.escape(page["title"])}</h1>'
+        f'<span class="cover-rule"></span>{subtitle}'
     )
 
 
 def _banner(page: dict, orders: dict) -> str:
+    entries = page.get("support_points", [])
+    if page.get("page_role") == "agenda":
+        rows = "".join(
+            f'<div class="agenda-row">'
+            f'<span class="agenda-num"{_fragment_attrs(f"support_points[{i}]", orders)}>'
+            f'{i + 1:02d}</span>'
+            f'<span class="agenda-item"{_fragment_attrs(f"support_points[{i}]", orders)}>'
+            f'{html.escape(_point_text(entry)[0])}</span></div>'
+            for i, entry in enumerate(entries)
+        )
+        return (
+            f'<h1{_fragment_attrs("title", orders)}>{html.escape(page["title"])}</h1>'
+            f'<div class="agenda">{rows}</div>'
+        )
     items = "".join(
         f'<li{_fragment_attrs(f"support_points[{i}]", orders, "muted")}>'
         f'{html.escape(_point_text(entry)[0])}</li>'
-        for i, entry in enumerate(page.get("support_points", []))
+        for i, entry in enumerate(entries)
     )
     return (
         f'<h1{_fragment_attrs("title", orders)}>{html.escape(page["title"])}</h1>'
@@ -168,9 +190,14 @@ def _content(
     page: dict, theme: RenderTheme, result: HtmlResult, run_root: Path,
     evidence: dict | None, orders: dict,
 ) -> str:
-    parts: list[str] = [
+    parts: list[str] = []
+    kicker = str(page.get("kicker") or "")
+    if kicker:
+        parts.append(f'<div class="kicker">{html.escape(kicker)}</div>')
+    parts.append(
         f'<h2{_fragment_attrs("title", orders)}>{html.escape(page["title"])}</h2>'
-    ]
+        '<div class="h2-rule"></div>'
+    )
 
     cards = page.get("metric_cards") or []
     if cards:
@@ -325,16 +352,36 @@ def _css(theme: RenderTheme) -> str:
         f"--accent-soft:{t.accent_soft}; --card-fill:{t.card_fill}; --card-line:{t.card_line};"
         f"--title-size:{t.content_title_size}px; --body-size:{t.body_size}px;"
         f"--detail-size:{t.detail_size}px; --card-value-size:{t.card_value_size}px;"
-        f"--callout-size:{t.callout_size}px;"
+        f"--callout-size:{t.callout_size}px; --kicker-size:{t.kicker_size}px;"
+        f"--footer-size:{t.footer_size}px; --index-size:{t.index_number_size}px;"
+        f"--cover-size:{t.cover_title_size}px;"
     )
     return f":root{{{variables}}}" + """
 html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
   font-family:'Microsoft YaHei','Segoe UI',Calibri,sans-serif; }
 .reveal { font-size:var(--body-size); }
-.reveal h1 { font-size:calc(var(--title-size) * 1.25px); color:var(--text); }
+.reveal h1 { font-size:var(--banner-size, 40px); color:var(--text); }
+.cover-title { font-size:var(--cover-size) !important; text-align:left; margin:0.3em 0 0 0;
+  line-height:1.12; }
+.cover-rule { display:block; width:140px; height:4px; background:var(--accent);
+  margin:28px 0 18px 0; }
+.cover-meta { font-size:var(--body-size); }
 .reveal h2 { font-size:var(--title-size); color:var(--text); text-align:left;
-  border-bottom:5px solid var(--accent); display:inline-block; padding-bottom:8px;
-  margin:0 0 28px 0; }
+  margin:0.1em 0 10px 0; }
+.h2-rule { height:1px; background:var(--card-line); margin:0 0 22px 0; position:relative; }
+.h2-rule::before { content:""; position:absolute; left:0; top:-2px; width:70px;
+  height:3.5px; background:var(--accent); }
+.kicker { color:var(--accent); font-size:var(--kicker-size); font-weight:700;
+  letter-spacing:0.14em; margin-bottom:6px; }
+.footer { position:absolute; bottom:20px; left:70px; right:70px; display:flex;
+  justify-content:space-between; font-size:var(--footer-size); }
+.agenda { margin-top:30px; }
+.agenda-row { display:flex; align-items:baseline; gap:26px; padding:16px 0;
+  border-bottom:1px solid var(--card-line); }
+.agenda-row:last-child { border-bottom:none; }
+.agenda-num { font-size:var(--index-size); font-weight:700; color:var(--accent);
+  min-width:56px; }
+.agenda-item { font-size:calc(var(--body-size) + 2px); }
 .reveal section { text-align:left; }
 .muted { color:var(--muted); }
 .plain { list-style:none; padding:0; }
@@ -348,7 +395,10 @@ html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
 .cards { display:flex; gap:14px; margin:20px 0; }
 .card { flex:1; background:var(--card-fill); border:1px solid var(--card-line);
   border-radius:12px; padding:16px 12px; text-align:center; }
-.card-value { font-size:var(--card-value-size); font-weight:700; color:var(--accent); }
+.card-value { font-size:var(--card-value-size); font-weight:700;
+  color:var(--accent); margin-top:10px; }
+.card::before { content:""; display:block; width:50px; height:3.5px;
+  background:var(--accent); margin:0 auto; }
 .card-label { font-size:13px; margin-top:6px; }
 .columns { display:flex; gap:28px; align-items:stretch; }
 .col { flex:1; display:flex; flex-direction:column; justify-content:center; }

@@ -34,6 +34,9 @@ _SIZE_FIELDS = {
     "card_value": "card_value_size",
     "card_label": "card_label_size",
     "callout": "callout_size",
+    "kicker": "kicker_size",
+    "footer": "footer_size",
+    "index_number": "index_number_size",
 }
 
 
@@ -48,16 +51,19 @@ class DeckTheme:
     accent_soft: RGBColor
     card_fill: RGBColor
     card_line: RGBColor
-    cover_title_size: int = 44
-    banner_title_size: int = 36
+    cover_title_size: int = 56
+    banner_title_size: int = 40
     content_title_size: int = 32
     body_size: int = 22
     body_size_wide: int = 24
     detail_size: int = 17
     caption_size: int = 13
-    card_value_size: int = 34
+    card_value_size: int = 40
     card_label_size: int = 13
     callout_size: int = 18
+    kicker_size: int = 13
+    footer_size: int = 11
+    index_number_size: int = 26
     latin_fonts: tuple[str, str] = ("Calibri", "Calibri")  # (title, body)
     notes: str = ""
 

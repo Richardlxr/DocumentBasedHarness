@@ -23,8 +23,8 @@ artifacts:
       evidence: sha256:fefe8f6cafb991639a93dc10ecf395c2905d210c8b5e4d0aec64f30dd797fdf8
   deck_plan:
     path: projection/deck_plan.yaml
-    hash: sha256:fe38f16c313f0ea8e814db37b5af051884e1416b9dfac35d3e746002771cf211
-    saved_at: '2026-09-01T08:07:51+00:00'
+    hash: sha256:fcfb3bdbc6b16ca08a30bc80a05983edffb96656e0683185398c8af2d24f19df
+    saved_at: '2026-09-01T08:51:15+00:00'
     upstream:
       narrative: sha256:b6425d66f20fcfd9b8092b420c29e3dd0555304fa20d0d05b1ab3e3b3f76fe0a
       brief: sha256:5b08364acb92db889111160b2c0ab11a568e25bb4593658ec5507878473d1e14

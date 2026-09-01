@@ -98,21 +98,26 @@ def render_deck(
     prs = Presentation()
     prs.slide_width = _SLIDE_W
     prs.slide_height = _SLIDE_H
+    total = len(plan["deck"]["pages"])
 
     for slide_number, page in enumerate(plan["deck"]["pages"]):
         role = page.get("page_role", "content")
         page_id = page.get("id", f"P{slide_number + 1:02d}")
         slide = prs.slides.add_slide(prs.slide_layouts[6])
         _paint_background(slide, theme.theme.background)
-        shapes: dict[str, int] = {}
+        shapes: dict[str, list[int]] = {}
         if role == "cover":
             _render_cover(slide, page, theme, result, shapes)
-        elif role in ("agenda", "section_divider", "closing"):
+        elif role == "agenda":
+            _render_agenda(slide, page, theme, result, shapes)
+        elif role in ("section_divider", "closing"):
             _render_banner(slide, page, theme, result, shapes)
         else:
             _render_content(slide, page, run_root, theme, result, evidence, shapes)
         result.shape_map[page_id] = shapes
         result.slide_index[page_id] = slide_number
+        if role != "cover":
+            _add_footer(slide, page_id, slide_number, total, plan, theme)
         _add_notes(slide, page)
 
     _apply_transition(prs, plan, result)
@@ -216,25 +221,80 @@ def _fmt(number: float) -> str:
 def _render_cover(
     slide, page: dict, theme: RenderTheme, result: RenderResult, shapes: dict
 ) -> None:
+    """Editorial cover: left accent band, display-scale left-aligned title,
+    accent rule, muted meta — typography is the hero."""
     t = theme.theme
+    band = slide.shapes.add_shape(1, Inches(0), Inches(0), Inches(0.16), Inches(7.5))
+    band.fill.solid()
+    band.fill.fore_color.rgb = t.accent
+    band.line.fill.background()
+    shapes["title"] = []
+
     points = page.get("support_points", [])
     joined = "  ·  ".join(p[0] for p in (_point_parts(x) for x in points))
-    subtitle_lines = len(wrap_lines(joined, t.body_size, _BODY_W * _PT_PER_IN, theme.body_font))
+    subtitle_lines = len(wrap_lines(joined, t.body_size, 10.8 * _PT_PER_IN, theme.body_font))
     size = _fit_or_report(
         page["title"], page_id=page["id"], element="title",
-        width_in=_BODY_W, height_in=2.4 - 0.35 * subtitle_lines,
-        max_size=t.cover_title_size, min_size=28, family=theme.title_font,
+        width_in=10.8, height_in=2.6 - 0.4 * subtitle_lines,
+        max_size=t.cover_title_size, min_size=30, family=theme.title_font,
         findings=result.findings,
     )
-    box = _textbox(slide, Inches(1.0), Inches(2.4), Inches(_BODY_W), Inches(2.4))
-    shapes["title"] = [box.shape_id]
+    box = _textbox(slide, Inches(0.9), Inches(2.15), Inches(10.8), Inches(2.6))
     _set(
         box.text_frame.paragraphs[0], page["title"],
         size=size, font=theme.title_font, color=t.text, bold=True,
     )
     if joined:
         paragraph = box.text_frame.add_paragraph()
+        paragraph.space_before = Pt(14)
         _set(paragraph, joined, size=t.body_size, font=theme.body_font, color=t.muted)
+    rule = slide.shapes.add_shape(1, Inches(0.9), Inches(5.15), Inches(1.4), Pt(4))
+    rule.fill.solid()
+    rule.fill.fore_color.rgb = t.accent
+    rule.line.fill.background()
+
+
+def _render_agenda(
+    slide, page: dict, theme: RenderTheme, result: RenderResult, shapes: dict
+) -> None:
+    """Editorial agenda: hairline-separated rows of accent index numbers and
+    items, spread across the body zone."""
+    t = theme.theme
+    shapes["title"] = []
+    title = _textbox(slide, Inches(_MARGIN_X), Inches(0.55), Inches(_BODY_W), Inches(1.0))
+    _set(
+        title.text_frame.paragraphs[0], page["title"],
+        size=t.banner_title_size, font=theme.title_font, color=t.text, bold=True,
+    )
+
+    entries = page.get("support_points", [])
+    top, bottom = 2.0, 6.7
+    n = max(len(entries), 1)
+    row_h = (bottom - top) / n
+    for index, entry in enumerate(entries):
+        point, _detail = _point_parts(entry)
+        y = top + index * row_h
+        number = _textbox(slide, Inches(_MARGIN_X), Inches(y + 0.1), Inches(0.95), Inches(0.55))
+        _set(
+            number.text_frame.paragraphs[0], f"{index + 1:02d}",
+            size=t.index_number_size, font=theme.title_font, color=t.accent, bold=True,
+        )
+        item = _textbox(slide, Inches(1.95), Inches(y + 0.12), Inches(10.4), Inches(0.55))
+        _set(
+            item.text_frame.paragraphs[0], point,
+            size=t.body_size + 2, font=theme.body_font, color=t.text,
+        )
+        shapes[f"support_points[{index}]"] = [item.shape_id]
+        if index < n - 1:
+            hair = slide.shapes.add_shape(
+                1, Inches(_MARGIN_X), Inches(y + row_h - 0.07), Inches(_BODY_W), Pt(0.75)
+            )
+            hair.fill.solid()
+            hair.fill.fore_color.rgb = t.card_line
+            hair.line.fill.background()
+    shapes["support_points"] = [
+        sid for i in range(len(entries)) for sid in shapes.get(f"support_points[{i}]", [])
+    ]
 
 
 def _render_banner(
@@ -270,6 +330,24 @@ def _render_banner(
         _set(paragraph, point, size=t.body_size, font=theme.body_font, color=t.muted)
 
 
+def _add_footer(slide, page_id: str, index: int, total: int, plan: dict,
+                 theme: RenderTheme) -> None:
+    """Page furniture: deck title bottom-left, NN / NN bottom-right."""
+    t = theme.theme
+    brand = _textbox(slide, Inches(_MARGIN_X), Inches(7.06), Inches(8.0), Inches(0.32))
+    _set(
+        brand.text_frame.paragraphs[0], plan.get("deck", {}).get("title", ""),
+        size=t.footer_size, font=theme.body_font, color=t.muted,
+    )
+    number = _textbox(slide, Inches(11.0), Inches(7.06), Inches(1.43), Inches(0.32))
+    paragraph = number.text_frame.paragraphs[0]
+    paragraph.alignment = PP_ALIGN.RIGHT
+    _set(
+        paragraph, f"{index + 1:02d} / {total:02d}",
+        size=t.footer_size, font=theme.body_font, color=t.muted,
+    )
+
+
 def _render_content(
     slide, page: dict, run_root: Path, theme: RenderTheme,
     result: RenderResult, evidence: dict | None, shapes: dict,
@@ -281,26 +359,45 @@ def _render_content(
     diagram_spec = visual.get("diagram")
     cards = page.get("metric_cards") or []
 
+    title_top = 0.42
+    kicker = str(page.get("kicker") or "")
+    if kicker:
+        kick = _textbox(slide, Inches(_MARGIN_X), Inches(0.42), Inches(_BODY_W), Inches(0.34))
+        _set(
+            kick.text_frame.paragraphs[0], kicker,
+            size=t.kicker_size, font=theme.body_font, color=t.accent, bold=True,
+        )
+        title_top = 0.78
     size = _fit_or_report(
         page["title"], page_id=page_id, element="title",
         width_in=_BODY_W, height_in=1.15, max_size=t.content_title_size, min_size=20,
         family=theme.title_font, findings=result.findings,
     )
-    title = _textbox(slide, Inches(_MARGIN_X), Inches(0.45), Inches(_BODY_W), Inches(1.15))
+    title = _textbox(slide, Inches(_MARGIN_X), Inches(title_top), Inches(_BODY_W), Inches(1.1))
     shapes["title"] = [title.shape_id]
     _set(
         title.text_frame.paragraphs[0], page["title"],
         size=size, font=theme.title_font, color=t.text, bold=True,
     )
-    underline = slide.shapes.add_shape(1, Inches(_MARGIN_X), Inches(1.55), Inches(0.7), Pt(5))
+    # full-width hairline with a short accent segment — editorial separation
+    hair_y = title_top + 1.06
+    hair = slide.shapes.add_shape(
+        1, Inches(_MARGIN_X), Inches(hair_y), Inches(_BODY_W), Pt(0.75)
+    )
+    hair.fill.solid()
+    hair.fill.fore_color.rgb = t.card_line
+    hair.line.fill.background()
+    underline = slide.shapes.add_shape(
+        1, Inches(_MARGIN_X), Inches(hair_y - Pt(1.5)), Inches(0.7), Pt(3.5)
+    )
     underline.fill.solid()
     underline.fill.fore_color.rgb = t.accent
     underline.line.fill.background()
 
-    content_top = _BODY_TOP
+    content_top = _BODY_TOP if title_top < 0.5 else _BODY_TOP + 0.2
     if cards:
-        _render_metric_cards(slide, cards, theme, result, evidence, page_id, shapes)
-        content_top = _BODY_TOP + 1.65
+        _render_metric_cards(slide, cards, theme, result, evidence, page_id, shapes, content_top)
+        content_top += 1.8
 
     body_width = _BODY_W
     if chart_spec is not None:
@@ -414,7 +511,7 @@ def _add_figure(
 
 def _render_metric_cards(
     slide, cards: list, theme: RenderTheme, result: RenderResult,
-    evidence: dict | None, page_id: str, shapes: dict,
+    evidence: dict | None, page_id: str, shapes: dict, top: float,
 ) -> None:
     t = theme.theme
     items = {item["id"]: item for item in (evidence or {}).get("items", [])}
@@ -434,7 +531,7 @@ def _render_metric_cards(
         number, unit = _evidence_number(items, ref, page_id, "metric card")
         left = _MARGIN_X + index * (width + gap)
         shape = slide.shapes.add_shape(
-            _ROUNDED, Inches(left), Inches(_BODY_TOP), Inches(width), Inches(1.45)
+            _ROUNDED, Inches(left), Inches(top), Inches(width), Inches(1.6)
         )
         shapes[f"metric_cards[{index}]"] = [shape.shape_id]
         shape.fill.solid()
@@ -442,9 +539,15 @@ def _render_metric_cards(
         shape.line.color.rgb = t.card_line
         shape.line.width = Pt(1)
         shape.shadow.inherit = False
+        top_bar = slide.shapes.add_shape(
+            1, Inches(left + 0.18), Inches(top + 0.16), Inches(0.5), Pt(3.5)
+        )
+        top_bar.fill.solid()
+        top_bar.fill.fore_color.rgb = t.accent
+        top_bar.line.fill.background()
         value_text = _fmt(number) + (f" {unit}" if unit else "")
         value_box = _textbox(
-            slide, Inches(left), Inches(_BODY_TOP + 0.12), Inches(width), Inches(0.75)
+            slide, Inches(left), Inches(top + 0.34), Inches(width), Inches(0.8)
         )
         _set(
             value_box.text_frame.paragraphs[0], value_text,
@@ -453,7 +556,7 @@ def _render_metric_cards(
         value_box.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
         label = str(card.get("label") or card.get("value_from", ""))
         label_box = _textbox(
-            slide, Inches(left), Inches(_BODY_TOP + 0.92), Inches(width), Inches(0.45)
+            slide, Inches(left), Inches(top + 1.14), Inches(width), Inches(0.4)
         )
         _set(
             label_box.text_frame.paragraphs[0], label,

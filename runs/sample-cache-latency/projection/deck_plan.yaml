@@ -24,6 +24,7 @@ deck:
 
     - id: P03
       page_role: content
+      kicker: "背景 · BACKGROUND"
       beat: S01
       title: 尾延迟抖动是客户线上体验的第一痛点
       support_points:
@@ -40,6 +41,7 @@ deck:
 
     - id: P04
       page_role: content
+      kicker: "方法 · METHOD"
       beat: S02
       title: 受控环境、固定负载、标准负载 12 轮与高负载 6 轮重复
       support_points:
@@ -63,6 +65,7 @@ deck:
 
     - id: P05
       page_role: content
+      kicker: "结果 · RESULTS"
       beat: S03
       title: 标准负载下 P99 降低 18.2%，吞吐不受影响
       support_points:
@@ -100,6 +103,7 @@ deck:
 
     - id: P06
       page_role: content
+      kicker: "边界 · LIMITS"
       beat: S04
       title: 高负载下改善有限：瓶颈可能在磁盘 IO，不在缓存
       metric_cards:
@@ -126,6 +130,7 @@ deck:
 
     - id: P07
       page_role: content
+      kicker: "机制 · MECHANISM"
       beat: S05
       title: 租户级分区隔离了缓存挤占——这正是标准负载见效的原因
       support_points:
@@ -148,6 +153,7 @@ deck:
 
     - id: P08
       page_role: closing
+      kicker: "建议 · RECOMMENDATION"
       beat: S06
       title: 建议：进入 staging 灰度，同时立高负载瓶颈专项
       support_points:
@@ -158,6 +164,7 @@ deck:
 
     - id: P09
       page_role: appendix
+      kicker: "附录 · APPENDIX"
       title: 附录：实验配置明细
       support_points:
         - 标准负载 12 轮 / 高负载 6 轮，同硬件与负载生成器

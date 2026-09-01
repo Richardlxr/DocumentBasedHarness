@@ -14,6 +14,8 @@
 
 - 一页 ≈ 一个主要沟通信息。内容页 `title` 写**观众该记住的那句话**，不写话题所属。
   反例："实验结果"。正例："Cache Partitioning 将 P99 latency 降低 18.2%"。
+- 可选 `kicker`（页眉小标，如"结果 · RESULTS"）：小号强调色，提供编辑级层次；
+  不要重复标题内容，每个 section 用一次即可。
 - 但不要机械执行：`page_role` 为 `cover` / `agenda` / `section_divider` /
   `closing` / `appendix` 的页面用主题式标题是正当的。系统按 role 理解页面，QA 也按
   role 分规则检查。
