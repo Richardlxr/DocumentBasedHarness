@@ -120,6 +120,7 @@ def render_deck(
             _add_footer(slide, page_id, slide_number, total, plan, theme)
         _add_notes(slide, page)
 
+    _check_geometry(prs, result)
     _apply_transition(prs, plan, result)
     _apply_animations(prs, plan, result)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -225,6 +226,7 @@ def _render_cover(
     accent rule, muted meta — typography is the hero."""
     t = theme.theme
     band = slide.shapes.add_shape(1, Inches(0), Inches(0), Inches(0.16), Inches(7.5))
+    band.name = "decor"
     band.fill.solid()
     band.fill.fore_color.rgb = t.accent
     band.line.fill.background()
@@ -249,6 +251,7 @@ def _render_cover(
         paragraph.space_before = Pt(14)
         _set(paragraph, joined, size=t.body_size, font=theme.body_font, color=t.muted)
     rule = slide.shapes.add_shape(1, Inches(0.9), Inches(5.15), Inches(1.4), Pt(4))
+    rule.name = "decor"
     rule.fill.solid()
     rule.fill.fore_color.rgb = t.accent
     rule.line.fill.background()
@@ -289,6 +292,7 @@ def _render_agenda(
             hair = slide.shapes.add_shape(
                 1, Inches(_MARGIN_X), Inches(y + row_h - 0.07), Inches(_BODY_W), Pt(0.75)
             )
+            hair.name = "decor"
             hair.fill.solid()
             hair.fill.fore_color.rgb = t.card_line
             hair.line.fill.background()
@@ -302,6 +306,7 @@ def _render_banner(
 ) -> None:
     t = theme.theme
     accent = slide.shapes.add_shape(1, Inches(0.9), Inches(2.35), Inches(1.2), Pt(6))
+    accent.name = "decor"
     accent.fill.solid()
     accent.fill.fore_color.rgb = t.accent
     accent.line.fill.background()
@@ -384,12 +389,14 @@ def _render_content(
     hair = slide.shapes.add_shape(
         1, Inches(_MARGIN_X), Inches(hair_y), Inches(_BODY_W), Pt(0.75)
     )
+    hair.name = "decor"
     hair.fill.solid()
     hair.fill.fore_color.rgb = t.card_line
     hair.line.fill.background()
     underline = slide.shapes.add_shape(
-        1, Inches(_MARGIN_X), Inches(hair_y - Pt(1.5)), Inches(0.7), Pt(3.5)
+        1, Inches(_MARGIN_X), Inches(hair_y) - Pt(1.5), Inches(0.7), Pt(3.5)
     )
+    underline.name = "decor"
     underline.fill.solid()
     underline.fill.fore_color.rgb = t.accent
     underline.line.fill.background()
@@ -533,6 +540,7 @@ def _render_metric_cards(
         shape = slide.shapes.add_shape(
             _ROUNDED, Inches(left), Inches(top), Inches(width), Inches(1.6)
         )
+        shape.name = f"card:metric[{index}]"
         shapes[f"metric_cards[{index}]"] = [shape.shape_id]
         shape.fill.solid()
         shape.fill.fore_color.rgb = t.card_fill
@@ -542,6 +550,7 @@ def _render_metric_cards(
         top_bar = slide.shapes.add_shape(
             1, Inches(left + 0.18), Inches(top + 0.16), Inches(0.5), Pt(3.5)
         )
+        top_bar.name = "decor"
         top_bar.fill.solid()
         top_bar.fill.fore_color.rgb = t.accent
         top_bar.line.fill.background()
@@ -612,6 +621,7 @@ def _render_points(
         card = slide.shapes.add_shape(
             _ROUNDED, Inches(x), Inches(cursor), Inches(width_in), Inches(heights[index])
         )
+        card.name = f"card:point[{index}]"
         card.fill.solid()
         card.fill.fore_color.rgb = t.card_fill
         card.line.color.rgb = t.card_line
@@ -647,6 +657,7 @@ def _render_callout(
     band = slide.shapes.add_shape(
         _ROUNDED, Inches(_MARGIN_X), Inches(6.1), Inches(_BODY_W), Inches(0.85)
     )
+    band.name = "callout"
     shapes["callout"] = [band.shape_id]
     band.fill.solid()
     band.fill.fore_color.rgb = t.card_fill
@@ -656,6 +667,7 @@ def _render_callout(
     bar = slide.shapes.add_shape(
         1, Inches(_MARGIN_X + 0.08), Inches(6.22), Pt(5), Inches(0.61)
     )
+    bar.name = "decor"
     bar.fill.solid()
     bar.fill.fore_color.rgb = t.accent
     bar.line.fill.background()
@@ -864,3 +876,92 @@ def _apply_animations(prs: Presentation, plan: dict, result: RenderResult) -> No
         _el(_el(_el(prev, "cond", evt="onPrev", delay="0"), "tgtEl"), "sldTgt")
         nxt = _el(seq, "nextCondLst")
         _el(_el(_el(nxt, "cond", evt="onNext", delay="0"), "tgtEl"), "sldTgt")
+
+
+# -- post-render geometry validation ------------------------------------------
+#
+# Occlusion and overlap are exactly the class of defect a harness can catch
+# deterministically: after building every slide, read back each shape's
+# bounding box and verify (a) nothing falls off the canvas (the y=-19048in
+# unit-mixing bug shipped once; never again) and (b) no two content blocks
+# overlap unless one contains the other (intentional layering). Decorative
+# furniture (hairlines, accent segments, bands) is name-tagged "decor" and
+# exempt. Findings land in qa/render-deck.yaml like every other check.
+
+
+def _shape_bbox(shape) -> tuple[float, float, float, float]:
+    return (
+        shape.left / _EMU_PER_IN,
+        shape.top / _EMU_PER_IN,
+        (shape.left + shape.width) / _EMU_PER_IN,
+        (shape.top + shape.height) / _EMU_PER_IN,
+    )
+
+
+_EMU_PER_IN = 914400
+_TOLERANCE = 0.06  # inches
+
+
+def _contains(
+    outer: tuple[float, float, float, float], inner: tuple[float, float, float, float]
+) -> bool:
+    return (
+        outer[0] - _TOLERANCE <= inner[0]
+        and outer[1] - _TOLERANCE <= inner[1]
+        and outer[2] + _TOLERANCE >= inner[2]
+        and outer[3] + _TOLERANCE >= inner[3]
+    )
+
+
+def _overlap_area(
+    a: tuple[float, float, float, float], b: tuple[float, float, float, float]
+) -> float:
+    width = min(a[2], b[2]) - max(a[0], b[0])
+    height = min(a[3], b[3]) - max(a[1], b[1])
+    return max(0.0, width) * max(0.0, height)
+
+
+def _check_geometry(prs: Presentation, result: RenderResult) -> None:
+    slide_w = prs.slide_width / _EMU_PER_IN
+    slide_h = prs.slide_height / _EMU_PER_IN
+    for slide_number, slide in enumerate(prs.slides, 1):
+        boxes: list[tuple[str, tuple[float, float, float, float]]] = []
+        for shape in slide.shapes:
+            name = shape.name or "shape"
+            bbox = _shape_bbox(shape)
+            if name != "decor" and (
+                bbox[0] < -_TOLERANCE
+                or bbox[1] < -_TOLERANCE
+                or bbox[2] > slide_w + _TOLERANCE
+                or bbox[3] > slide_h + _TOLERANCE
+            ):
+                result.findings.append(
+                    Finding(
+                        "deck_plan", "geometry", "warn", "fail",
+                        f"slide {slide_number}: '{name}' falls outside the canvas "
+                        f"({bbox[0]:.2f},{bbox[1]:.2f})-({bbox[2]:.2f},{bbox[3]:.2f})",
+                        "deck_plan",
+                    )
+                )
+            if name != "decor":
+                boxes.append((name, bbox))
+        for i in range(len(boxes)):
+            for j in range(i + 1, len(boxes)):
+                name_a, box_a = boxes[i]
+                name_b, box_b = boxes[j]
+                if _contains(box_a, box_b) or _contains(box_b, box_a):
+                    continue  # intentional layering (child inside parent)
+                area = _overlap_area(box_a, box_b)
+                smaller = min(
+                    (box_a[2] - box_a[0]) * (box_a[3] - box_a[1]),
+                    (box_b[2] - box_b[0]) * (box_b[3] - box_b[1]),
+                )
+                if smaller > 0 and area / smaller > 0.04:
+                    result.findings.append(
+                        Finding(
+                            "deck_plan", "geometry", "warn", "fail",
+                            f"slide {slide_number}: '{name_a}' overlaps '{name_b}' "
+                            f"({area / smaller:.0%} of the smaller block)",
+                            "deck_plan",
+                        )
+                    )

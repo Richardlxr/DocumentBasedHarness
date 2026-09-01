@@ -125,3 +125,50 @@ def test_pptx_animations_off_by_default(tmp_path: Path):
     with ZipFile(tmp_path / "off.pptx") as archive:
         slide_xml = archive.read("ppt/slides/slide1.xml").decode("utf-8")
     assert "<p:timing>" not in slide_xml
+
+
+def test_rendered_shapes_stay_on_canvas(tmp_path: Path):
+    """Regression for the unit-mixing bug that put an accent segment at
+    y=-19048in: every shape of every slide must sit inside the canvas."""
+    from pptx import Presentation
+
+    result = render_deck(
+        ANIM_PLAN, tmp_path, tmp_path / "bounds.pptx", language="zh-CN", evidence=EVIDENCE
+    )
+    assert not [f for f in result.findings if f.check == "geometry"], [
+        f.detail for f in result.findings
+    ]
+    prs = Presentation(str(tmp_path / "bounds.pptx"))
+    emu = 914400
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            assert shape.top / emu >= -0.06, f"{shape.name} off-canvas top"
+            assert shape.left / emu >= -0.06, f"{shape.name} off-canvas left"
+            assert (shape.top + shape.height) / emu <= 7.5 + 0.06
+            assert (shape.left + shape.width) / emu <= 13.34
+
+
+def test_geometry_checker_flags_overlap_and_off_canvas():
+    from pptx import Presentation
+    from pptx.util import Inches
+
+    from comh.render.deck import RenderResult, _check_geometry
+
+    prs = Presentation()
+    prs.slide_width, prs.slide_height = Inches(13.333), Inches(7.5)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    good = slide.shapes.add_textbox(Inches(1), Inches(1), Inches(2), Inches(1))
+    good.name = "title"
+    clash = slide.shapes.add_textbox(Inches(2), Inches(1.2), Inches(2), Inches(1))
+    clash.name = "card:point[0]"
+    lost = slide.shapes.add_textbox(Inches(1), Inches(-3), Inches(2), Inches(1))
+    lost.name = "kicker"
+    decor = slide.shapes.add_textbox(Inches(1.5), Inches(1.1), Inches(0.5), Inches(0.2))
+    decor.name = "decor"  # overlaps both, but decor is exempt
+
+    result = RenderResult(output=Path("x.pptx"), theme="t", transition=None)
+    _check_geometry(prs, result)
+    details = " | ".join(f.detail for f in result.findings)
+    assert "overlaps 'card:point[0]'" in details or "overlaps 'title'" in details
+    assert "'kicker' falls outside the canvas" in details
+    assert len([f for f in result.findings if f.check == "geometry"]) == 2
