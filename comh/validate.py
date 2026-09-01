@@ -130,9 +130,12 @@ def validate_refs(artifacts: dict[str, dict | None]) -> list[Finding]:
 
 
 def validate_claims(artifacts: dict[str, dict | None]) -> list[Finding]:
-    """Grounding honesty: supported claims must cite evidence; statuses must be known."""
+    """Grounding honesty: supported claims must cite evidence; statuses must be known;
+    claims resting solely on visual estimates are flagged (chart reads are
+    estimates, not ground truth)."""
     findings: list[Finding] = []
     narrative = artifacts.get("narrative") or {}
+    evidence_items = {i["id"]: i for i in (artifacts.get("evidence") or {}).get("items", [])}
     for claim in narrative.get("claims", []):
         status = claim.get("status")
         if status not in KNOWN_CLAIM_STATUSES:
@@ -149,6 +152,25 @@ def validate_claims(artifacts: dict[str, dict | None]) -> list[Finding]:
                     "narrative", "claims-grounded", "error", "fail",
                     f"claim {claim['id']} is 'supported' but cites no evidence; "
                     f"demote to background/assumption or add evidence", "narrative",
+                )
+            )
+        refs = claim.get("evidence", [])
+        cited = [evidence_items[r] for r in refs if r in evidence_items]
+        estimated_only = (
+            status == "supported"
+            and cited
+            and all(
+                (item.get("extraction") or {}).get("confidence") == "estimated"
+                for item in cited
+            )
+        )
+        if estimated_only:
+            findings.append(
+                Finding(
+                    "narrative", "visual-estimate-only", "warn", "fail",
+                    f"claim {claim['id']} rests only on visually estimated evidence "
+                    f"({', '.join(refs)}); verify against an underlying data file "
+                    f"or soften the claim", "evidence",
                 )
             )
     return findings

@@ -9,6 +9,10 @@ sources:
     path: sources/notes.md
     kind: markdown
     note: 实验条件、方案说明与高负载推测
+  - id: SRC03
+    path: sources/p99-trend.png
+    kind: image
+    note: 实验方提供的 P99 逐轮走势图（仅图片，无对应逐轮数据文件）
 
 items:
   - id: E001
@@ -52,6 +56,15 @@ items:
     kind: table
     content: 标准负载结果汇总——p50 从 85ms 降至 82ms，P99 从 220ms 降至 180ms，吞吐从 12400 变为 12300 QPS
     source: {source: SRC01, locator: "rows baseline/partitioned, cols p50_ms/p99_ms/throughput_qps"}
+
+  - id: E010
+    kind: figure
+    content: 逐轮走势图显示两配置各自稳定——baseline 约 220ms、partitioned 约 180ms，全程无交叉，与 CSV 读数（E001/E002）一致
+    asset: sources/p99-trend.png
+    source: {source: SRC03, locator: "两条折线整体水平，图例标注 ~220ms/~180ms"}
+    observed_at: "2026-08-28"
+    extraction: {via: visual, confidence: estimated, note: "估读用于佐证逐轮稳定性（无交叉），数值以 E001/E002 的文件读数为准"}
+    tags: [corroboration, visual]
 
   - id: E006
     kind: fact

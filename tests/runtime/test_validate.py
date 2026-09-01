@@ -105,6 +105,46 @@ def test_claims_grounding_rejects_supported_without_evidence():
     assert any("C02" in f.detail and f.severity == "error" for f in findings)
 
 
+def test_visual_estimate_only_claim_warns():
+    items = [
+        {
+            "id": "E001",
+            "kind": "datum",
+            "content": "图上读出约 40ms",
+            "source": {"source": "SRC01", "locator": "柱 1"},
+            "extraction": {"via": "visual", "confidence": "estimated"},
+        },
+        {
+            "id": "E002",
+            "kind": "datum",
+            "content": "CSV 读出 38ms",
+            "source": {"source": "SRC01", "locator": "row=2"},
+            "value": {"number": 38, "unit": "ms"},
+        },
+    ]
+    artifacts = {
+        "evidence": {"items": items},
+        "narrative": {
+            "claims": [
+                {"id": "C01", "statement": "仅凭图", "evidence": ["E001"], "status": "supported"},
+                {
+                    "id": "C02",
+                    "statement": "图与文件互证",
+                    "evidence": ["E001", "E002"],
+                    "status": "supported",
+                },
+            ],
+            "story": [],
+        },
+    }
+    findings = validate_claims(artifacts)
+    flagged = [f for f in findings if f.check == "visual-estimate-only"]
+    assert len(flagged) == 1
+    assert "C01" in flagged[0].detail
+    assert flagged[0].owning_artifact == "evidence"
+    assert not any("C02" in f.detail and f.check == "visual-estimate-only" for f in findings)
+
+
 def test_number_consistency_levels_and_exclusions():
     artifacts = _artifacts()
     # deck P02 title has no number; report prose has 3.2 (ungrounded) and a date.

@@ -59,6 +59,19 @@
             }
           },
           "asset": { "type": "string", "description": "Path (relative to run root) of an extracted figure/table asset." },
+          "extraction": {
+            "type": "object",
+            "description": "How this fact was obtained. Via 'visual' means read off an image/chart by a vision-capable model: such values are ESTIMATES, not ground truth. 'file' = read from data/text; 'derived' = computed from other items (also expressible via locator 'derived:(...)').",
+            "additionalProperties": true,
+            "properties": {
+              "via": { "type": "string", "description": "file | visual | derived (open vocabulary)" },
+              "confidence": {
+                "type": "string",
+                "description": "exact | estimated. Numbers read off chart pixels are 'estimated' unless corroborated by an underlying data file."
+              },
+              "note": { "type": "string" }
+            }
+          },
           "observed_at": {
             "type": "string",
             "description": "When the underlying measurement/observation was made. ISO 8601 preferred; MUST be a quoted string in YAML ('2026-08-28'), since unquoted dates parse as date objects and fail schema validation. Enables future freshness QA."
