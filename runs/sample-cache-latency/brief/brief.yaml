@@ -26,6 +26,11 @@ constraints:
   soft:
     - 数据页专业一点，但开场希望有一点故事感
 
+visual_materials:
+  direction: 排版为主，数据卡片与要点用图标点缀；不使用照片
+  icons: tabler-outline
+  photos: none
+
 spec:
   dimensions:
     technical_rigor: high

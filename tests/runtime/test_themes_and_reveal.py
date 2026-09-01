@@ -128,3 +128,45 @@ def test_unknown_verb_and_trigger_warn_legacy_strings_pass() -> None:
     checks = {f.check for f in findings}
     assert "reveal-verb" in checks and "reveal-trigger" in checks
     assert all(f.severity == "warn" for f in findings)
+
+
+def test_icon_validation_and_search() -> None:
+    from comh.render.icons import icon_exists, icon_svg, search_icons
+    from comh.validate import validate_visuals
+
+    assert icon_exists("database") and not icon_exists("not-an-icon")
+    assert any(e["name"] == "database" for e in search_icons("database", 5))
+    svg = icon_svg("database", "4F46E5")
+    assert 'stroke="#4F46E5"' in svg
+
+    artifacts = {
+        "evidence": {"items": []},
+        "deck_plan": {"deck": {"title": "t", "pages": [{
+            "id": "P01", "page_role": "content", "title": "x",
+            "metric_cards": [{"value_from": "E001", "icon": "no-such-icon"}],
+        }]}},
+    }
+    findings = validate_visuals(artifacts)
+    assert any("unknown icon 'no-such-icon'" in f.detail and f.severity == "error"
+               for f in findings)
+
+
+def test_pptx_card_icons_render(tmp_path: Path):
+    from pptx import Presentation
+
+    from comh.render.deck import render_deck
+
+    plan = {
+        "version": 1,
+        "deck": {"title": "t", "pages": [{
+            "id": "P01", "page_role": "content", "title": "x",
+            "metric_cards": [{"value_from": "E001", "icon": "gauge"}],
+        }]},
+    }
+    evidence = {"items": [{"id": "E001", "kind": "datum", "content": "5",
+                           "value": {"number": 5, "unit": "ms"},
+                           "source": {"source": "S", "locator": "x"}}]}
+    result = render_deck(plan, tmp_path, tmp_path / "i.pptx", evidence=evidence)
+    assert not [f for f in result.findings if f.check == "icon"]
+    prs = Presentation(str(tmp_path / "i.pptx"))
+    assert any(sh.shape_type == 13 for sh in prs.slides[0].shapes), "icon embedded"

@@ -307,6 +307,20 @@ def validate_visuals(artifacts: dict[str, dict | None]) -> list[Finding]:
                 check_value_ref(page_id, str(entry.get("value_from", "")), "chart series")
         for card in page.get("metric_cards") or []:
             check_value_ref(page_id, str(card.get("value_from", "")), "metric card")
+        from .render.icons import icon_exists
+
+        for icon_source in [page.get("metric_cards") or []] + [page.get("support_points") or []]:
+            for entry in icon_source:
+                icon_name = str(entry.get("icon") or "") if isinstance(entry, dict) else ""
+                if icon_name and not icon_exists(icon_name):
+                    findings.append(
+                        Finding(
+                            "deck_plan", "icon", "error", "fail",
+                            f"page {page_id} references unknown icon '{icon_name}' "
+                            f"(search comh.render.icons.search_icons)",
+                            "deck_plan",
+                        )
+                    )
         diagram = (page.get("visual") or {}).get("diagram")
         if diagram:
             if diagram.get("evidence") and diagram["evidence"] not in evidence_items:

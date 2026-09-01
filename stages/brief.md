@@ -25,6 +25,10 @@
   白名单；"必须包含:局限性" → report 存在性检查）。无法落到检查点的，向用户提议
   降级为 soft preference，并说明原因。
 - `constraints.soft`：偏好，尽力满足不保证。
+- `visual_materials`（素材方向，Gate 1 必谈）：这批成品的视觉素材从哪来——
+  纯排版（typography-only 也是显式选择）/ 图标点缀（`assets/vendor/tabler-outline`，
+  5 千+语义图标）/ 需要配图（用户提供 or 显式申请外部获取，绝不静默抓取）。
+  写成开放字段记进 brief，deck 投影时消费。
 - `spec.dimensions`：自由发明的维度表（`technical_rigor`、`storytelling`、
   `evidence_density`、以及任何你觉得能表达这次沟通风格的新词）。代码只透传不解释，
   下游靠你自己在各 stage 里贯彻。

@@ -205,8 +205,20 @@ def _content(
         for index, card in enumerate(cards):
             value_html = _card_value(card, evidence, result, page["id"])
             label = html.escape(str(card.get("label", "")))
+            icon_name = str(card.get("icon") or "")
+            icon_html = ""
+            if icon_name:
+                from .icons import icon_exists, icon_svg
+
+                if icon_exists(icon_name):
+                    svg = icon_svg(icon_name, "var(--accent)")
+                    svg = svg.replace('width="24"', 'width="26"')
+                    svg = svg.replace('height="24"', 'height="26"')
+                    icon_html = f'<div class="card-icon">{svg}</div>'
+            card_top = icon_html or '<div class="card-topbar"></div>'
             items.append(
                 f'<div{_fragment_attrs(f"metric_cards[{index}]", orders, "card")}>'
+                f'{card_top}'
                 f'<div class="card-value">{value_html}</div>'
                 f'<div class="card-label muted">{label}</div></div>'
             )
@@ -261,8 +273,17 @@ def _points(page: dict, orders: dict, has_visual: bool) -> str:
         detail_html = ""
         if detail:
             detail_html = f'<div class="detail muted">{html.escape(str(detail))}</div>'
+        icon_name = str(entry.get("icon") or "") if isinstance(entry, dict) else ""
+        icon_inline = ""
+        if icon_name:
+            from .icons import icon_exists, icon_svg
+
+            if icon_exists(icon_name):
+                svg = icon_svg(icon_name, "var(--accent)")
+                svg = svg.replace('width="24"', 'width="22"').replace('height="24"', 'height="22"')
+                icon_inline = f'<span class="point-icon">{svg}</span>'
         items.append(f'<div{fragment}><div class="point-line">'
-                     f'<b>{html.escape(point)}</b></div>{detail_html}</div>')
+                     f'{icon_inline}<b>{html.escape(point)}</b></div>{detail_html}</div>')
     if not items:
         return ""
     return f'<div class="points{" narrow" if has_visual else ""}">{"".join(items)}</div>'
@@ -397,8 +418,12 @@ html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
   border-radius:12px; padding:16px 12px; text-align:center; }
 .card-value { font-size:var(--card-value-size); font-weight:700;
   color:var(--accent); margin-top:10px; }
-.card::before { content:""; display:block; width:50px; height:3.5px;
-  background:var(--accent); margin:0 auto; }
+.card-topbar { width:50px; height:3.5px; background:var(--accent);
+  margin:12px auto 0 auto; }
+.card-icon { display:flex; justify-content:center; margin-top:12px; }
+.card-icon svg { stroke:var(--accent); }
+.point-icon { display:inline-block; vertical-align:-4px; margin-right:10px; }
+.point-icon svg { stroke:var(--accent); }
 .card-label { font-size:13px; margin-top:6px; }
 .columns { display:flex; gap:28px; align-items:stretch; }
 .col { flex:1; display:flex; flex-direction:column; justify-content:center; }

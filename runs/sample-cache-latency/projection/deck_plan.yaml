@@ -30,6 +30,7 @@ deck:
       support_points:
         - point: 用户感知的"慢"来自 P99 长尾，而非平均延迟
           detail: 平均延迟指标长期健康，投诉集中在偶发卡顿——典型的长尾特征
+          icon: clock-bolt
         - point: 缓存命中率随热租户行为波动，是主要可疑因素
           detail: 共享缓存层无隔离，单个热租户可以挤占全集群的缓存份额
         - point: 长尾问题直接牵动 SLA 达标与客户信任
@@ -107,9 +108,9 @@ deck:
       beat: S04
       title: 高负载下改善有限：瓶颈可能在磁盘 IO，不在缓存
       metric_cards:
-        - {label: "baseline P99（高负载）", value_from: E005}
-        - {label: "partitioned P99（高负载）", value_from: E011}
-        - {label: 改善幅度, value_from: E012}
+        - {label: "baseline P99（高负载）", value_from: E005, icon: clock}
+        - {label: "partitioned P99（高负载）", value_from: E011, icon: bolt}
+        - {label: 改善幅度, value_from: E012, icon: trending-down}
       support_points:
         - point: 两配置缓存命中率已接近饱和，分区收益空间受限
           detail: 高负载下缓存不再是瓶颈，分区的机制收益无从发挥

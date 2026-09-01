@@ -51,6 +51,14 @@ reveal:
 要点：出场顺序讲的是"论证的展开节奏"（先给结论，再给证据，最后给 so-what），
 不是花哨；每页 reveal 步骤通常不超过三步。
 
+## 图标
+
+- 语义名词引用（`icon: trending-down`），来自 vendored 的 tabler-outline 集
+  （5,130 个，MIT）。用 `comh.render.icons.search_icons('latency')` 式语义搜索选名。
+- 克制：图标是路标不是插画。KPI 卡一枚、要点导语一枚已足够；每页超过三枚就是在
+  用图标凑数。
+- 图标颜色跟随主题 accent，不要在内容里指定颜色。
+
 ## Speaker notes
 
 - 内容：被裁掉的细节与数字、过渡话术、预备 Q&A、给未来重用者的上下文。

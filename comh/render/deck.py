@@ -403,7 +403,10 @@ def _render_content(
 
     content_top = _BODY_TOP if title_top < 0.5 else _BODY_TOP + 0.2
     if cards:
-        _render_metric_cards(slide, cards, theme, result, evidence, page_id, shapes, content_top)
+        _render_metric_cards(
+            slide, cards, theme, result, evidence, page_id, shapes,
+            content_top, run_root,
+        )
         content_top += 1.8
 
     body_width = _BODY_W
@@ -425,7 +428,7 @@ def _render_content(
         _render_points(
             slide, points, page_id=page_id, x=_MARGIN_X, y=content_top,
             width_in=body_width, height_in=_BODY_BOTTOM - content_top,
-            theme=theme, findings=result.findings, shapes=shapes,
+            theme=theme, findings=result.findings, shapes=shapes, run_root=run_root,
         )
 
     callout = page.get("callout")
@@ -518,7 +521,7 @@ def _add_figure(
 
 def _render_metric_cards(
     slide, cards: list, theme: RenderTheme, result: RenderResult,
-    evidence: dict | None, page_id: str, shapes: dict, top: float,
+    evidence: dict | None, page_id: str, shapes: dict, top: float, run_root: Path,
 ) -> None:
     t = theme.theme
     items = {item["id"]: item for item in (evidence or {}).get("items", [])}
@@ -547,13 +550,45 @@ def _render_metric_cards(
         shape.line.color.rgb = t.card_line
         shape.line.width = Pt(1)
         shape.shadow.inherit = False
-        top_bar = slide.shapes.add_shape(
-            1, Inches(left + 0.18), Inches(top + 0.16), Inches(0.5), Pt(3.5)
-        )
-        top_bar.name = "decor"
-        top_bar.fill.solid()
-        top_bar.fill.fore_color.rgb = t.accent
-        top_bar.line.fill.background()
+        card_icon = str(card.get("icon") or "")
+        if card_icon:
+            from .icons import icon_exists, icon_png
+
+            if icon_exists(card_icon):
+                try:
+                    png = icon_png(
+                        card_icon, color=t.accent, background=t.card_fill,
+                        px=48, run_root=run_root,
+                    )
+                    icon_shape = slide.shapes.add_picture(
+                        str(png), Inches(left + width / 2 - 0.17), Inches(top + 0.14),
+                        height=Inches(0.34),
+                    )
+                    icon_shape.name = "decor"
+                except RuntimeError as error:
+                    result.findings.append(
+                        Finding(
+                            "deck_plan", "icon", "warn", "fail",
+                            f"page {page_id}: icon '{card_icon}' could not rasterize "
+                            f"({error})", "deck_plan",
+                        )
+                    )
+            else:
+                result.findings.append(
+                    Finding(
+                        "deck_plan", "icon", "warn", "fail",
+                        f"page {page_id}: unknown icon '{card_icon}' (search "
+                        f"assets/vendor/tabler-outline/icons-index.json)", "deck_plan",
+                    )
+                )
+        else:
+            top_bar = slide.shapes.add_shape(
+                1, Inches(left + 0.18), Inches(top + 0.16), Inches(0.5), Pt(3.5)
+            )
+            top_bar.name = "decor"
+            top_bar.fill.solid()
+            top_bar.fill.fore_color.rgb = t.accent
+            top_bar.line.fill.background()
         value_text = _fmt(number) + (f" {unit}" if unit else "")
         value_box = _textbox(
             slide, Inches(left), Inches(top + 0.34), Inches(width), Inches(0.8)
@@ -577,7 +612,7 @@ def _render_metric_cards(
 def _render_points(
     slide, points: list, *, page_id: str, x: float, y: float,
     width_in: float, height_in: float, theme: RenderTheme, findings: list[Finding],
-    shapes: dict,
+    shapes: dict, run_root: Path | None = None,
 ) -> None:
     """Each point renders as a rounded card (point bold + detail muted inside),
     and the stack spreads evenly across the body zone — no floating text
@@ -588,7 +623,7 @@ def _render_points(
 
     def card_height(entry, size: int) -> float:
         point, detail = _point_parts(entry)
-        inner_w = (width_in - 2 * pad_h) * _PT_PER_IN
+        inner_w = (width_in - 2 * pad_h - 0.42) * _PT_PER_IN
         lines = len(wrap_lines(point, size, inner_w, theme.body_font)) * size * _LINE_SPACING
         if detail:
             detail_lines = wrap_lines(detail, detail_size, inner_w, theme.body_font)
@@ -622,6 +657,39 @@ def _render_points(
             _ROUNDED, Inches(x), Inches(cursor), Inches(width_in), Inches(heights[index])
         )
         card.name = f"card:point[{index}]"
+        icon_name = str(entry.get("icon") or "") if isinstance(entry, dict) else ""
+        icon_width = 0.0
+        if icon_name and run_root is not None:
+            from .icons import icon_exists, icon_png
+
+            if icon_exists(icon_name):
+                try:
+                    png = icon_png(
+                        icon_name, color=t.accent, background=t.card_fill,
+                        px=44, run_root=run_root,
+                    )
+                    picture = slide.shapes.add_picture(
+                        str(png), Inches(x + 0.22),
+                        Inches(cursor + heights[index] / 2 - 0.14),
+                        height=Inches(0.28),
+                    )
+                    picture.name = "decor"
+                    icon_width = 0.42
+                except RuntimeError as error:
+                    findings.append(
+                        Finding(
+                            "deck_plan", "icon", "warn", "fail",
+                            f"page {page_id}: icon '{icon_name}' could not rasterize "
+                            f"({error})", "deck_plan",
+                        )
+                    )
+            else:
+                findings.append(
+                    Finding(
+                        "deck_plan", "icon", "warn", "fail",
+                        f"page {page_id}: unknown icon '{icon_name}'", "deck_plan",
+                    )
+                )
         card.fill.solid()
         card.fill.fore_color.rgb = t.card_fill
         card.line.color.rgb = t.card_line
@@ -629,7 +697,7 @@ def _render_points(
         card.shadow.inherit = False
         frame = card.text_frame
         frame.word_wrap = True
-        frame.margin_left = Inches(pad_h)
+        frame.margin_left = Inches(pad_h + icon_width)
         frame.margin_right = Inches(pad_h)
         frame.margin_top = Inches(pad_v)
         frame.margin_bottom = Inches(pad_v)

@@ -77,6 +77,7 @@ python -m venv .venv
 
 | | |
 |---|---|
+| **图标素材** | 5,130 个 tabler-outline 语义图标（MIT，`assets/vendor/`）+ 可搜索索引；HTML 内联 SVG、pptx 经 Chrome 栅格化缓存；Gate 1 显式沟通素材方向 |
 | **主题** | `themes/*.yaml`（palette/字号/字体）；run 可自带主题覆盖仓库级；`tokens_override` 按次微调；brief 禁深色 → 亮度级强制浅色 |
 | **页面结构** | 展开式要点（加粗导语+浅色展开）、大数字卡片（证据取数）、原生图表（证据取数）、底部结论条、mermaid 示意图（确定性布局）、图片带图注与溯源 |
 | **布局** | 真实字形度量 → 确定性换行 → 字号自适应；装不下出 finding，不静默溢出 |

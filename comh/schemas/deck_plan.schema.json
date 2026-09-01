@@ -71,7 +71,8 @@
                       "additionalProperties": true,
                       "properties": {
                         "point": { "type": "string", "description": "Bold lead-in." },
-                        "detail": { "type": "string", "description": "One-or-two-line explanation under the lead-in." }
+                        "detail": { "type": "string", "description": "One-or-two-line explanation under the lead-in." },
+                        "icon": { "type": "string", "description": "Semantic icon name shown beside the lead-in." }
                       }
                     }
                   ]
