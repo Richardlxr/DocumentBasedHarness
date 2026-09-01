@@ -242,7 +242,7 @@ def test_elaborated_points_cards_and_callout(tmp_path: Path):
     assert "加粗导语" in joined and "展开说明一行" in joined and "普通要点" in joined
     assert "18.2 %" in joined and "220 ms" in joined, "card values pulled from evidence"
     assert "底部结论条" in joined
-    # rounded rectangles: 2 cards + 1 callout band
+    # rounded rectangles: 2 metric cards + 2 point cards + 1 callout band
     from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
 
     def _rounded(shape) -> bool:
@@ -253,7 +253,7 @@ def test_elaborated_points_cards_and_callout(tmp_path: Path):
 
     shapes = Presentation(str(result.output)).slides[0].shapes
     rounded = [sh for sh in shapes if _rounded(sh)]
-    assert len(rounded) == 3
+    assert len(rounded) == 5
 
 
 def test_metric_card_missing_evidence_fails_loud(tmp_path: Path):

@@ -86,26 +86,27 @@ def render_html_deck(
 
 
 def _fragment_orders(page: dict) -> dict[str, tuple[str, int]]:
-    """element address -> (fragment class, index). click steps advance the
-    counter; with_previous reuses the previous step's index; after behaves
+    """element address -> (fragment class, index). Only reveal steps create
+    fragments — emphasis must NOT hide an element (it stays visible; the pptx
+    surface will style it later). click steps advance the counter;
+    with_previous reuses the previous step's index; after behaves
     sequentially (v1)."""
     orders: dict[str, tuple[str, int]] = {}
     counter = 0
     previous_index = 0
-    for field_name in ("reveal", "emphasis"):
-        for entry in page.get(field_name) or []:
-            if not isinstance(entry, dict):
-                continue
-            verb = str(entry.get("verb", "fade_in"))
-            classes = _VERB_CLASSES.get(verb, "fragment fade-in")
-            if entry.get("trigger") == "with_previous":
-                index = previous_index
-            else:
-                index = counter
-                counter += 1
-            previous_index = index
-            for address in entry.get("elements") or []:
-                orders[str(address)] = (classes, index)
+    for entry in page.get("reveal") or []:
+        if not isinstance(entry, dict):
+            continue
+        verb = str(entry.get("verb", "fade_in"))
+        classes = _VERB_CLASSES.get(verb, "fragment fade-in")
+        if entry.get("trigger") == "with_previous":
+            index = previous_index
+        else:
+            index = counter
+            counter += 1
+        previous_index = index
+        for address in entry.get("elements") or []:
+            orders[str(address)] = (classes, index)
     return orders
 
 
@@ -234,7 +235,7 @@ def _points(page: dict, orders: dict, has_visual: bool) -> str:
         if detail:
             detail_html = f'<div class="detail muted">{html.escape(str(detail))}</div>'
         items.append(f'<div{fragment}><div class="point-line">'
-                     f'• <b>{html.escape(point)}</b></div>{detail_html}</div>')
+                     f'<b>{html.escape(point)}</b></div>{detail_html}</div>')
     if not items:
         return ""
     return f'<div class="points{" narrow" if has_visual else ""}">{"".join(items)}</div>'
@@ -337,17 +338,20 @@ html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
 .reveal section { text-align:left; }
 .muted { color:var(--muted); }
 .plain { list-style:none; padding:0; }
-.points { margin-top:12px; }
+.points { margin-top:12px; display:flex; flex-direction:column;
+  justify-content:space-between; gap:14px; }
 .points.narrow { max-width:46%; }
+.point { background:var(--card-fill); border:1px solid var(--card-line);
+  border-radius:12px; padding:12px 16px; }
 .point-line { font-size:var(--body-size); }
-.detail { font-size:var(--detail-size); margin:4px 0 14px 18px; }
+.detail { font-size:var(--detail-size); margin-top:4px; }
 .cards { display:flex; gap:14px; margin:20px 0; }
 .card { flex:1; background:var(--card-fill); border:1px solid var(--card-line);
   border-radius:12px; padding:16px 12px; text-align:center; }
 .card-value { font-size:var(--card-value-size); font-weight:700; color:var(--accent); }
 .card-label { font-size:13px; margin-top:6px; }
-.columns { display:flex; gap:28px; align-items:flex-start; }
-.col { flex:1; }
+.columns { display:flex; gap:28px; align-items:stretch; }
+.col { flex:1; display:flex; flex-direction:column; justify-content:center; }
 figure { margin:0; text-align:center; }
 figure img { max-width:100%; max-height:58vh; }
 .caption { font-size:13px; margin-top:8px; }
@@ -356,11 +360,11 @@ figure img { max-width:100%; max-height:58vh; }
 .callout-bar { position:absolute; left:8px; top:12px; bottom:12px; width:5px;
   background:var(--accent); border-radius:3px; margin-right:12px; }
 .chart-title { font-size:15px; margin-bottom:10px; text-align:center; }
-.bar-row { display:flex; align-items:center; gap:10px; margin:10px 0; }
-.bar-label { width:30%; text-align:right; font-size:15px; }
-.bar-track { flex:1; background:var(--card-line); border-radius:6px; height:24px; }
-.bar-fill { display:block; height:24px; border-radius:6px; background:var(--accent); }
-.bar-value { width:14%; font-size:15px; }
+.bar-row { display:flex; align-items:center; gap:12px; margin:14px 0; }
+.bar-label { width:30%; text-align:right; font-size:16px; }
+.bar-track { flex:1; background:var(--card-line); border-radius:6px; height:30px; }
+.bar-fill { display:block; height:30px; border-radius:6px; background:var(--accent); }
+.bar-value { width:16%; font-size:17px; }
 .chart-table { border-collapse:collapse; margin:0 auto; }
 .chart-table td { border:1px solid var(--card-line); padding:6px 16px; }
 .reveal .fragment.highlight-current.visible { color:var(--accent); }

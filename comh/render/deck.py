@@ -227,7 +227,7 @@ def _render_cover(
         findings=result.findings,
     )
     box = _textbox(slide, Inches(1.0), Inches(2.4), Inches(_BODY_W), Inches(2.4))
-    shapes["title"] = box.shape_id
+    shapes["title"] = [box.shape_id]
     _set(
         box.text_frame.paragraphs[0], page["title"],
         size=size, font=theme.title_font, color=t.text, bold=True,
@@ -257,7 +257,7 @@ def _render_banner(
         findings=result.findings,
     )
     box = _textbox(slide, Inches(1.0), Inches(2.7), Inches(_BODY_W), Inches(2.4))
-    shapes["title"] = box.shape_id
+    shapes["title"] = [box.shape_id]
     _set(
         box.text_frame.paragraphs[0], page["title"],
         size=size, font=theme.title_font, color=t.text, bold=True,
@@ -287,7 +287,7 @@ def _render_content(
         family=theme.title_font, findings=result.findings,
     )
     title = _textbox(slide, Inches(_MARGIN_X), Inches(0.45), Inches(_BODY_W), Inches(1.15))
-    shapes["title"] = title.shape_id
+    shapes["title"] = [title.shape_id]
     _set(
         title.text_frame.paragraphs[0], page["title"],
         size=size, font=theme.title_font, color=t.text, bold=True,
@@ -399,7 +399,7 @@ def _add_figure(
         picture = slide.shapes.add_picture(
             str(image), Inches(6.55), Inches(_BODY_TOP), width=Inches(5.9)
         )
-        shapes["visual"] = picture.shape_id
+        shapes["visual"] = [picture.shape_id]
         caption = entry.get("caption")
         if caption:
             box = _textbox(slide, Inches(6.55), Inches(6.05), Inches(5.9), Inches(0.4))
@@ -436,7 +436,7 @@ def _render_metric_cards(
         shape = slide.shapes.add_shape(
             _ROUNDED, Inches(left), Inches(_BODY_TOP), Inches(width), Inches(1.45)
         )
-        shapes[f"metric_cards[{index}]"] = shape.shape_id
+        shapes[f"metric_cards[{index}]"] = [shape.shape_id]
         shape.fill.solid()
         shape.fill.fore_color.rgb = t.card_fill
         shape.line.color.rgb = t.card_line
@@ -467,27 +467,26 @@ def _render_points(
     width_in: float, height_in: float, theme: RenderTheme, findings: list[Finding],
     shapes: dict,
 ) -> None:
+    """Each point renders as a rounded card (point bold + detail muted inside),
+    and the stack spreads evenly across the body zone — no floating text
+    huddling at the top, no blank canyon under it."""
     t = theme.theme
     detail_size = t.detail_size
+    pad_h, pad_v = 0.22, 0.15  # card padding, inches
 
-    def measure_full(size: int) -> float:
-        total = 0.0
-        for entry in points:
-            point, detail = _point_parts(entry)
-            max_pt = width_in * _PT_PER_IN
-            point_lines = wrap_lines("• " + point, size, max_pt, theme.body_font)
-            total += len(point_lines) * size * _LINE_SPACING + 6
-            if detail:
-                detail_lines = wrap_lines(
-                    detail, detail_size, (width_in - 0.35) * _PT_PER_IN, theme.body_font
-                )
-                total += len(detail_lines) * detail_size * 1.3 + 8
-        return total
+    def card_height(entry, size: int) -> float:
+        point, detail = _point_parts(entry)
+        inner_w = (width_in - 2 * pad_h) * _PT_PER_IN
+        lines = len(wrap_lines(point, size, inner_w, theme.body_font)) * size * _LINE_SPACING
+        if detail:
+            detail_lines = wrap_lines(detail, detail_size, inner_w, theme.body_font)
+            lines += len(detail_lines) * detail_size * 1.3
+        return lines / _PT_PER_IN + 2 * pad_v
 
     max_size = t.body_size if width_in < _BODY_W else t.body_size_wide
     size = 14
     for candidate in range(max_size, 13, -1):
-        if measure_full(candidate) <= height_in * _PT_PER_IN:
+        if sum(card_height(e, candidate) for e in points) <= height_in:
             size = candidate
             break
     else:
@@ -500,32 +499,40 @@ def _render_points(
             )
         )
 
-    needed = measure_full(size)
-    leftover = height_in * _PT_PER_IN - needed
-    extra_gap = max(0.0, min(leftover / max(len(points), 1), 26.0))
+    heights = [card_height(entry, size) for entry in points]
+    gaps = max(1, len(points) - 1)
+    gap = max(0.14, min((height_in - sum(heights)) / gaps, 0.42))
 
-    box = _textbox(slide, Inches(x), Inches(y), Inches(width_in), Inches(height_in))
-    shapes["support_points"] = box.shape_id
-    first = True
-    for entry in points:
+    cursor = y
+    for index, entry in enumerate(points):
         point, detail = _point_parts(entry)
-        if first:
-            paragraph = box.text_frame.paragraphs[0]
-        else:
-            paragraph = box.text_frame.add_paragraph()
-            paragraph.space_before = Pt(extra_gap)
-        first = False
-        _set(
-            paragraph, "• " + point,
-            size=size, font=theme.body_font, color=t.text, bold=detail is not None,
+        card = slide.shapes.add_shape(
+            _ROUNDED, Inches(x), Inches(cursor), Inches(width_in), Inches(heights[index])
         )
+        card.fill.solid()
+        card.fill.fore_color.rgb = t.card_fill
+        card.line.color.rgb = t.card_line
+        card.line.width = Pt(1)
+        card.shadow.inherit = False
+        frame = card.text_frame
+        frame.word_wrap = True
+        frame.margin_left = Inches(pad_h)
+        frame.margin_right = Inches(pad_h)
+        frame.margin_top = Inches(pad_v)
+        frame.margin_bottom = Inches(pad_v)
+        _set(frame.paragraphs[0], point, size=size, font=theme.body_font, color=t.text, bold=True)
         if detail:
-            detail_para = box.text_frame.add_paragraph()
+            detail_para = frame.add_paragraph()
             detail_para.space_before = Pt(2)
-            _set(
-                detail_para, detail, size=detail_size,
-                font=theme.body_font, color=t.muted,
-            )
+            _set(detail_para, detail, size=detail_size, font=theme.body_font, color=t.muted)
+        shapes[f"support_points[{index}]"] = [card.shape_id]
+        cursor += heights[index] + gap
+    # block-level address: the whole stack animates together in pptx v1
+    shapes["support_points"] = [
+        shape_id
+        for index in range(len(points))
+        for shape_id in shapes.get(f"support_points[{index}]", [])
+    ]
 
 
 def _render_callout(
@@ -537,7 +544,7 @@ def _render_callout(
     band = slide.shapes.add_shape(
         _ROUNDED, Inches(_MARGIN_X), Inches(6.1), Inches(_BODY_W), Inches(0.85)
     )
-    shapes["callout"] = band.shape_id
+    shapes["callout"] = [band.shape_id]
     band.fill.solid()
     band.fill.fore_color.rgb = t.card_fill
     band.line.color.rgb = t.card_line
@@ -599,7 +606,7 @@ def _add_chart(
         _CHART_TYPES[chart_type],
         Inches(x), Inches(y), Inches(w), Inches(h), data,
     )
-    shapes["visual"] = frame.shape_id
+    shapes["visual"] = [frame.shape_id]
     chart = frame.chart
     chart.has_legend = False
     if spec.get("title"):
@@ -720,7 +727,7 @@ def _apply_animations(prs: Presentation, plan: dict, result: RenderResult) -> No
             targets: list[int] = []
             for address in step.get("elements") or []:
                 address = str(address)
-                if address.startswith("support_points"):
+                if address.startswith("support_points["):
                     result.findings.append(
                         Finding(
                             "deck_plan", "animation", "info", "pass",
@@ -728,9 +735,10 @@ def _apply_animations(prs: Presentation, plan: dict, result: RenderResult) -> No
                             f"in pptx v1 (paragraph-level is HTML-only)", "deck_plan",
                         )
                     )
-                shape_id = shapes.get(address) or shapes.get(address.split("[")[0])
-                if shape_id is not None and shape_id not in targets:
-                    targets.append(shape_id)
+                ids = shapes.get(address) or shapes.get(address.split("[")[0]) or []
+                for shape_id in ids:
+                    if shape_id not in targets:
+                        targets.append(shape_id)
             if not targets:
                 continue
             if step.get("trigger") == "with_previous" and groups:

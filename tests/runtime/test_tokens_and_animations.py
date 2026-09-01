@@ -112,7 +112,8 @@ def test_pptx_animations_inject_timing_xml(tmp_path: Path):
         slide_xml = archive.read("ppt/slides/slide1.xml").decode("utf-8")
     assert "<p:timing>" in slide_xml and 'nodeType="mainSeq"' in slide_xml
     targets = set(re.findall(r'<p:spTgt spid="(\d+)"', slide_xml))
-    assert {str(shapes["title"]), str(shapes["metric_cards[0]"]), str(shapes["callout"])} <= targets
+    ids = {str(shapes["title"][0]), str(shapes["metric_cards[0]"][0]), str(shapes["callout"][0])}
+    assert ids <= targets
     assert slide_xml.count('nodeType="clickEffect"') == 2
     assert 'filter="fade"' in slide_xml
 

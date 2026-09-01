@@ -62,9 +62,11 @@ def test_html_deck_single_file_with_fragments(tmp_path: Path):
     assert "cdn" not in doc.lower() and len(doc) > 100_000
     # fragments carry explicit indices; with_previous shares the previous index
     indices = sorted({int(i) for i in re.findall(r'data-fragment-index="(\d+)"', doc)})
-    assert indices == [0, 1, 2]  # callout (with_previous) shares visual's index 1
+    assert indices == [0, 1]  # callout (with_previous) shares visual's index 1
     callout = re.search(r'<div class="callout fragment[^"]*" data-fragment-index="(\d+)"', doc)
     assert callout and callout.group(1) == "1"
+    # emphasis never hides the title in the HTML surface
+    assert 'class="fragment' not in doc.split("<h2")[1].split("</h2>")[0]
     # evidence-backed cards and CSS bars
     assert "220 ms" in doc and re.search(r'class="card-value"', doc)
     assert len(re.findall(r'class="bar-fill"', doc)) == 2
