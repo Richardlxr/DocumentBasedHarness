@@ -72,7 +72,15 @@ def load_artifact(run_root: Path, key: str) -> tuple[Any, list[Finding]]:
         return None, [
             Finding(key, "schema", "error", "fail", f"file missing: {path}", key)
         ]
-    data = load_yaml(path)
+    try:
+        data = load_yaml(path)
+    except yaml.YAMLError as error:
+        location = getattr(getattr(error, "problem_mark", None), "line", None)
+        where = f" (line {location + 1})" if location is not None else ""
+        return None, [
+            Finding(key, "schema", "error", "fail",
+                    f"{path.name} is not valid YAML{where}: fix the syntax and retry", key)
+        ]
     findings = [
         Finding(key, "schema", "error", "fail", message, key)
         for message in validate_schema(key, data)

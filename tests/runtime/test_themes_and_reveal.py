@@ -170,3 +170,29 @@ def test_pptx_card_icons_render(tmp_path: Path):
     assert not [f for f in result.findings if f.check == "icon"]
     prs = Presentation(str(tmp_path / "i.pptx"))
     assert any(sh.shape_type == 13 for sh in prs.slides[0].shapes), "icon embedded"
+
+
+def test_malformed_yaml_is_a_finding_not_a_traceback(tmp_path: Path):
+    from comh.artifacts import load_artifact
+    from comh.scaffold import init_run
+
+    run = init_run(tmp_path / "run", "yaml-run")
+    (run / "evidence" / "evidence.yaml").write_text("version: 1\nitems: [broken", encoding="utf-8")
+    data, findings = load_artifact(run, "evidence")
+    assert data is None
+    assert any("not valid YAML" in f.detail and f.severity == "error" for f in findings)
+
+
+def test_agenda_overflow_gets_layout_finding(tmp_path: Path):
+    from comh.render.deck import render_deck
+
+    plan = {
+        "version": 1,
+        "deck": {"title": "t", "pages": [{
+            "id": "P02", "page_role": "agenda", "title": "目录",
+            "support_points": [f"事项{i}" for i in range(10)],
+        }]},
+    }
+    result = render_deck(plan, tmp_path, tmp_path / "agenda.pptx")
+    overflow = [f for f in result.findings if f.check == "layout" and "agenda rows" in f.detail]
+    assert overflow and overflow[0].owning_artifact == "deck_plan"

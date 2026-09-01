@@ -1,112 +1,137 @@
 # DocumentBasedHarness
 
-**把原始材料编译成说服力的沟通编译器。**
-
-Sources in. Conviction out.
-
-你手里有一堆 CSV、实验日志、论文、截图和半成品笔记，六周后要站在客户面前讲清
-一件事。普通的做法是打开 PPT 开始搬字——然后数字对不上、逻辑断裂、报告和幻灯片
-各说各话。这个项目换一条路：
-
-```text
-sources ──► evidence ──► brief ─Gate1─► narrative ─Gate2─► projection ──► render
- 材料        事实库       沟通契约      故事结构          两份计划        成品
-                          （你拍板）    （你拍板）                        pptx / html / docx / md
-                ▲                                                          │
-                └──────────── 修复循环：诊断 → 定位归属层 → 修复 ←──────────┘
-```
-
-**报告和幻灯片不是互相压缩的版本，它们是同一个故事的两个投影。** 事实先变成
-可追溯的证据，证据支撑论断，论断排成故事；你在两个关卡拍板之后，同一份故事
-投影成 PPTX、可动画的 HTML、Markdown 报告（DOCX 自动编译）。每一个出现在成品里
-的数字，都能沿 ID 链一路回溯到源文件的某一行。
+> **把一堆材料，变成一场能说服人的汇报。**
+> 材料进来，事实打底，你拍板两次，幻灯片 / 网页 / 报告一起出来——
+> 每个数字都有出处，每次修改只动该动的那层。
 
 ---
 
-## 为什么它不一样
+## 这是个什么东西？
 
-- **证据是一等公民。** `page → beat → claim → evidence → source` 全链 ID 引用。
-  图表和大数字卡片在**渲染时**直接从证据库取数——数字物理上不可能漂移。从图上
-  估读的数值被显式标注为 estimated，纯估读撑起的结论会被校验器点名。
-- **两个 Gate，硬执行。** 沟通契约（给谁看、要什么效果）和故事逻辑链都要你确认，
-  CLI 拒绝放行未确认的下游——对齐不靠模型自觉。
-- **改了哪层，只重做哪层。** 每层产物记录上游指纹；材料一变全链自动标脏，
-  但内容没变的层重存即恢复、Gate 存活。质检 finding 全部标注归属层。
-- **动画是语义，不是特效。** "先出结论、再出证据、最后出 so-what" 写在
-  deck_plan 里（fragment 模型），HTML 执行它，PPTX（实验性）执行同一份语义。
-- **词汇，不是边界。** 主题是 yaml 数据、叙事模式是 markdown 参考——模型可以
-  混合、改写、无视、创造。硬约束（"不要黑底"）落到亮度级的确定性检查上。
+周五下午，你手里有：一份 CSV、几段实验日志、一张结果截图、半篇没写完的说明。
+下周三，你要用这些说服客户：这个方案值得上。
 
-## 三十秒 workflow
+一般的做法是打开 PPT 开始搬字。搬着搬着就会发现：数字对不上、逻辑断在第三页、
+报告和幻灯片各说各话、改一处漏三处。
 
-| 阶段 | 谁干活 | 产出 |
-|---|---|---|
-| intake | 你 | `sources/` 里丢材料 |
-| evidence | 模型 | `evidence.yaml`：带出处的事实，数字带结构化锚点 |
-| **brief** → Gate 1 | 模型推断，**你拍板** | 受众、目标、硬约束、期望带走什么 |
-| **narrative** → Gate 2 | 模型设计，**你拍板** | beats（每个一句话 message）+ claims（诚实标注证据状态） |
-| projection | 模型 | `deck_plan.yaml` + `report_plan.yaml`（同一故事的两种组装） |
-| render | 纯代码 | `deck.pptx` / `deck.html`（含动画）/ `report.md` + `report.docx` |
-| qa | 代码 + 模型 | 引用链、数字一致性、逻辑、标题、读者测试 |
+这里的做法不一样——一个**汇报编译器**。它先把你的材料读成一份**带出处的
+事实库**，跟你对齐"讲给谁、要什么效果"，设计一条**故事线**（这两步你拍板），
+然后把同一个故事一次编译成三种成品：
 
-完整走一遍（含命令和样例）见 **[用户指南](docs/user-guide.md)**。
+| 成品 | 长什么样 |
+|---|---|
+| `deck.pptx` | 幻灯片：每页一个观点，标题就是结论；数据卡片、图表、示意图的数字**直接从事实库取**——想写错都没机会 |
+| `deck.html` | 网页版：单文件、离线双击可开，带出场动画（先结论、再证据、最后 so-what）和演讲者备注 |
+| `report.md` + `report.docx` | 详版报告：Markdown 是正主，Word 是一键编译的排版成品 |
+
+两个硬承诺：
+
+- **数字不会飞。** 成品里出现的每个数字都能一路点回源文件的某一行；
+  从图上读出来的数字会被老实标注为"估读"，只靠估读撑起来的结论会被点名。
+- **改哪层，修哪层。** 材料变了不会从头重来：系统知道每层产物是从哪个
+  上游生成的，只把受影响的层标脏重做，你确认过的内容原样保留。
+
+---
+
+## 工作流：五步走（全项目的核心）
+
+```text
+  你的材料                你拍板 ①                你拍板 ②
+    │                        │                       │
+    ▼                        ▼                       ▼
+ sources ──► 事实库 ────► 沟通契约 ──────► 故事线 ──► 三种成品
+ csv·日志·    每条事实        给谁看·要什么      一拍一句话      pptx·html·报告
+ 图·文档      都带出处        效果·什么不做      逻辑你过目
+                           ┌─────────────────────────────┘
+                           └── 不满意？沿链定位问题在哪一层，只修那一层
+```
+
+**① 交材料** —— 你把东西丢进 `sources/`（CSV、日志、PDF、图、markdown、旧文档都行），
+AI 逐条提取成事实库：每条带出处，数字带结构化锚点，读图读出来的标注为估读。
+
+**② 对齐目标（你拍板）** —— AI 推断出一份沟通契约：给谁看、想达成什么、多长场合、
+什么语言、希望对方记住什么、什么绝对不能做（"不要黑底"这种会落到代码级强制）。
+你看摘要、改细节、放行：
+
+```bash
+comh confirm brief        # Gate 1：没过这关，后面一步都动不了
+```
+
+**③ 定故事（你拍板）** —— AI 把故事线排成你能一眼看懂的逻辑链：
+
+```text
+01 为什么要关心尾延迟      02 我们怎么验证的       03 P99 降了 18.2%
+04 但高负载有边界          05 原因是缓存挤占被隔离  06 建议灰度 + 专项
+```
+
+每个论断都挂着证据状态（有据 / 部分 / 假设 / 缺料——宁可诚实，不编引用）。
+你确认逻辑链：
+
+```bash
+comh confirm narrative    # Gate 2
+```
+
+**④ 双投影** —— 同一个故事，两种组装（不是互相压缩）：幻灯片按"现场 30 分钟
+怎么讲"投影，报告按"会后细读怎么展开"投影。数据卡片、图表、mermaid 示意图、
+图标（5,130 个语义图标库）在这一步就位。
+
+**⑤ 渲染 + 体检** —— 纯代码出成品，出厂前过一遍体检：
+
+```bash
+comh validate all     # 引用链、数字一致性、硬约束、图语法、遮挡碰撞…
+comh render deck      # → build/deck.pptx
+comh render deck-html # → build/deck.html（动画版）
+comh render report    # → build/report.docx
+```
+
+体检不过会告诉你**该修哪个文件**——每条问题都带归属层，不会让你猜。
+
+**之后不满意？** 一句话描述哪里不对，`comh evidence-pack deck P05` 会把那一页
+的完整证据链切出来（页面→故事→论断→证据→源文件），六问诊断定位病根在哪层，
+提案、放行、只修那层。同一处修两次还不满意，系统会自动换个诊断思路而不是硬修。
+
+---
 
 ## 快速开始
 
 ```bash
-python -m venv .venv
-.venv/bin/pip install -e '.[dev]'
+git clone git@github.com:Richardlxr/DocumentBasedHarness.git
+cd DocumentBasedHarness
+python -m venv .venv && .venv/bin/pip install -e '.[dev]'
 
-# 开一个任务工作区，把材料丢进 sources/
-.venv/bin/comh init-run runs/my-report
+# 看现成的：一个完整的客户汇报样例
+open runs/sample-cache-latency/build/deck.html     # 浏览器里翻页、点动画、按 S 看备注
+open runs/sample-cache-latency/build/deck.pptx
 
-# ……按 stages/*.md 逐阶段产出，用 CLI 记录状态、过 Gate、验证、渲染：
-.venv/bin/comh save evidence
-.venv/bin/comh confirm brief          # Gate 1：你确认沟通契约
-.venv/bin/comh confirm narrative      # Gate 2：你确认故事逻辑链
-.venv/bin/comh validate all           # 0 error 才算数
-.venv/bin/comh render deck            # → build/deck.pptx（主题、卡片、图表、实测防溢出）
-.venv/bin/comh render deck-html       # → build/deck.html（reveal.js 单文件，动画开箱即用）
-.venv/bin/comh render report          # → build/report.docx（md 是正主，docx 是编译副产物）
+# 开你自己的
+.venv/bin/comh init-run runs/my-report    # 材料丢进 sources/，然后按上面五步走
 ```
 
-现场demo（场景 A：缓存实验 → 客户汇报）就在 `runs/sample-cache-latency/`，
-`open runs/sample-cache-latency/build/deck.html` 直接看。
+图形（mermaid 示意图）渲染需要 draw.io Desktop；macOS 上：
+`export DRAWIO_CLI="/Applications/draw.io.app/Contents/MacOS/draw.io"`
+（版本与内置 pin 不一致时再加 `DRAWIO_ACCEPT_VERSION=<版本号>`）。
 
-## 能力一览
+---
 
-| | |
-|---|---|
-| **图标素材** | 5,130 个 tabler-outline 语义图标（MIT，`assets/vendor/`）+ 可搜索索引；HTML 内联 SVG、pptx 经 Chrome 栅格化缓存；Gate 1 显式沟通素材方向 |
-| **主题** | `themes/*.yaml`（palette/字号/字体）；run 可自带主题覆盖仓库级；`tokens_override` 按次微调；brief 禁深色 → 亮度级强制浅色 |
-| **页面结构** | 展开式要点（加粗导语+浅色展开）、大数字卡片（证据取数）、原生图表（证据取数）、底部结论条、mermaid 示意图（确定性布局）、图片带图注与溯源 |
-| **布局** | 真实字形度量 → 确定性换行 → 字号自适应；装不下出 finding，不静默溢出 |
-| **动画** | `reveal`/`emphasis` 步骤（元素寻址在验证期解析）；HTML 全量执行；PPTX appear/fade_in（实验性，需真机验证后开 `animations: true`） |
-| **报告** | Markdown 为正主；docx-harness 确定性编译 DOCX（原生公式/表格/mermaid），方言写错带行号报错=免费质检 |
-| **质检** | ID 链完整性、数字一致性（含日期/序号降噪）、beat 覆盖、硬约束、图语法干跑、估读诚实性、Gate 有效性 |
-| **修复循环** | `evidence-pack` 一条命令切出某页的完整溯源切片；六问诊断定归属层；两次修不好自动升级换假设 |
+## 凭什么信它
 
-## 用户与开发者
+- **两道关卡，代码强制。** 契约和故事线没经你确认，下游命令直接拒绝执行；
+  确认后偷改文件会自动作废确认——对齐不靠模型自觉。
+- **验收有清单。** 135 个自动化测试 + 十类出厂体检：悬空引用、无据结论、
+  数字漂移、静默丢内容、图语法错误、图标名写错、元素遮挡、越界、密度超载…
+- **AI 做判断，代码管合同。** 该灵活的地方（叙事模式、视觉风格、spec 维度）
+  是开放的词汇表；该死硬的地方（Gate、溯源、硬约束）是确定性代码。
 
-- **使用者**：[docs/user-guide.md](docs/user-guide.md) —— 从材料到成品的完整走法，
-  含修复循环和常见任务。
-- **AI 操作者**：`skill/SKILL.md` 路由 → `stages/*.md` 是每个阶段的判断力来源。
-- **架构与纪律**：`AGENTS.md`；编译器内部设计：`docs/compiler/`。
+## 深入了解
 
-## 设计原则
+- **[用户指南](docs/user-guide.md)** —— 五步走完整手册：命令、验证器抓什么、
+  修复循环怎么用、材料更新后怎么办
+- **给 AI 操作者** —— `skill/SKILL.md` 路由各阶段指令（`stages/`）
+- **架构与纪律** —— `AGENTS.md`；内置 DOCX 编译器的设计：`docs/compiler/`
 
-1. Content logic before visual design.
-2. Report ≠ 字更多的 Presentation；两者是同一 narrative 的投影。
-3. Libraries provide vocabulary, not boundaries.
-4. User hard constraints > 用户偏好 > 已确认 spec > 模型推断 > preset。
-5. 持久化显式推理 artifact，不保存隐藏 Chain-of-Thought。
-6. Evidence → Claim → Narrative → Projection → Artifact，每步可回溯。
-7. 修复在归属层进行；上游变更只标脏，不自动重生成。
-8. 观众是最终消费者——优化他们理解了什么，不是你想倒什么。
+## 设计原则（八句话）
 
-## 环境备注
-
-- 图形（mermaid → PNG）渲染需要 draw.io CLI；macOS：
-  `export DRAWIO_CLI="/Applications/draw.io.app/Contents/MacOS/draw.io"`
-  （版本与上游 pin 不符时再加 `DRAWIO_ACCEPT_VERSION=<你的版本>`，显式放行）。
-- 测试与 lint：`.venv/bin/pytest && .venv/bin/ruff check .`
+内容逻辑先于视觉设计 · 报告和幻灯片是同一故事的两个投影 ·
+词库只供词汇不划边界 · 用户硬约束 > 偏好 > 已确认 spec > 推断 > 默认 ·
+保存显式产物而非隐藏思维链 · 证据→论断→故事→投影→成品步步可回溯 ·
+修复在归属层进行 · 观众是最终消费者——优化他们记住了什么，不是你想倒什么

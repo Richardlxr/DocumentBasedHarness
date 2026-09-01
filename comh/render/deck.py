@@ -274,6 +274,15 @@ def _render_agenda(
     top, bottom = 2.0, 6.7
     n = max(len(entries), 1)
     row_h = (bottom - top) / n
+    if row_h < 0.55:
+        result.findings.append(
+            Finding(
+                "deck_plan", "layout", "warn", "fail",
+                f"page {page.get('id', '?')}: {len(entries)} agenda rows leave only "
+                f"{row_h:.2f}in each (needs ~0.55in) — merge or split into two pages",
+                "deck_plan",
+            )
+        )
     for index, entry in enumerate(entries):
         point, _detail = _point_parts(entry)
         y = top + index * row_h

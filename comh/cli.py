@@ -293,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return args.func(args)
-    except (RunError, FileNotFoundError, FileExistsError, KeyError) as error:
+    except (RunError, FileNotFoundError, FileExistsError, KeyError, RuntimeError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
 
