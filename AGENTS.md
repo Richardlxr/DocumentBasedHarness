@@ -59,6 +59,14 @@ upstream by replacing the package directory and re-running `tests/compiler/`.
 - Model judgment lives in `stages/*.md` (prompts) and `references/*.md` (vocabulary);
   contracts and invariants live in `comh/` (code). Do not move judgment into code or
   contracts into prompts.
+- Themes are data (`themes/<name>/theme.yaml`; a run may carry `runs/<name>/themes/`
+  which takes precedence). Theme files change tokens only. Future per-role layout
+  implementations in themes must compose the measured primitives in
+  `comh/render/metrics.py` (`fit_box`/`wrap_lines`) — a theme may never compute raw
+  coordinates itself, or overflow findings stop being guaranteed.
+- Reveal/emphasis are fragment-style semantics: element addresses resolve
+  deterministically at validation time; renderers (pptx timing XML, HTML fragments)
+  execute the same steps. Keep the verb set small.
 - Open vocabularies (evidence `kind`, beat `purpose`, `spec.dimensions`, `page_role`
   beyond the known set) must stay open: validators warn on unknown values instead of
   rejecting them, and unknown `spec.dimensions` are passed through, never interpreted.

@@ -26,6 +26,7 @@ sources → evidence → brief ─Gate1─→ narrative ─Gate2─→ projectio
 | `docx_harness/` | 搬入的确定性 Markdown/MyST → DOCX 编译器（原样保留，独立演进，见 `docs/compiler/`） |
 | `stages/` | 每个 stage 的模型指令（progressive disclosure，模型判断力的注入点） |
 | `references/` | 词汇库：叙事模式、slide craft。提供参考，不是能力边界 |
+| `themes/` | 主题包（数据）：palette、字号、字体；run 可自带 `themes/` 覆盖仓库级 |
 | `skill/` | Agent Skill 打包入口 |
 | `runs/<name>/` | 一次沟通任务的工作区（artifact 全部版本化） |
 | `tests/` | `tests/runtime/`（沟通层）+ `tests/compiler/`（编译器契约测试） |

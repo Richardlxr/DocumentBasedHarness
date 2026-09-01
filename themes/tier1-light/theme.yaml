@@ -1,0 +1,27 @@
+name: tier1-light
+is_light: true
+
+# 默认浅色主题：白底、深灰文字、蓝色强调。
+colors:
+  background: "FFFFFF"
+  text: "1F2937"
+  muted: "6B7280"
+  accent: "2563EB"
+  accent_soft: "93C5FD"
+  card_fill: "F1F5F9"
+  card_line: "CBD5E1"
+
+fonts:
+  latin: ["Calibri", "Calibri"]   # (title, body)
+
+sizes:
+  cover_title: 44
+  banner_title: 36
+  content_title: 32
+  body: 22
+  body_wide: 24
+  detail: 17
+  caption: 13
+  card_value: 34
+  card_label: 13
+  callout: 18

@@ -83,8 +83,12 @@ deck:
           series:
             - {label: baseline, value_from: E001}
             - {label: partitioned, value_from: E002}
-      emphasis: [P99 降低 18.2%（本页唯一大数字）]
-      reveal: [先出基线柱, 再出分区柱, 最后出降幅标注]
+      emphasis:
+        - {elements: [title], verb: highlight, note: 本页唯一大数字}
+      reveal:
+        - {elements: ["support_points[0]"], verb: fade_in, trigger: click}
+        - {elements: [visual], verb: fade_in, trigger: click}
+        - {elements: ["support_points[2]", callout], verb: fade_in, trigger: click}
       demotions:
         - content: 逐轮 P99 时序图与轮间波动区间
           to: appendix
@@ -108,6 +112,11 @@ deck:
         - point: 磁盘 IO 假设尚未单独验证，是下一阶段专项的内容
           detail: 明确标注为推测——诚实呈现比硬撑更能建立信任
       visual: {intent: 双场景对比：标准负载 vs 高负载的改善幅度并排}
+      emphasis:
+        - {elements: ["metric_cards[2]"], verb: highlight, note: 改善幅度是本页锚点}
+      reveal:
+        - {elements: ["metric_cards[0]", "metric_cards[1]"], verb: appear, trigger: click}
+        - {elements: ["metric_cards[2]"], verb: fade_in, trigger: click}
       notes: |
         明确说这是推测（E008 为 assumption）：磁盘 IO 假设尚未单独验证，
         是下一阶段专项的内容。

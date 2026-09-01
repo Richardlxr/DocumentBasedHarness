@@ -27,6 +27,13 @@ _NUMBER = re.compile(r"(?<![A-Za-z\d])-?\d+(?:\.\d+)?(?!\s*[年月日])")
 _NON_PROSE = re.compile(r"```.*?```|^:::.*?:::", re.DOTALL | re.MULTILINE)
 # Ordered-list markers ("1. ", "2、") are structure, not data.
 _LIST_MARKER = re.compile(r"^(\s*)\d+[.、)]\s+", re.MULTILINE)
+
+# Reveal/emphasis semantics (fragment model): element addresses resolve against
+# the page structure deterministically at validation time.
+_ADDRESS = re.compile(r"^([a-z_]+)(?:\[(\d+)\])?$")
+_ELEMENT_BASES = {"title", "callout", "visual", "support_points", "metric_cards"}
+_KNOWN_VERBS = {"appear", "fade_in", "emphasize", "highlight"}
+_KNOWN_TRIGGERS = {"click", "with_previous", "after"}
 _MUST_INCLUDE = re.compile(r"必须包含[:：]?\s*(.+)")
 _BACKGROUND_FORBIDS_DARK = re.compile(r"黑底|暗色背景|深色背景|dark background", re.IGNORECASE)
 
@@ -334,6 +341,81 @@ def validate_visuals(artifacts: dict[str, dict | None]) -> list[Finding]:
     return findings
 
 
+def _address_error(page: dict, address: str) -> str | None:
+    """Resolve one element address against a page; None when valid."""
+    match = _ADDRESS.match(address)
+    if not match:
+        return (
+            f"'{address}' is not a valid element address "
+            f"(title | callout | visual | support_points[i] | metric_cards[i])"
+        )
+    base, index = match.group(1), match.group(2)
+    if base not in _ELEMENT_BASES:
+        return f"unknown element '{base}'"
+    if base in ("title", "callout", "visual") and index is not None:
+        return f"'{base}' takes no index"
+    if base == "visual":
+        visual = page.get("visual") or {}
+        if not (visual.get("chart") or visual.get("diagram") or visual.get("asset_refs")):
+            return "'visual' addressed but the page has no chart/diagram/figure"
+    if base == "callout" and not page.get("callout"):
+        return "'callout' addressed but the page has none"
+    if base == "support_points":
+        points = page.get("support_points") or []
+        if index is None and not points:
+            return "'support_points' addressed but the page has none"
+        if index is not None and int(index) >= len(points):
+            return f"support_points[{index}] out of range ({len(points)} points)"
+    if base == "metric_cards":
+        cards = page.get("metric_cards") or []
+        if index is None and not cards:
+            return "'metric_cards' addressed but the page has none"
+        if index is not None and int(index) >= len(cards):
+            return f"metric_cards[{index}] out of range ({len(cards)} cards)"
+    return None
+
+
+def validate_reveal(artifacts: dict[str, dict | None]) -> list[Finding]:
+    """Reveal/emphasis steps: element addresses must resolve against the page,
+    verbs/triggers come from the fragment vocabulary (unknown values warn)."""
+    findings: list[Finding] = []
+    deck = artifacts.get("deck_plan") or {}
+    for page in deck.get("deck", {}).get("pages", []):
+        page_id = page["id"]
+        for field in ("reveal", "emphasis"):
+            for entry in page.get(field) or []:
+                if not isinstance(entry, dict):
+                    continue  # legacy free-form note string
+                for address in entry.get("elements") or []:
+                    error = _address_error(page, str(address))
+                    if error:
+                        findings.append(
+                            Finding(
+                                "deck_plan", "reveal-address", "error", "fail",
+                                f"page {page_id} {field}: {error}", "deck_plan",
+                            )
+                        )
+                verb = entry.get("verb")
+                if verb and verb not in _KNOWN_VERBS:
+                    findings.append(
+                        Finding(
+                            "deck_plan", "reveal-verb", "warn", "pass",
+                            f"page {page_id} {field}: unknown verb '{verb}' "
+                            f"(renderers ignore unknown verbs)", "deck_plan",
+                        )
+                    )
+                trigger = entry.get("trigger")
+                if trigger and trigger not in _KNOWN_TRIGGERS:
+                    findings.append(
+                        Finding(
+                            "deck_plan", "reveal-trigger", "warn", "pass",
+                            f"page {page_id} {field}: unknown trigger '{trigger}'",
+                            "deck_plan",
+                        )
+                    )
+    return findings
+
+
 def validate_hard_constraints(
     artifacts: dict[str, dict | None], report_md_text: str | None
 ) -> list[Finding]:
@@ -402,6 +484,7 @@ def run_all(run_root: Path) -> list[Finding]:
         findings += validate_numbers(artifacts, report_md_text)
         findings += validate_coverage(artifacts)
         findings += validate_visuals(artifacts)
+        findings += validate_reveal(artifacts)
     if artifacts.get("brief") is not None:
         findings += validate_hard_constraints(artifacts, report_md_text)
 
@@ -442,4 +525,5 @@ __all__ = [
     "validate_hard_constraints",
     "validate_numbers",
     "validate_refs",
+    "validate_reveal",
 ]

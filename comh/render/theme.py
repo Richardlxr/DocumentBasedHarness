@@ -1,19 +1,40 @@
 """Deck themes: vocabulary, not boundaries.
 
-A theme is a small palette/typography record the renderer consumes. The
-registry provides built-ins; ``deck.style.template`` may name one, miss it
-(fallback + warn), or carry a free-form ``palette_hint`` a future model-driven
-renderer could interpret. Unknown keys pass through untouched.
+Themes are data. They live as ``themes/<name>/theme.yaml`` — at the
+repository root (the shipped built-ins) and optionally at
+``<run_root>/themes/`` (run-local themes take precedence, so a run can carry
+its own). ``select_theme`` resolves ``deck.style.template`` with explicit
+fallbacks; unknown names fall back to the default with a finding.
 
 ``is_light`` participates in hard-constraint enforcement: a brief that forbids
-dark backgrounds pins every selectable theme to a light one.
+dark backgrounds pins every selectable theme to a light one — deterministically.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 
+import yaml
 from pptx.dml.color import RGBColor
+
+DEFAULT_THEME_NAME = "tier1-light"
+
+_REPO_THEMES = Path(__file__).resolve().parents[2] / "themes"
+
+_SIZE_FIELDS = {
+    "cover_title": "cover_title_size",
+    "banner_title": "banner_title_size",
+    "content_title": "content_title_size",
+    "body": "body_size",
+    "body_wide": "body_size_wide",
+    "detail": "detail_size",
+    "caption": "caption_size",
+    "card_value": "card_value_size",
+    "card_label": "card_label_size",
+    "callout": "callout_size",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,50 +66,68 @@ def _rgb(value: str) -> RGBColor:
     return RGBColor.from_string(value)
 
 
-TIER1_LIGHT = DeckTheme(
-    name="tier1-light",
-    is_light=True,
-    background=_rgb("FFFFFF"),
-    text=_rgb("1F2937"),
-    muted=_rgb("6B7280"),
-    accent=_rgb("2563EB"),
-    accent_soft=_rgb("93C5FD"),
-    card_fill=_rgb("F1F5F9"),
-    card_line=_rgb("CBD5E1"),
-)
+def _emergency_default() -> DeckTheme:
+    return DeckTheme(
+        name=DEFAULT_THEME_NAME,
+        is_light=True,
+        background=_rgb("FFFFFF"),
+        text=_rgb("1F2937"),
+        muted=_rgb("6B7280"),
+        accent=_rgb("2563EB"),
+        accent_soft=_rgb("93C5FD"),
+        card_fill=_rgb("F1F5F9"),
+        card_line=_rgb("CBD5E1"),
+    )
 
-SLATE_TECH = DeckTheme(
-    name="slate-tech",
-    is_light=True,
-    background=_rgb("F1F5F9"),
-    text=_rgb("0F172A"),
-    muted=_rgb("64748B"),
-    accent=_rgb("4F46E5"),
-    accent_soft=_rgb("A5B4FC"),
-    card_fill=_rgb("FFFFFF"),
-    card_line=_rgb("CBD5E1"),
-    latin_fonts=("Segoe UI", "Segoe UI"),
-)
 
-MIDNIGHT = DeckTheme(
-    name="midnight",
-    is_light=False,
-    background=_rgb("0F172A"),
-    text=_rgb("F8FAFC"),
-    muted=_rgb("94A3B8"),
-    accent=_rgb("38BDF8"),
-    accent_soft=_rgb("0EA5E9"),
-    card_fill=_rgb("1E293B"),
-    card_line=_rgb("334155"),
-    latin_fonts=("Aptos Display", "Aptos"),
-    notes="dark theme; forbidden automatically when the brief pins a light background",
-)
+def load_theme(path: Path) -> DeckTheme:
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    colors = data.get("colors") or {}
+    sizes = data.get("sizes") or {}
+    fonts = data.get("fonts") or {}
+    latin = list(fonts.get("latin") or []) + ["Calibri", "Calibri"]
+    kwargs = {_SIZE_FIELDS[key]: int(value) for key, value in sizes.items() if key in _SIZE_FIELDS}
+    return DeckTheme(
+        name=str(data["name"]),
+        is_light=bool(data["is_light"]),
+        background=_rgb(colors["background"]),
+        text=_rgb(colors["text"]),
+        muted=_rgb(colors["muted"]),
+        accent=_rgb(colors["accent"]),
+        accent_soft=_rgb(colors["accent_soft"]),
+        card_fill=_rgb(colors["card_fill"]),
+        card_line=_rgb(colors["card_line"]),
+        latin_fonts=(str(latin[0]), str(latin[1])),
+        notes=str(data.get("notes", "")),
+        **kwargs,
+    )
 
-DEFAULT_THEME = TIER1_LIGHT
 
-_REGISTRY: dict[str, DeckTheme] = {
-    theme.name: theme for theme in (TIER1_LIGHT, SLATE_TECH, MIDNIGHT)
-}
+@lru_cache(maxsize=8)
+def _registry(repo_themes: str, run_themes: str | None) -> dict[str, DeckTheme]:
+    """Load themes; run-local directory wins over the repository directory."""
+    themes: dict[str, DeckTheme] = {}
+    directories = [Path(repo_themes)]
+    if run_themes:
+        directories.insert(0, Path(run_themes))
+    for directory in directories:
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.glob("*/theme.yaml")):
+            try:
+                theme = load_theme(path)
+            except (KeyError, ValueError, yaml.YAMLError):
+                continue  # a broken theme file must not take the renderer down
+            themes[theme.name] = theme
+    if not themes:
+        default = _emergency_default()
+        themes[default.name] = default
+    return themes
+
+
+def available_themes(run_root: Path | None = None) -> dict[str, DeckTheme]:
+    run_themes = str((run_root / "themes").resolve()) if run_root else None
+    return _registry(str(_REPO_THEMES), run_themes)
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,25 +138,29 @@ class ThemeChoice:
     forced_light: bool = False
 
 
-def select_theme(style: dict | None, *, allow_dark: bool = True) -> ThemeChoice:
+def select_theme(
+    style: dict | None, *, allow_dark: bool = True, run_root: Path | None = None
+) -> ThemeChoice:
     """Resolve ``deck.style.template`` into a theme with explicit fallbacks.
 
     ``allow_dark=False`` (the brief contains a dark-forbidding hard constraint)
     forces any dark selection to the default light theme — deterministically,
     not by prompt discipline.
     """
+    registry = available_themes(run_root)
+    default = registry.get(DEFAULT_THEME_NAME) or next(iter(registry.values()))
     requested = (style or {}).get("template")
     if requested is None:
-        return ThemeChoice(DEFAULT_THEME, None)
-    theme = _REGISTRY.get(str(requested))
+        return ThemeChoice(default, None)
+    theme = registry.get(str(requested))
     if theme is None:
         return ThemeChoice(
-            DEFAULT_THEME,
+            default,
             str(requested),
-            fallback_reason=f"unknown template '{requested}'; using '{DEFAULT_THEME.name}'",
+            fallback_reason=f"unknown template '{requested}'; using '{default.name}'",
         )
     if not allow_dark and not theme.is_light:
-        return ThemeChoice(DEFAULT_THEME, str(requested), forced_light=True)
+        return ThemeChoice(default, str(requested), forced_light=True)
     return ThemeChoice(theme, str(requested))
 
 
@@ -139,8 +182,14 @@ def fonts_for(theme: DeckTheme, language: str) -> tuple[str, str]:
     return theme.latin_fonts
 
 
-def render_theme(style: dict | None, language: str, *, allow_dark: bool = True) -> RenderTheme:
-    choice = select_theme(style, allow_dark=allow_dark)
+def render_theme(
+    style: dict | None,
+    language: str,
+    *,
+    allow_dark: bool = True,
+    run_root: Path | None = None,
+) -> RenderTheme:
+    choice = select_theme(style, allow_dark=allow_dark, run_root=run_root)
     title_font, body_font = fonts_for(choice.theme, language)
     return RenderTheme(
         theme=choice.theme,

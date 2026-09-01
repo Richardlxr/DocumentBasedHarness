@@ -37,8 +37,19 @@
 - `流程：请求路径时序，瓶颈标红`
 - `证据引用：放大关键数字，来源标注在角落`
 
-emphases/reveal 的语义写法：`emphasis: [P99 降低 18.2%（本页唯一大数字）]`；
-`reveal: [先出基线柱, 再出优化柱, 最后出差异标注]`。
+emphasis/reveal 的正式写法（fragment 模式，renderer 将来执行）：
+
+```yaml
+emphasis:
+  - {elements: [title], verb: highlight, note: 本页唯一大数字}
+reveal:
+  - {elements: [support_points[0]], verb: fade_in, trigger: click}
+  - {elements: [visual], verb: fade_in, trigger: click}
+  - {elements: [callout], verb: fade_in, trigger: click}
+```
+
+要点：出场顺序讲的是"论证的展开节奏"（先给结论，再给证据，最后给 so-what），
+不是花哨；每页 reveal 步骤通常不超过三步。
 
 ## Speaker notes
 

@@ -1,0 +1,29 @@
+name: midnight
+is_light: false
+
+# 深色主题。brief 的硬约束禁深色时，选它会被校验器打回、渲染器强制浅色。
+colors:
+  background: "0F172A"
+  text: "F8FAFC"
+  muted: "94A3B8"
+  accent: "38BDF8"
+  accent_soft: "0EA5E9"
+  card_fill: "1E293B"
+  card_line: "334155"
+
+fonts:
+  latin: ["Aptos Display", "Aptos"]
+
+sizes:
+  cover_title: 44
+  banner_title: 36
+  content_title: 32
+  body: 22
+  body_wide: 24
+  detail: 17
+  caption: 13
+  card_value: 34
+  card_label: 13
+  callout: 18
+
+notes: dark theme; forbidden automatically when the brief pins a light background

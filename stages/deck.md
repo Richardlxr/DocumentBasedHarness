@@ -52,9 +52,23 @@
 - `demotions[]`：凡是从本 beat 里裁掉、去了别处的信息，登记 `{content, to}`，
   `to` ∈ `notes | appendix | report_only`。**内容去向必须可审计**——没有 demotion
   记录的静默丢弃会被 QA 盯上。
-- `emphasis` / `reveal`：语义级的强调与出场顺序（"先出基线，再出优化后数字"）。
-  当前 renderer 忽略它们；未来的动画词汇表和 HTML surface 会消费。这是沟通决策，
-  不是视觉决策，所以属于这里。
+- `emphasis` / `reveal`：**出场顺序和强调是沟通决策，不是视觉决策**——这是动画的
+  语义建模（fragment 模式）。正式形式是步骤对象：
+  ```yaml
+  reveal:
+    - elements: [support_points[0]]   # 语义地址：title | callout | visual |
+      verb: fade_in                    #   support_points[i] | metric_cards[i]
+      trigger: click                   # 动词: appear|fade_in|emphasize|highlight
+    - elements: [visual, callout]      # 触发: click|with_previous|after
+      verb: fade_in
+      trigger: click
+  emphasis:
+    - elements: [title]
+      verb: highlight
+  ```
+  纯字符串仍然允许（自由备注，renderer 忽略）。地址在 validate 期确定性解析——
+  写错名字/越界会直接报 error。当前 pptx renderer 尚不消费步骤对象；HTML surface
+  和 PPTX 动画词汇表将执行同一份语义。
 - 所有数字必须来自 evidence（派生数字先落库，见 stages/evidence.md）。
 
 ## 收尾

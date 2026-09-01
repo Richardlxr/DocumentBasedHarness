@@ -1,0 +1,27 @@
+name: slate-tech
+is_light: true
+
+# 石板蓝科技感：浅石板底、靛蓝强调。客户技术评审场合的默认选择。
+colors:
+  background: "F1F5F9"
+  text: "0F172A"
+  muted: "64748B"
+  accent: "4F46E5"
+  accent_soft: "A5B4FC"
+  card_fill: "FFFFFF"
+  card_line: "CBD5E1"
+
+fonts:
+  latin: ["Segoe UI", "Segoe UI"]
+
+sizes:
+  cover_title: 44
+  banner_title: 36
+  content_title: 32
+  body: 22
+  body_wide: 24
+  detail: 17
+  caption: 13
+  card_value: 34
+  card_label: 13
+  callout: 18

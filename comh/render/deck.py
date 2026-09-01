@@ -75,7 +75,9 @@ def render_deck(
     evidence: dict | None = None,
     allow_dark: bool = True,
 ) -> RenderResult:
-    theme = render_theme(plan.get("deck", {}).get("style"), language, allow_dark=allow_dark)
+    theme = render_theme(
+        plan.get("deck", {}).get("style"), language, allow_dark=allow_dark, run_root=run_root
+    )
     result = RenderResult(output=output, theme=theme.theme.name, transition=None)
     if theme.fallback_reason:
         result.findings.append(

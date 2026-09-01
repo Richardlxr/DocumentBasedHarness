@@ -5,6 +5,27 @@
   "type": "object",
   "required": ["version", "deck"],
   "additionalProperties": true,
+  "$defs": {
+    "revealStep": {
+      "type": "object",
+      "required": ["elements"],
+      "additionalProperties": true,
+      "properties": {
+        "elements": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Semantic element addresses: title | callout | visual | support_points[i] | metric_cards[i]. Bare block name (support_points) = the whole block. Renderers resolve addresses to shapes (pptx) or DOM nodes (html); validate-time resolution is deterministic."
+        },
+        "verb": {
+          "type": "string",
+          "description": "appear | fade_in | emphasize | highlight (fragment-style verb set; open vocabulary, renderers warn-and-ignore unknown)."
+        },
+        "trigger": { "type": "string", "description": "click | with_previous | after." },
+        "note": { "type": "string" }
+      }
+    }
+  },
   "properties": {
     "version": { "const": 1 },
     "deck": {
@@ -151,8 +172,16 @@
                   }
                 }
               },
-              "emphasis": { "type": "array", "items": { "type": "string" }, "description": "Semantic emphasis (future animation vocabulary; renderers may ignore)." },
-              "reveal": { "type": "array", "items": { "type": "string" }, "description": "Semantic reveal order (future animation vocabulary; renderers may ignore)." },
+              "emphasis": {
+                "type": "array",
+                "description": "What to emphasize on this page. Plain strings are free-form notes; objects are formal reveal steps (elements + verb) that animation renderers execute.",
+                "items": { "anyOf": [{ "type": "string" }, { "$ref": "#/$defs/revealStep" }] }
+              },
+              "reveal": {
+                "type": "array",
+                "description": "Reveal order: what appears when. Plain strings are free-form notes; objects are formal steps — animation is sequencing semantics, not visual properties (fragment model).",
+                "items": { "anyOf": [{ "type": "string" }, { "$ref": "#/$defs/revealStep" }] }
+              },
               "merge_rationale": { "type": "string", "description": "Required when one page merges multiple beats." }
             }
           }
