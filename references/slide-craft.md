@@ -14,13 +14,18 @@
 句式工具：数字结论式、对比式（A 赢在 X，B 赢在 Y）、条件式（在 Y 边界内 X 成立）、
 主张式（先给结论，支撑点在页面下方）。
 
-## 密度
+## 密度与充实
 
 - 由 brief 的 spec.dimensions 决定，没有死字数。executive 场景每页 1-2 个支撑点；
   技术评审可以 3-4 个 + 图。
+- **页面主体区至少要有一个展开结构或视觉块**：`{point, detail}` 展开式要点、
+  `metric_cards` 大数字卡片、`chart` 图表、或 `callout` 结论条。"三个短 bullet 孤悬
+  一页"就是太空——要么展开，要么合并页面。
+- 展开优先加宽而不是加多：一个 point 带 detail 比五个裸 bullet 层次好。
 - 页面放不下就 demote：细节去 `notes`，证明过程去 `appendix`，长论证去
   `report_only`。**demotions 必须登记**。
 - 图 > 表 > 短句 > 长句。能用一张对比图说清的，不要用四个 bullet。
+- callout 是"so what"强化条，不是第二个 message；它讲了新事情 = 该拆页。
 
 ## 视觉意图词汇（visual.intent）
 

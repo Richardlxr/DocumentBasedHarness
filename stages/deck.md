@@ -13,19 +13,31 @@
 页面规则：
 
 - 一页 ≈ 一个主要沟通信息。内容页 `title` 写**观众该记住的那句话**，不写话题所属。
-  反例："实验结果"。正例："Cache partitioning 将 P99 latency 降低 18.2%"。
+  反例："实验结果"。正例："Cache Partitioning 将 P99 latency 降低 18.2%"。
 - 但不要机械执行：`page_role` 为 `cover` / `agenda` / `section_divider` /
   `closing` / `appendix` 的页面用主题式标题是正当的。系统按 role 理解页面，QA 也按
   role 分规则检查。
 - `beat`：引用 `Sxx`。一 beat 拆多页可以；多 beat 并一页必须写 `merge_rationale`。
-- `support_points`：每页 2-4 个支撑点，短句。密度按 `spec.dimensions` 和
-  `density_hint` 自己判断，没有死字数规则。
+
+## 让页面充实（展开结构）
+
+"三个短 bullet 孤悬一页"就是太空。页面主体区至少要有一种展开结构或视觉块：
+
+- **`support_points` 支持 `{point, detail}`**：point 是加粗导语，detail 是下面一行浅色
+  展开。这是首选的充实手段——比加第四第五个 bullet 好，信息有层次。
+- **`metric_cards`**：数据页的大数字卡片，`{label, value_from: Exxx}`，数值渲染时从
+  evidence 取（不会漂移）。适合 2-4 个关键数字。卡片和图表同时用会很挤，二选一。
+- **`callout`**：底部"so what"结论条 `{text, evidence?}`。**强化本页信息，不许引入
+  第二个 message**——如果 callout 讲的是新事情，说明该拆页了。
 - `visual.intent`：用自然语言描述视觉意图，具体像素留给 renderer。落到具体载体时：
   - **数据图优先用 `visual.chart`**：`{type: bar|column|line, series: [{label,
     value_from: Exxx}]}`。数值在渲染时直接从 evidence 的 `value.number` 取——图上的
     数字物理上不可能和证据库漂移。前提：被引用的 evidence 条目必须有 `value`。
   - 已有图片用 `asset_refs`，**引用图片时用对象形式 `{ref, caption, evidence}`**——
     caption 随图渲染，evidence 把图挂进溯源链。图不是溯源的盲区。
+
+密度仍按 brief 的 spec.dimensions 判断——没有死字数规则，但"空"和"密"都该是有意
+为之的选择，不是默认结果。
 - `deck.style`：`template` 选主题（内置 `tier1-light` / `slate-tech` / `midnight`，
   未知名字回退默认并出 finding）；`transition` 选转场（`fade|push|wipe|cut`）；
   其余键（如 `palette_hint`）自由写，代码透传。注意：brief 禁深色时选 midnight 主题

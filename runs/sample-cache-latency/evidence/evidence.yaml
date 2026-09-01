@@ -66,6 +66,21 @@ items:
     extraction: {via: visual, confidence: estimated, note: "估读用于佐证逐轮稳定性（无交叉），数值以 E001/E002 的文件读数为准"}
     tags: [corroboration, visual]
 
+  - id: E011
+    kind: datum
+    content: 高负载下 partitioned 配置的 P99 latency 为 910ms（6 轮稳定值）
+    value: {number: 910, unit: ms, label: partitioned P99（高负载）}
+    source: {source: SRC01, locator: "config=partitioned_highload, col=p99_ms"}
+    observed_at: "2026-08-28"
+    tags: [latency, highload, partitioned]
+
+  - id: E012
+    kind: datum
+    content: 高负载下 P99 从 940ms 到 910ms，改善约 3.2%
+    value: {number: 3.2, unit: "%", label: P99 改善（高负载）}
+    source: {source: derived, locator: "derived:(E005,E011)"}
+    tags: [derived]
+
   - id: E006
     kind: fact
     content: 实验条件——同硬件 3 节点集群、缓存层 256GB、固定负载生成器回放线上流量模型；标准负载重复 12 轮、高负载重复 6 轮

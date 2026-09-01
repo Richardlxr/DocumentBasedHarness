@@ -1,19 +1,20 @@
 """Deck renderer: projection/deck_plan.yaml → build/deck.pptx.
 
-Pure code — no model in the loop at render time. Tier-2 capabilities:
+Pure code — no model in the loop at render time. Content pages compose four
+optional blocks, so a page fills its canvas with substance instead of three
+short bullets floating in white space:
 
-- **Themes** (``deck.style.template``): palette + typography records from the
-  registry; unknown names fall back with a finding. A brief that forbids dark
-  backgrounds pins the render to a light theme deterministically.
-- **Measured layout**: real glyph metrics (see ``metrics.py``) drive wrapping
-  and font fitting; anything that cannot fit at the minimum size becomes a
-  layout finding in the render report instead of silent overflow.
-- **Evidence-backed charts** (``visual.chart``): values are pulled from the
-  evidence store at render time by ``value_from`` references — chart numbers
-  physically cannot drift from their source. Missing evidence fails loudly.
-- **Slide transitions** (``deck.style.transition``): a safe OOXML whitelist
-  (fade/push/wipe/cut). Per-element animation timing trees are deliberately
-  deferred: they need verification in real PowerPoint before shipping.
+- **Elaborated points** — ``{point, detail}`` support points render as a bold
+  lead-in plus a lighter explanation line; plain strings stay plain bullets.
+- **Metric cards** — ``metric_cards`` render big-number tiles whose values are
+  pulled from the evidence store at render time (``value_from``), so card
+  numbers cannot drift.
+- **Native charts** — ``visual.chart`` likewise plots evidence values.
+- **Callout** — a bottom "so what" band reinforcing the page's message.
+
+Layout is measured: real glyph metrics drive wrapping, font fitting, and
+vertical distribution of leftover space; anything that cannot fit becomes a
+layout finding in the render report instead of silent overflow.
 
 ``emphasis``/``reveal`` remain read-but-unconsumed semantic slots.
 """
@@ -25,7 +26,6 @@ from pathlib import Path
 
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
-from pptx.dml.color import RGBColor
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.text import PP_ALIGN
 from pptx.oxml.ns import qn
@@ -46,11 +46,16 @@ _TRANSITIONS: dict[str, dict] = {
     "wipe": {"dir": "r"},
     "cut": {},
 }
+_ROUNDED = 5  # MSO_SHAPE.ROUNDED_RECTANGLE
 
 _SLIDE_W = Inches(13.333)
 _SLIDE_H = Inches(7.5)
 _LINE_SPACING = 1.25
 _PT_PER_IN = 72.0
+_MARGIN_X = 0.9
+_BODY_W = 11.53
+_BODY_TOP = 2.0
+_BODY_BOTTOM = 5.95
 
 
 @dataclass(slots=True)
@@ -109,7 +114,7 @@ def render_deck(
 # -- shared helpers ---------------------------------------------------------
 
 
-def _paint_background(slide, color: RGBColor) -> None:
+def _paint_background(slide, color) -> None:
     slide.background.fill.solid()
     slide.background.fill.fore_color.rgb = color
 
@@ -120,7 +125,8 @@ def _textbox(slide, left, top, width, height) -> object:
     return box
 
 
-def _style_runs(paragraph, *, size: int, font: str, color: RGBColor, bold: bool = False) -> None:
+def _set(paragraph, text: str, *, size: int, font: str, color, bold: bool = False) -> None:
+    paragraph.text = text
     for run in paragraph.runs:
         run.font.size = Pt(size)
         run.font.bold = bold
@@ -166,30 +172,55 @@ def _fit_or_report(
     return fit.font_size
 
 
+def _point_parts(entry) -> tuple[str, str | None]:
+    if isinstance(entry, dict):
+        return str(entry.get("point", "")), entry.get("detail")
+    return str(entry), None
+
+
+def _evidence_number(items: dict, ref: str, page_id: str, what: str) -> tuple[float, str | None]:
+    item = items.get(ref)
+    if item is None:
+        raise RuntimeError(
+            f"page {page_id} {what} references evidence '{ref}' which does not exist; "
+            f"run `comh validate all`"
+        )
+    value = item.get("value") or {}
+    number = value.get("number")
+    if number is None:
+        raise RuntimeError(
+            f"page {page_id} {what}: evidence '{ref}' has no value.number; "
+            f"cards and charts plot structured data only"
+        )
+    return float(number), value.get("unit")
+
+
+def _fmt(number: float) -> str:
+    return f"{number:g}"
+
+
 # -- page kinds --------------------------------------------------------------
 
 
 def _render_cover(slide, page: dict, theme: RenderTheme, result: RenderResult) -> None:
     t = theme.theme
     points = page.get("support_points", [])
-    joined = "  ·  ".join(points)
-    subtitle_lines = len(wrap_lines(joined, t.body_size, 11.3 * _PT_PER_IN, theme.body_font))
+    joined = "  ·  ".join(p[0] for p in (_point_parts(x) for x in points))
+    subtitle_lines = len(wrap_lines(joined, t.body_size, _BODY_W * _PT_PER_IN, theme.body_font))
     size = _fit_or_report(
         page["title"], page_id=page["id"], element="title",
-        width_in=11.3, height_in=2.4 - 0.35 * subtitle_lines,
-        max_size=t.cover_title_size, min_size=26, family=theme.title_font,
+        width_in=_BODY_W, height_in=2.4 - 0.35 * subtitle_lines,
+        max_size=t.cover_title_size, min_size=28, family=theme.title_font,
         findings=result.findings,
     )
-    box = _textbox(slide, Inches(1.0), Inches(2.4), Inches(11.3), Inches(2.4))
-    box.text_frame.paragraphs[0].text = page["title"]
-    _style_runs(
-        box.text_frame.paragraphs[0], size=size, font=theme.title_font,
-        color=t.text, bold=True,
+    box = _textbox(slide, Inches(1.0), Inches(2.4), Inches(_BODY_W), Inches(2.4))
+    _set(
+        box.text_frame.paragraphs[0], page["title"],
+        size=size, font=theme.title_font, color=t.text, bold=True,
     )
-    if points:
+    if joined:
         paragraph = box.text_frame.add_paragraph()
-        paragraph.text = joined
-        _style_runs(paragraph, size=t.body_size, font=theme.body_font, color=t.muted)
+        _set(paragraph, joined, size=t.body_size, font=theme.body_font, color=t.muted)
 
 
 def _render_banner(slide, page: dict, theme: RenderTheme, result: RenderResult) -> None:
@@ -200,25 +231,26 @@ def _render_banner(slide, page: dict, theme: RenderTheme, result: RenderResult) 
     accent.line.fill.background()
     points = page.get("support_points", [])
     body_lines = sum(
-        len(wrap_lines(p, t.body_size, 11.3 * _PT_PER_IN, theme.body_font)) for p in points
+        len(wrap_lines(p, t.body_size, _BODY_W * _PT_PER_IN, theme.body_font)) for p, _ in
+        (_point_parts(x) for x in points)
     )
     size = _fit_or_report(
         page["title"], page_id=page["id"], element="title",
-        width_in=11.3, height_in=2.2 - 0.32 * body_lines,
-        max_size=t.banner_title_size, min_size=22, family=theme.title_font,
+        width_in=_BODY_W, height_in=2.2 - 0.32 * body_lines,
+        max_size=t.banner_title_size, min_size=24, family=theme.title_font,
         findings=result.findings,
     )
-    box = _textbox(slide, Inches(1.0), Inches(2.7), Inches(11.3), Inches(2.2))
-    box.text_frame.paragraphs[0].text = page["title"]
-    _style_runs(
-        box.text_frame.paragraphs[0], size=size, font=theme.title_font,
-        color=t.text, bold=True,
+    box = _textbox(slide, Inches(1.0), Inches(2.7), Inches(_BODY_W), Inches(2.4))
+    _set(
+        box.text_frame.paragraphs[0], page["title"],
+        size=size, font=theme.title_font, color=t.text, bold=True,
     )
-    for point in points:
+    for entry in points:
+        point, _ = _point_parts(entry)
         paragraph = box.text_frame.add_paragraph()
         paragraph.text = point
         paragraph.space_before = Pt(10)
-        _style_runs(paragraph, size=t.body_size, font=theme.body_font, color=t.muted)
+        _set(paragraph, point, size=t.body_size, font=theme.body_font, color=t.muted)
 
 
 def _render_content(
@@ -226,66 +258,56 @@ def _render_content(
     result: RenderResult, evidence: dict | None,
 ) -> None:
     t = theme.theme
+    page_id = page["id"]
     chart_spec = (page.get("visual") or {}).get("chart")
+    cards = page.get("metric_cards") or []
 
     size = _fit_or_report(
-        page["title"], page_id=page["id"], element="title",
-        width_in=11.5, height_in=1.5, max_size=t.content_title_size, min_size=20,
+        page["title"], page_id=page_id, element="title",
+        width_in=_BODY_W, height_in=1.4, max_size=t.content_title_size, min_size=20,
         family=theme.title_font, findings=result.findings,
     )
-    title = _textbox(slide, Inches(0.9), Inches(0.55), Inches(11.5), Inches(1.5))
-    title.text_frame.paragraphs[0].text = page["title"]
-    _style_runs(
-        title.text_frame.paragraphs[0], size=size, font=theme.title_font,
-        color=t.text, bold=True,
+    title = _textbox(slide, Inches(_MARGIN_X), Inches(0.5), Inches(_BODY_W), Inches(1.4))
+    _set(
+        title.text_frame.paragraphs[0], page["title"],
+        size=size, font=theme.title_font, color=t.text, bold=True,
     )
+    underline = slide.shapes.add_shape(1, Inches(_MARGIN_X), Inches(1.62), Inches(0.7), Pt(5))
+    underline.fill.solid()
+    underline.fill.fore_color.rgb = t.accent
+    underline.line.fill.background()
 
-    body_width = 11.5
+    content_top = _BODY_TOP
+    if cards:
+        _render_metric_cards(slide, cards, theme, result, evidence, page_id)
+        content_top = _BODY_TOP + 1.65
+
+    body_width = _BODY_W
     if chart_spec is not None:
-        _add_chart(slide, page, chart_spec, t, result, evidence)
-        body_width = 5.2
+        _add_chart(
+            slide, page_id, chart_spec, t, result, evidence,
+            x=6.55, y=content_top, w=5.9, h=_BODY_BOTTOM - content_top,
+        )
+        body_width = 5.35
     else:
-        body_width = _add_figure(slide, page, run_root, theme, result) or body_width
+        _add_figure(slide, page, run_root, theme, result)
+        body_width = 5.35 if _has_figure(page, run_root) else _BODY_W
 
     points = page.get("support_points", [])
     if points:
-        body_size = _fit_points(
-            points, page_id=page["id"], width_in=body_width, theme=theme, findings=result.findings
+        _render_points(
+            slide, points, page_id=page_id, x=_MARGIN_X, y=content_top,
+            width_in=body_width, height_in=_BODY_BOTTOM - content_top,
+            theme=theme, findings=result.findings,
         )
-        body = _textbox(slide, Inches(0.9), Inches(2.3), Inches(body_width), Inches(4.4))
-        first = True
-        for point in points:
-            paragraph = body.text_frame.paragraphs[0] if first else body.text_frame.add_paragraph()
-            first = False
-            paragraph.text = "• " + point
-            paragraph.space_after = Pt(10)
-            _style_runs(paragraph, size=body_size, font=theme.body_font, color=t.text)
+
+    callout = page.get("callout")
+    if callout:
+        _render_callout(slide, callout, theme, result, page_id)
 
 
-def _fit_points(
-    points: list[str], *, page_id: str, width_in: float, theme: RenderTheme, findings: list[Finding]
-) -> int:
-    t = theme.theme
-    for size in range(t.body_size, 13, -1):
-        needed = sum(
-            len(wrap_lines("• " + p, size, width_in * _PT_PER_IN, theme.body_font))
-            * size * _LINE_SPACING + 10
-            for p in points
-        )
-        if needed <= 4.4 * _PT_PER_IN:
-            return size
-    findings.append(
-        Finding(
-            "deck_plan", "layout", "warn", "fail",
-            f"page {page_id} body points do not fit at 14pt — demote content to "
-            f"notes/appendix (see stages/deck.md)",
-            "deck_plan",
-        )
-    )
-    return 14
-
-
-# -- figures and charts ------------------------------------------------------
+def _has_figure(page: dict, run_root: Path) -> bool:
+    return any((run_root / entry["ref"]).is_file() for entry in _asset_entries(page))
 
 
 def _asset_entries(page: dict) -> list[dict]:
@@ -297,8 +319,7 @@ def _asset_entries(page: dict) -> list[dict]:
 
 def _add_figure(
     slide, page: dict, run_root: Path, theme: RenderTheme, result: RenderResult
-) -> float | None:
-    """Render the first existing image asset with its caption; returns used width."""
+) -> None:
     for entry in _asset_entries(page):
         image = run_root / entry["ref"]
         if not image.is_file():
@@ -310,30 +331,176 @@ def _add_figure(
                 )
             )
             continue
-        slide.shapes.add_picture(str(image), Inches(6.4), Inches(2.2), width=Inches(6.2))
+        slide.shapes.add_picture(str(image), Inches(6.55), Inches(_BODY_TOP), width=Inches(5.9))
         caption = entry.get("caption")
         if caption:
-            box = _textbox(slide, Inches(6.4), Inches(6.55), Inches(6.2), Inches(0.5))
+            box = _textbox(slide, Inches(6.55), Inches(6.05), Inches(5.9), Inches(0.4))
             paragraph = box.text_frame.paragraphs[0]
             paragraph.alignment = PP_ALIGN.CENTER
-            paragraph.text = caption
-            _style_runs(
-                paragraph, size=theme.theme.caption_size, font=theme.body_font,
-                color=theme.theme.muted,
+            _set(
+                paragraph, caption, size=theme.theme.caption_size,
+                font=theme.body_font, color=theme.theme.muted,
             )
-        return 5.2
-    return None
+        return
+
+
+def _render_metric_cards(
+    slide, cards: list, theme: RenderTheme, result: RenderResult,
+    evidence: dict | None, page_id: str,
+) -> None:
+    t = theme.theme
+    items = {item["id"]: item for item in (evidence or {}).get("items", [])}
+    if len(cards) > 4:
+        result.findings.append(
+            Finding(
+                "deck_plan", "layout", "warn", "fail",
+                f"page {page_id} has {len(cards)} metric cards (max 4); extras dropped",
+                "deck_plan",
+            )
+        )
+        cards = cards[:4]
+    gap = 0.25
+    width = (_BODY_W - gap * (len(cards) - 1)) / len(cards)
+    for index, card in enumerate(cards):
+        ref = str(card.get("value_from", ""))
+        number, unit = _evidence_number(items, ref, page_id, "metric card")
+        left = _MARGIN_X + index * (width + gap)
+        shape = slide.shapes.add_shape(
+            _ROUNDED, Inches(left), Inches(_BODY_TOP), Inches(width), Inches(1.45)
+        )
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = t.card_fill
+        shape.line.color.rgb = t.card_line
+        shape.line.width = Pt(1)
+        shape.shadow.inherit = False
+        value_text = _fmt(number) + (f" {unit}" if unit else "")
+        value_box = _textbox(
+            slide, Inches(left), Inches(_BODY_TOP + 0.12), Inches(width), Inches(0.75)
+        )
+        _set(
+            value_box.text_frame.paragraphs[0], value_text,
+            size=t.card_value_size, font=theme.title_font, color=t.accent, bold=True,
+        )
+        value_box.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+        label = str(card.get("label") or card.get("value_from", ""))
+        label_box = _textbox(
+            slide, Inches(left), Inches(_BODY_TOP + 0.92), Inches(width), Inches(0.45)
+        )
+        _set(
+            label_box.text_frame.paragraphs[0], label,
+            size=t.card_label_size, font=theme.body_font, color=t.muted,
+        )
+        label_box.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+
+
+def _render_points(
+    slide, points: list, *, page_id: str, x: float, y: float,
+    width_in: float, height_in: float, theme: RenderTheme, findings: list[Finding],
+) -> None:
+    t = theme.theme
+    detail_size = t.detail_size
+
+    def measure_full(size: int) -> float:
+        total = 0.0
+        for entry in points:
+            point, detail = _point_parts(entry)
+            max_pt = width_in * _PT_PER_IN
+            point_lines = wrap_lines("• " + point, size, max_pt, theme.body_font)
+            total += len(point_lines) * size * _LINE_SPACING + 6
+            if detail:
+                detail_lines = wrap_lines(
+                    detail, detail_size, (width_in - 0.35) * _PT_PER_IN, theme.body_font
+                )
+                total += len(detail_lines) * detail_size * 1.3 + 8
+        return total
+
+    max_size = t.body_size if width_in < _BODY_W else t.body_size_wide
+    size = 14
+    for candidate in range(max_size, 13, -1):
+        if measure_full(candidate) <= height_in * _PT_PER_IN:
+            size = candidate
+            break
+    else:
+        findings.append(
+            Finding(
+                "deck_plan", "layout", "warn", "fail",
+                f"page {page_id} body points do not fit at 14pt — demote content to "
+                f"notes/appendix (see stages/deck.md)",
+                "deck_plan",
+            )
+        )
+
+    needed = measure_full(size)
+    leftover = height_in * _PT_PER_IN - needed
+    extra_gap = max(0.0, min(leftover / max(len(points), 1), 26.0))
+
+    box = _textbox(slide, Inches(x), Inches(y), Inches(width_in), Inches(height_in))
+    first = True
+    for entry in points:
+        point, detail = _point_parts(entry)
+        if first:
+            paragraph = box.text_frame.paragraphs[0]
+        else:
+            paragraph = box.text_frame.add_paragraph()
+            paragraph.space_before = Pt(extra_gap)
+        first = False
+        _set(
+            paragraph, "• " + point,
+            size=size, font=theme.body_font, color=t.text, bold=detail is not None,
+        )
+        if detail:
+            detail_para = box.text_frame.add_paragraph()
+            detail_para.space_before = Pt(2)
+            _set(
+                detail_para, detail, size=detail_size,
+                font=theme.body_font, color=t.muted,
+            )
+
+
+def _render_callout(
+    slide, callout: dict, theme: RenderTheme, result: RenderResult, page_id: str
+) -> None:
+    t = theme.theme
+    text = str(callout.get("text", ""))
+    band = slide.shapes.add_shape(
+        _ROUNDED, Inches(_MARGIN_X), Inches(6.1), Inches(_BODY_W), Inches(0.85)
+    )
+    band.fill.solid()
+    band.fill.fore_color.rgb = t.card_fill
+    band.line.color.rgb = t.card_line
+    band.line.width = Pt(1)
+    band.shadow.inherit = False
+    bar = slide.shapes.add_shape(
+        1, Inches(_MARGIN_X + 0.08), Inches(6.22), Pt(5), Inches(0.61)
+    )
+    bar.fill.solid()
+    bar.fill.fore_color.rgb = t.accent
+    bar.line.fill.background()
+    size = _fit_or_report(
+        text, page_id=page_id, element="callout",
+        width_in=_BODY_W - 0.7, height_in=0.62,
+        max_size=t.callout_size, min_size=14, family=theme.body_font,
+        findings=result.findings,
+    )
+    box = _textbox(
+        slide, Inches(_MARGIN_X + 0.35), Inches(6.14), Inches(_BODY_W - 0.7), Inches(0.78)
+    )
+    _set(box.text_frame.paragraphs[0], text, size=size, font=theme.body_font, color=t.text)
+
+
+# -- charts -----------------------------------------------------------------
 
 
 def _add_chart(
-    slide, page: dict, spec: dict, t, result: RenderResult, evidence: dict | None
+    slide, page_id: str, spec: dict, t, result: RenderResult,
+    evidence: dict | None, *, x: float, y: float, w: float, h: float,
 ) -> None:
     chart_type = str(spec.get("type", "column")).lower()
     if chart_type not in _CHART_TYPES:
         result.findings.append(
             Finding(
                 "deck_plan", "chart", "warn", "fail",
-                f"page {page['id']} chart type '{chart_type}' unknown "
+                f"page {page_id} chart type '{chart_type}' unknown "
                 f"(known: {', '.join(_CHART_TYPES)}); skipping chart",
                 "deck_plan",
             )
@@ -345,21 +512,9 @@ def _add_chart(
     units: set[str] = set()
     for entry in spec.get("series", []):
         ref = entry.get("value_from", "")
-        item = items.get(ref)
-        if item is None:
-            raise RuntimeError(
-                f"page {page['id']} chart references evidence '{ref}' which does not exist; "
-                f"run `comh validate all`"
-            )
-        number = (item.get("value") or {}).get("number")
-        if number is None:
-            raise RuntimeError(
-                f"page {page['id']} chart: evidence '{ref}' has no value.number; "
-                f"charts may only plot structured data"
-            )
-        values.append(float(number))
+        number, unit = _evidence_number(items, ref, page_id, "chart")
+        values.append(number)
         labels.append(str(entry.get("label", ref)))
-        unit = (item.get("value") or {}).get("unit")
         if unit:
             units.add(str(unit))
 
@@ -368,7 +523,8 @@ def _add_chart(
     series_name = str(spec.get("series_name") or ("; ".join(sorted(units)) or "value"))
     data.add_series(series_name, tuple(values))
     frame = slide.shapes.add_chart(
-        _CHART_TYPES[chart_type], Inches(6.4), Inches(2.1), Inches(6.2), Inches(4.2), data
+        _CHART_TYPES[chart_type],
+        Inches(x), Inches(y), Inches(w), Inches(h), data,
     )
     chart = frame.chart
     chart.has_legend = False

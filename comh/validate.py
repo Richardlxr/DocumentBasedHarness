@@ -200,9 +200,16 @@ def validate_numbers(
                 )
     deck = artifacts.get("deck_plan") or {}
     for page in deck.get("deck", {}).get("pages", []):
-        text = " ".join(
-            [page.get("title", ""), *page.get("support_points", [])]
-        )
+        parts = [page.get("title", "")]
+        for entry in page.get("support_points", []):
+            if isinstance(entry, dict):
+                parts.append(str(entry.get("point", "")))
+                parts.append(str(entry.get("detail", "") or ""))
+            else:
+                parts.append(str(entry))
+        if page.get("callout"):
+            parts.append(str(page["callout"].get("text", "")))
+        text = " ".join(parts)
         for number in sorted(_numbers_in(text)):
             if number not in pool:
                 findings.append(
@@ -247,36 +254,50 @@ def validate_coverage(artifacts: dict[str, dict | None]) -> list[Finding]:
     return findings
 
 
-def validate_charts(artifacts: dict[str, dict | None]) -> list[Finding]:
-    """Charts may only plot structured evidence: value_from must resolve to an
-    item carrying value.number. Values are pulled at render time, so chart
-    numbers cannot drift — this check only guarantees the references are real."""
+def validate_visuals(artifacts: dict[str, dict | None]) -> list[Finding]:
+    """Cards and charts may only plot structured evidence: value_from must resolve
+    to an item carrying value.number. Values are pulled at render time, so card
+    and chart numbers cannot drift — this check only guarantees the references
+    are real. Callout evidence links resolve too."""
     findings: list[Finding] = []
     deck = artifacts.get("deck_plan") or {}
     evidence_items = {i["id"]: i for i in (artifacts.get("evidence") or {}).get("items", [])}
+
+    def check_value_ref(page_id: str, ref: str, what: str) -> None:
+        item = evidence_items.get(ref)
+        if item is None:
+            findings.append(
+                Finding(
+                    "deck_plan", "ref-integrity", "error", "fail",
+                    f"page {page_id} {what} references missing evidence '{ref}'", "evidence",
+                )
+            )
+        elif (item.get("value") or {}).get("number") is None:
+            findings.append(
+                Finding(
+                    "deck_plan", "visual", "error", "fail",
+                    f"page {page_id} {what}: evidence '{ref}' has no value.number; "
+                    f"cards and charts plot structured data only", "evidence",
+                )
+            )
+
     for page in deck.get("deck", {}).get("pages", []):
-        spec = (page.get("visual") or {}).get("chart")
-        if not spec:
-            continue
-        for entry in spec.get("series", []):
-            ref = entry.get("value_from", "")
-            item = evidence_items.get(ref)
-            if item is None:
-                findings.append(
-                    Finding(
-                        "deck_plan", "ref-integrity", "error", "fail",
-                        f"page {page['id']} chart series references missing evidence '{ref}'",
-                        "evidence",
-                    )
+        page_id = page["id"]
+        chart = (page.get("visual") or {}).get("chart")
+        if chart:
+            for entry in chart.get("series", []):
+                check_value_ref(page_id, str(entry.get("value_from", "")), "chart series")
+        for card in page.get("metric_cards") or []:
+            check_value_ref(page_id, str(card.get("value_from", "")), "metric card")
+        callout = page.get("callout")
+        if callout and callout.get("evidence") and callout["evidence"] not in evidence_items:
+            findings.append(
+                Finding(
+                    "deck_plan", "ref-integrity", "error", "fail",
+                    f"page {page_id} callout references missing evidence "
+                    f"'{callout['evidence']}'", "evidence",
                 )
-            elif (item.get("value") or {}).get("number") is None:
-                findings.append(
-                    Finding(
-                        "deck_plan", "chart", "error", "fail",
-                        f"page {page['id']} chart: evidence '{ref}' has no value.number; "
-                        f"charts plot structured data only", "evidence",
-                    )
-                )
+            )
     return findings
 
 
@@ -347,7 +368,7 @@ def run_all(run_root: Path) -> list[Finding]:
         findings += validate_claims(artifacts)
         findings += validate_numbers(artifacts, report_md_text)
         findings += validate_coverage(artifacts)
-        findings += validate_charts(artifacts)
+        findings += validate_visuals(artifacts)
     if artifacts.get("brief") is not None:
         findings += validate_hard_constraints(artifacts, report_md_text)
 
@@ -382,7 +403,7 @@ def write_findings(run_root: Path, findings: list[Finding]) -> Path:
 __all__ = [
     "run_all",
     "write_findings",
-    "validate_charts",
+    "validate_visuals",
     "validate_claims",
     "validate_coverage",
     "validate_hard_constraints",

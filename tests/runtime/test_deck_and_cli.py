@@ -201,6 +201,110 @@ def test_figure_with_caption_renders(tmp_path: Path):
     assert not result.findings
 
 
+def test_elaborated_points_cards_and_callout(tmp_path: Path):
+    plan = {
+        "version": 1,
+        "deck": {
+            "title": "t",
+            "pages": [
+                {
+                    "id": "P01",
+                    "page_role": "content",
+                    "title": "标题",
+                    "support_points": [
+                        {"point": "加粗导语", "detail": "展开说明一行"},
+                        "普通要点",
+                    ],
+                    "metric_cards": [
+                        {"label": "P99 降幅", "value_from": "E003"},
+                        {"label": "基线", "value_from": "E001"},
+                    ],
+                    "callout": {"text": "底部结论条"},
+                }
+            ],
+        },
+    }
+    evidence = {
+        "items": EVIDENCE["items"]
+        + [{"id": "E003", "kind": "datum", "content": "降幅 18.2%",
+            "value": {"number": 18.2, "unit": "%"}, "source": {"source": "S", "locator": "x"}}]
+    }
+    result = render_deck(
+        plan, tmp_path, tmp_path / "rich.pptx", language="zh-CN", evidence=evidence
+    )
+    assert not result.findings, [f.detail for f in result.findings]
+    texts = [
+        sh.text_frame.text
+        for sh in Presentation(str(result.output)).slides[0].shapes
+        if sh.has_text_frame
+    ]
+    joined = "\n".join(texts)
+    assert "加粗导语" in joined and "展开说明一行" in joined and "普通要点" in joined
+    assert "18.2 %" in joined and "220 ms" in joined, "card values pulled from evidence"
+    assert "底部结论条" in joined
+    # rounded rectangles: 2 cards + 1 callout band
+    from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
+
+    def _rounded(shape) -> bool:
+        try:
+            return shape.auto_shape_type == MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE
+        except (ValueError, AttributeError):
+            return False
+
+    shapes = Presentation(str(result.output)).slides[0].shapes
+    rounded = [sh for sh in shapes if _rounded(sh)]
+    assert len(rounded) == 3
+
+
+def test_metric_card_missing_evidence_fails_loud(tmp_path: Path):
+    import pytest
+
+    plan = {
+        "version": 1,
+        "deck": {
+            "title": "t",
+            "pages": [
+                {
+                    "id": "P01",
+                    "page_role": "content",
+                    "title": "x",
+                    "metric_cards": [{"label": "l", "value_from": "E999"}],
+                }
+            ],
+        },
+    }
+    with pytest.raises(RuntimeError, match="E999"):
+        render_deck(plan, tmp_path, tmp_path / "bad.pptx", evidence=EVIDENCE)
+
+
+def test_visual_validation_covers_cards_and_callout(tmp_path: Path):
+    from comh.validate import validate_visuals
+
+    artifacts = {
+        "evidence": {"items": EVIDENCE["items"]},
+        "deck_plan": {
+            "deck": {
+                "title": "t",
+                "pages": [
+                    {
+                        "id": "P01",
+                        "page_role": "content",
+                        "title": "x",
+                        "metric_cards": [{"label": "l", "value_from": "E001"},
+                                          {"label": "bad", "value_from": "E999"}],
+                        "callout": {"text": "c", "evidence": "E888"},
+                    }
+                ],
+            }
+        },
+    }
+    findings = validate_visuals(artifacts)
+    details = " | ".join(f.detail for f in findings)
+    assert "metric card references missing evidence 'E999'" in details
+    assert "callout references missing evidence 'E888'" in details
+    assert not any("'E001'" in f.detail for f in findings)
+
+
 def test_cli_init_and_guard_flow(tmp_path: Path):
     from comh.cli import main
 

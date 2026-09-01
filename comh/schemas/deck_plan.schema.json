@@ -34,7 +34,47 @@
                 "description": "Known roles with validator rules: cover, agenda, section_divider, content, closing, appendix. Unknown roles are treated as content."
               },
               "title": { "type": "string", "description": "Message-style title: what the audience should remember from this page." },
-              "support_points": { "type": "array", "items": { "type": "string" } },
+              "support_points": {
+                "type": "array",
+                "description": "Page body. Plain strings, or {point, detail} objects: bold lead-in phrase plus a lighter explanation line — the standard way to elaborate without piling on bullets.",
+                "items": {
+                  "anyOf": [
+                    { "type": "string" },
+                    {
+                      "type": "object",
+                      "required": ["point"],
+                      "additionalProperties": true,
+                      "properties": {
+                        "point": { "type": "string", "description": "Bold lead-in." },
+                        "detail": { "type": "string", "description": "One-or-two-line explanation under the lead-in." }
+                      }
+                    }
+                  ]
+                }
+              },
+              "metric_cards": {
+                "type": "array",
+                "description": "Big-number tiles for data pages. Values pulled from evidence at render time (value_from), so card numbers cannot drift.",
+                "items": {
+                  "type": "object",
+                  "required": ["value_from"],
+                  "additionalProperties": true,
+                  "properties": {
+                    "label": { "type": "string" },
+                    "value_from": { "type": "string", "description": "Evidence ID whose value.number is displayed." }
+                  }
+                }
+              },
+              "callout": {
+                "type": "object",
+                "description": "Bottom 'so what' band. Reinforces this page's message with its implication — never introduces a second message.",
+                "required": ["text"],
+                "additionalProperties": true,
+                "properties": {
+                  "text": { "type": "string" },
+                  "evidence": { "type": "string", "description": "Optional evidence backing the callout." }
+                }
+              },
               "visual": {
                 "type": "object",
                 "additionalProperties": true,

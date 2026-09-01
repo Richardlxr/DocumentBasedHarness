@@ -11,7 +11,7 @@ dark backgrounds pins every selectable theme to a light one.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from pptx.dml.color import RGBColor
 
@@ -25,11 +25,18 @@ class DeckTheme:
     muted: RGBColor
     accent: RGBColor
     accent_soft: RGBColor
-    cover_title_size: int = 40
-    banner_title_size: int = 32
-    content_title_size: int = 28
-    body_size: int = 18
-    caption_size: int = 12
+    card_fill: RGBColor
+    card_line: RGBColor
+    cover_title_size: int = 44
+    banner_title_size: int = 36
+    content_title_size: int = 32
+    body_size: int = 21
+    body_size_wide: int = 24
+    detail_size: int = 16
+    caption_size: int = 13
+    card_value_size: int = 34
+    card_label_size: int = 13
+    callout_size: int = 18
     latin_fonts: tuple[str, str] = ("Calibri", "Calibri")  # (title, body)
     notes: str = ""
 
@@ -46,6 +53,8 @@ TIER1_LIGHT = DeckTheme(
     muted=_rgb("6B7280"),
     accent=_rgb("2563EB"),
     accent_soft=_rgb("93C5FD"),
+    card_fill=_rgb("F1F5F9"),
+    card_line=_rgb("CBD5E1"),
 )
 
 SLATE_TECH = DeckTheme(
@@ -56,6 +65,8 @@ SLATE_TECH = DeckTheme(
     muted=_rgb("64748B"),
     accent=_rgb("4F46E5"),
     accent_soft=_rgb("A5B4FC"),
+    card_fill=_rgb("FFFFFF"),
+    card_line=_rgb("CBD5E1"),
     latin_fonts=("Segoe UI", "Segoe UI"),
 )
 
@@ -67,6 +78,8 @@ MIDNIGHT = DeckTheme(
     muted=_rgb("94A3B8"),
     accent=_rgb("38BDF8"),
     accent_soft=_rgb("0EA5E9"),
+    card_fill=_rgb("1E293B"),
+    card_line=_rgb("334155"),
     latin_fonts=("Aptos Display", "Aptos"),
     notes="dark theme; forbidden automatically when the brief pins a light background",
 )
@@ -86,9 +99,7 @@ class ThemeChoice:
     forced_light: bool = False
 
 
-def select_theme(
-    style: dict | None, *, allow_dark: bool = True
-) -> ThemeChoice:
+def select_theme(style: dict | None, *, allow_dark: bool = True) -> ThemeChoice:
     """Resolve ``deck.style.template`` into a theme with explicit fallbacks.
 
     ``allow_dark=False`` (the brief contains a dark-forbidding hard constraint)
@@ -118,7 +129,7 @@ class RenderTheme:
     title_font: str
     body_font: str
     forced_light: bool = False
-    fallback_reason: str | None = field(default=None)
+    fallback_reason: str | None = None
 
 
 def fonts_for(theme: DeckTheme, language: str) -> tuple[str, str]:
