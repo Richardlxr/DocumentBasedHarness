@@ -39,7 +39,16 @@
             "description": "Open vocabulary communication move, e.g. establish_problem, demonstrate_effect, concede_limit."
           },
           "message": { "type": "string", "description": "The one sentence this beat should land in the audience's head." },
-          "claims": { "type": "array", "items": { "type": "string" } }
+          "claims": { "type": "array", "items": { "type": "string" } },
+          "projection": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "How this beat is projected into deliverables. status dropped/appendix marks an intentional non-coverage (beat-coverage then reports info, not warn).",
+            "properties": {
+              "status": { "type": "string", "description": "covered (default) | dropped | appendix — open vocabulary" },
+              "note": { "type": "string", "description": "Why it is not projected, for the record." }
+            }
+          }
         }
       }
     }

@@ -163,6 +163,24 @@ def select_theme(
         return ThemeChoice(default, None)
     theme = registry.get(str(requested))
     if theme is None:
+        # A theme directory that exists but fails to load was skipped by the
+        # registry; say so instead of conflating it with a typo in the name.
+        bases = [run_root / "themes"] if run_root else []
+        bases.append(Path(_REPO_THEMES))
+        for base in bases:
+            candidate = base / str(requested) / "theme.yaml"
+            if candidate.is_file():
+                try:
+                    load_theme(candidate)
+                except (KeyError, ValueError, yaml.YAMLError):
+                    return ThemeChoice(
+                        default,
+                        str(requested),
+                        fallback_reason=(
+                            f"theme '{requested}' exists but its theme.yaml is invalid "
+                            f"(fix the file); using '{default.name}'"
+                        ),
+                    )
         return ThemeChoice(
             default,
             str(requested),

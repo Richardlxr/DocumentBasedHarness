@@ -67,6 +67,7 @@ def default_manifest(name: str) -> dict:
             "narrative": {"confirmed": False, "at": None, "hash": None},
         },
         "build": dict(BUILD_OUTPUTS),
+        "deliveries": [],
     }
 
 
@@ -198,6 +199,34 @@ class Manifest:
             "hash": hash_file(file),
         }
         self.save()
+
+    # -- delivery acceptance ---------------------------------------------------
+
+    def delivery_state(self) -> tuple[str, dict | None]:
+        """(state, record) for the latest delivery: none | accepted | invalidated."""
+        records = self.data.get("deliveries") or []
+        if not records:
+            return "none", None
+        record = records[-1]
+        for rel, recorded in (record.get("outputs") or {}).items():
+            path = self.root / rel
+            if not path.is_file() or hash_file(path) != recorded:
+                return "invalidated", record
+        return "accepted", record
+
+    def record_delivery(self, note: str | None = None) -> dict:
+        """Pin the current build outputs as user-accepted (the final gate)."""
+        outputs = {}
+        for rel in self.data.get("build", {}).values():
+            path = self.root / str(rel)
+            if path.is_file():
+                outputs[str(rel)] = hash_file(path)
+        record = {"accepted_at": now_iso(), "outputs": outputs}
+        if note:
+            record["note"] = note
+        self.data.setdefault("deliveries", []).append(record)
+        self.save()
+        return record
 
     # -- guards ----------------------------------------------------------------
 

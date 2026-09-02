@@ -20,9 +20,12 @@ render stage.
   fields. Per-medium decisions belong in `deck_plan.yaml` / `report_plan.yaml`.
 - Gates are enforced by the CLI (`comh confirm`), not by prompt discipline. Downstream
   stages must refuse to run when an upstream gate is missing or invalidated.
+  `comh save/confirm/render/deliver` hard-chain `comh validate`: an operation's inputs
+  must be error-free. Delivery acceptance (`comh deliver`) is the final gate — it pins
+  the built outputs' hashes; re-rendering invalidates it until the user re-accepts.
 - Hard constraints from the user are enforced deterministically where possible (see
-  `comh/validate.py`); anything that cannot map to a check is proposed for demotion to a
-  soft preference at Gate 1.
+  `comh/validate.py`); anything that cannot map to a check is flagged for demotion to a
+  soft preference at Gate 1 (validators warn on unmatched constraints).
 - Derived numbers must be materialized as evidence items (with a `derived:` locator)
   before they can appear in claims, slides, or the report. Numbers that appear nowhere in
   the evidence store are findings, not facts.

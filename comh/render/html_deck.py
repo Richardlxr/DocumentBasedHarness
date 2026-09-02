@@ -406,9 +406,13 @@ def _diagram_png_path(entry: dict, run_root: Path) -> Path:
 
 def _css(theme: RenderTheme) -> str:
     t = theme.theme
+    # RGBColor str() is bare hex ("F1F5F9"); CSS custom properties substitute
+    # verbatim, so the "#" prefix must be added here or every var() color
+    # becomes invalid and the whole deck renders unstyled.
     variables = (
-        f"--bg:{t.background}; --text:{t.text}; --muted:{t.muted}; --accent:{t.accent};"
-        f"--accent-soft:{t.accent_soft}; --card-fill:{t.card_fill}; --card-line:{t.card_line};"
+        f"--bg:#{t.background}; --text:#{t.text}; --muted:#{t.muted};"
+        f" --accent:#{t.accent}; --accent-soft:#{t.accent_soft};"
+        f" --card-fill:#{t.card_fill}; --card-line:#{t.card_line};"
         f"--title-size:{t.content_title_size}px; --body-size:{t.body_size}px;"
         f"--detail-size:{t.detail_size}px; --card-value-size:{t.card_value_size}px;"
         f"--callout-size:{t.callout_size}px; --kicker-size:{t.kicker_size}px;"

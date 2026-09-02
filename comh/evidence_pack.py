@@ -87,13 +87,26 @@ def build_pack(run_root: Path, artifact: str, node_id: str) -> dict:
                 )
 
     sources_by_id = {s["id"]: s for s in evidence.get("sources", [])}
+    seen_sources: set[str] = set()
     sources = []
     for item in used_evidence:
         if "error" in item:
             continue
         source_id = item.get("source", {}).get("source")
-        if source_id and source_id in sources_by_id and source_id not in {s["id"] for s in sources}:
-            sources.append(sources_by_id[source_id])
+        if not source_id:
+            continue
+        if source_id in sources_by_id:
+            if source_id not in seen_sources:
+                seen_sources.add(source_id)
+                sources.append(sources_by_id[source_id])
+        elif source_id.startswith("SRC") and source_id not in seen_sources:
+            # a broken link must be visible in the pack, not silently dropped:
+            # the diagnosis depends on knowing the chain is incomplete
+            seen_sources.add(source_id)
+            sources.append(
+                {"id": source_id, "error": "source not found in evidence.sources registry"}
+            )
+    sources.sort(key=lambda s: (s["id"],))
 
     return {
         "node": node,

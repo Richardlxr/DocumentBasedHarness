@@ -63,4 +63,6 @@ style lint 只保证下限（机器可检测的 AI 腔清零）。**语言风格
 ## 收尾
 
 机械 + 模型 findings 合并后，有 error 必须修（在归属层修，见 stages/repair.md）；
-warn 逐条判断：修、记录不修原因、或降级。全部 error 清零后才能 deliver。
+warn 逐条判断：修、记录不修原因、或降级。全部 error 清零是硬性的：save / confirm /
+render 会直接拒绝带 error 的工作区。最后由用户验收：`comh deliver` 把验收落进
+run.yaml（钉住成品指纹；此后任何重渲染都会把验收标记为作废，需重新验收）。

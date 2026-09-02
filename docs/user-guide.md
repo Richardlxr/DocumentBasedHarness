@@ -93,6 +93,11 @@ Gate 后改文件会自动作废确认，需要重新拍板——代价可见是
 .venv/bin/comh render report      # build/report.docx；documents/report.md 是正主
 ```
 
+save / confirm / render 都会自动先跑校验、**有 error 直接拒绝**——不需要记得
+手动 validate。渲染报告在 `qa/render-deck.yaml` 和 `qa/render-deck-html.yaml`
+（几何/布局/主题体检）。HTML 布局守卫需要无头 Chrome：没有时命令会明确提示
+"layout check skipped"，不会静默跳过。
+
 HTML 单文件双击可开：方向键翻页、点击步进动画、`S` 开演讲者视图。
 PPTX 动画默认关闭（实验性）：在 `deck.style` 加 `animations: true` 可开
 appear/fade_in 点击序列，**建议先在真机 PowerPoint 验证再交付**。
@@ -170,11 +175,13 @@ appear/fade_in 点击序列，**建议先在真机 PowerPoint 验证再交付**�
 
 ```bash
 comh init-run <path>          # 开工作区（--preset cn-official 可出公文模板）
-comh status                   # 各层新鲜度 + Gate 状态
-comh save <artifact>          # 记录"产自当前上游快照"
+comh status                   # 各层新鲜度 + Gate 状态 + 交付验收状态
+comh save <artifact>          # 记录"产自当前上游快照"（自动先校验，有 error 拒存）
 comh confirm <brief|narrative># 过 Gate（需要你的明确同意）
 comh validate all             # 全量校验 → qa/findings.yaml
-comh render deck|deck-html|report
+comh render deck|deck-html|report   # 有 error 拒渲；渲染报告进 qa/
 comh evidence-pack deck P05   # 修复循环取证
+comh theme-from-pptx 模板.pptx --name brand   # 从模板提取品牌主题
+comh deliver [--note ...]     # 你验收后落记录：钉住成品指纹，重渲染即作废
 comh check-schema <file>      # 单文件 schema 校验
 ```

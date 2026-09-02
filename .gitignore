@@ -12,3 +12,6 @@ runs/*/.workspace/
 
 # private runs: real client/project data must not be committed
 runs/my-report/
+
+# macOS noise
+.DS_Store

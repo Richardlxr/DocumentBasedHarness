@@ -3,12 +3,14 @@
 Commands mirror the artifact lifecycle:
 
     init-run <path>      scaffold a run workspace
-    status               live state: artifacts (drift/staleness) + gates
+    status               live state: artifacts (drift/staleness) + gates + delivery
     save <artifact>      record "produced from current upstream" (hash snapshot)
     confirm <gate>       user confirms brief / narrative (hard gate)
     validate [target]    schema + cross-artifact checks → qa/findings.yaml
     render <target>      deck → build/deck.pptx; report → build/report.docx
     evidence-pack ...    ID-chain slice for one page/beat/section (repair-loop QA)
+    theme-from-pptx ...  extract a brand theme from a template .pptx
+    deliver              record user acceptance of the build outputs (final gate)
 
 Stage guards are enforced here, not by prompt discipline: downstream commands
 refuse to run when an upstream gate is missing or invalidated.
@@ -35,6 +37,36 @@ def _resolve_run(args: argparse.Namespace) -> Path:
     if root is None:
         raise RunError("not inside a run workspace (no run.yaml); use --run or cd into runs/<name>")
     return root
+
+
+def _upstream_chain(key: str) -> set[str]:
+    """The artifact plus all its upstream artifacts (excluding sources/)."""
+    keys, stack = {key}, [key]
+    while stack:
+        for up in DERIVATION.get(stack.pop(), []):
+            if up != "sources" and up not in keys:
+                keys.add(up)
+                stack.append(up)
+    return keys
+
+
+def _require_validated(manifest: Manifest, keys: set[str], action: str) -> None:
+    """Hard-chain `comh validate`: an operation's inputs must be error-free.
+
+    Findings outside ``keys`` never block — a broken sibling projection does
+    not stop the deck, and a stale downstream artifact does not block an
+    upstream save (it will be re-derived anyway).
+    """
+    blocking = [
+        f for f in run_all(manifest.root) if f.severity == "error" and f.artifact in keys
+    ]
+    if blocking:
+        for finding in blocking:
+            print(f"  ✗ {finding.artifact}/{finding.check}: {finding.detail}", file=sys.stderr)
+        artifacts = ", ".join(sorted({f.artifact for f in blocking}))
+        raise RunError(
+            f"cannot {action}: validation error(s) in {artifacts}; run `comh validate all`"
+        )
 
 
 def cmd_init_run(args: argparse.Namespace) -> int:
@@ -69,6 +101,16 @@ def cmd_status(args: argparse.Namespace) -> int:
             print(f"  [!] {gate:<10} invalidated: file changed after confirmation")
         else:
             print(f"  [·] {gate:<10} not confirmed")
+    state, record = manifest.delivery_state()
+    if state == "none":
+        print("delivery:  [·] not accepted")
+    elif state == "accepted":
+        print(f"delivery:  [✓] accepted at {record['accepted_at']}")
+    else:
+        print(
+            f"delivery:  [!] invalidated: build outputs changed since "
+            f"{record['accepted_at']}; re-render and re-accept (`comh deliver`)"
+        )
     return 0
 
 
@@ -93,6 +135,9 @@ def cmd_save(args: argparse.Namespace) -> int:
             for finding in errors:
                 print(f"schema error: {finding.detail}", file=sys.stderr)
             raise RunError(f"cannot save '{key}': schema validation failed")
+    # Cross-artifact validators are a hard prerequisite too: the artifact and
+    # its upstream chain must be error-free at save time.
+    _require_validated(manifest, _upstream_chain(key), f"save '{key}'")
     manifest.mark_saved(key)
     print(f"saved '{key}' (upstream snapshot: {', '.join(DERIVATION[key])})")
     gate = GATE_OF_ARTIFACT.get(key)
@@ -104,6 +149,11 @@ def cmd_save(args: argparse.Namespace) -> int:
 def cmd_confirm(args: argparse.Namespace) -> int:
     manifest = Manifest.load(_resolve_run(args))
     gate = args.gate
+    # A gate confirms saved, fresh, error-free content — never a hand-edited
+    # file that skipped `comh save` (and its checks).
+    manifest.require_fresh(gate)
+    keys = {"evidence", "brief"} if gate == "brief" else {"evidence", "brief", "narrative"}
+    _require_validated(manifest, keys, f"confirm gate '{gate}'")
     # A gate may only be confirmed when its upstream gate (if any) is valid.
     if gate == "narrative":
         manifest.require_gate("brief")
@@ -137,6 +187,9 @@ def cmd_render(args: argparse.Namespace) -> int:
     if args.target == "deck":
         manifest.require_gate("narrative")
         manifest.require_fresh("deck_plan")
+        _require_validated(
+            manifest, {"evidence", "brief", "narrative", "deck_plan"}, "render deck"
+        )
         plan, findings = load_artifact(run_root, "deck_plan")
         if findings:
             raise RunError("deck_plan fails schema validation; run `comh validate all`")
@@ -174,17 +227,23 @@ def cmd_render(args: argparse.Namespace) -> int:
             encoding="utf-8",
         )
         for finding in result.findings:
-            print(f"  [△] render: {finding.detail}")
+            marker = "✗" if finding.severity == "error" else "△"
+            print(f"  [{marker}] render: {finding.detail}")
         print(
             f"rendered deck → {output} (theme: {result.theme}, "
             f"transition: {result.transition or 'none'})"
         )
         if result.findings:
             print(f"render report → {report_path}")
-        return 0
+        return 1 if any(f.severity == "error" for f in result.findings) else 0
     if args.target == "report":
         manifest.require_fresh("report_plan")
         manifest.require_fresh("report_md")
+        _require_validated(
+            manifest,
+            {"evidence", "brief", "narrative", "report_plan", "report_md"},
+            "render report",
+        )
         source = run_root / manifest.data["artifacts"]["report_md"]["path"]
         template = run_root / "templates" / "base.docx"
         output = run_root / manifest.data["build"]["report_docx"]
@@ -195,6 +254,9 @@ def cmd_render(args: argparse.Namespace) -> int:
     if args.target == "deck-html":
         manifest.require_gate("narrative")
         manifest.require_fresh("deck_plan")
+        _require_validated(
+            manifest, {"evidence", "brief", "narrative", "deck_plan"}, "render deck-html"
+        )
         plan, findings = load_artifact(run_root, "deck_plan")
         if findings:
             raise RunError("deck_plan fails schema validation; run `comh validate all`")
@@ -205,7 +267,11 @@ def cmd_render(args: argparse.Namespace) -> int:
             _BACKGROUND_FORBIDS_DARK.search(c)
             for c in brief.get("constraints", {}).get("hard", [])
         )
-        output = run_root / manifest.data["build"].get("deck_html", "build/deck.html")
+        rel = manifest.data["build"].get("deck_html", "build/deck.html")
+        if "deck_html" not in manifest.data["build"]:
+            manifest.data["build"]["deck_html"] = rel
+            manifest.save()
+        output = run_root / rel
         result = render_html_deck(
             plan, run_root, output,
             language=brief.get("language", "en"),
@@ -213,13 +279,34 @@ def cmd_render(args: argparse.Namespace) -> int:
             allow_dark=allow_dark,
         )
         _headless_layout_check(output, result)
+        report_path = run_root / "qa" / "render-deck-html.yaml"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            yaml.safe_dump(
+                {
+                    "output": str(result.output),
+                    "theme": result.theme,
+                    "transition": result.transition,
+                    "count": {
+                        s: sum(1 for f in result.findings if f.severity == s)
+                        for s in ("error", "warn", "info")
+                    },
+                    "findings": [f.as_dict() for f in result.findings],
+                },
+                allow_unicode=True,
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
         for finding in result.findings:
-            print(f"  [△] render: {finding.detail}")
+            marker = "✗" if finding.severity == "error" else "△"
+            print(f"  [{marker}] render: {finding.detail}")
         print(
             f"rendered html deck → {output} (theme: {result.theme}, "
             f"transition: {result.transition or 'default'}) — single file, opens offline"
         )
-        return 0
+        print(f"render report → {report_path}")
+        return 1 if any(f.severity == "error" for f in result.findings) else 0
     raise RunError("render target must be 'deck', 'deck-html' or 'report'")
 
 
@@ -234,6 +321,13 @@ def _headless_layout_check(html_path: Path, result) -> None:
 
     chrome = _chrome()
     if chrome is None:
+        result.findings.append(
+            Finding(
+                "deck_plan", "layout", "warn", "fail",
+                "[html] layout check skipped: headless Chrome not found (set COMH_CHROME); "
+                "geometry findings are not guaranteed for this output", "deck_plan",
+            )
+        )
         return
     completed = subprocess_module.run(
         [chrome, "--headless=new", "--disable-gpu", "--virtual-time-budget=4000",
@@ -242,6 +336,12 @@ def _headless_layout_check(html_path: Path, result) -> None:
     )
     match = re_module.search(r'data-layout-findings="(.*?)"', completed.stdout or "")
     if not match:
+        result.findings.append(
+            Finding(
+                "deck_plan", "layout", "warn", "fail",
+                "[html] layout check produced no read-back (guard script did not run)", "deck_plan",
+            )
+        )
         return
     import html as html_module
 
@@ -250,6 +350,12 @@ def _headless_layout_check(html_path: Path, result) -> None:
             html_module.unescape(match.group(1)).encode().decode("unicode_escape")
         )
     except (ValueError, UnicodeDecodeError):
+        result.findings.append(
+            Finding(
+                "deck_plan", "layout", "warn", "fail",
+                "[html] layout check read-back could not be parsed", "deck_plan",
+            )
+        )
         return
     for issue in issues[:20]:
         result.findings.append(
@@ -285,6 +391,30 @@ def cmd_check_schema(args: argparse.Namespace) -> int:
         print(f"  ✗ {error}")
     print(f"{name}: {'OK' if not errors else f'{len(errors)} schema error(s)'}")
     return 1 if errors else 0
+
+
+def cmd_deliver(args: argparse.Namespace) -> int:
+    """Record user acceptance of the built outputs (the third and final gate).
+
+    Preconditions are deterministic: every existing artifact must validate
+    error-free, and at least one build output must exist. The acceptance pins
+    the output hashes — any later re-render invalidates it until re-accepted.
+    """
+    manifest = Manifest.load(_resolve_run(args))
+    existing = {
+        key
+        for key in manifest.data["artifacts"]
+        if (manifest.root / manifest.data["artifacts"][key]["path"]).is_file()
+    }
+    _require_validated(manifest, existing, "deliver")
+    if not any(
+        (manifest.root / str(rel)).is_file() for rel in manifest.data["build"].values()
+    ):
+        raise RunError("no build outputs found; render at least one medium first (`comh render …`)")
+    record = manifest.record_delivery(note=args.note)
+    print(f"delivery recorded at {record['accepted_at']}: {', '.join(record['outputs'])}")
+    print("acceptance pins the output hashes; re-rendering invalidates it (`comh status` shows)")
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -332,6 +462,15 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("check-schema", "validate one artifact file against its schema")
     p.add_argument("file")
     p.set_defaults(func=cmd_check_schema)
+
+    p = add("theme-from-pptx", "extract a theme from a .pptx template")
+    p.add_argument("pptx", help="path to the template .pptx")
+    p.add_argument("--name", required=True, help="theme name to create under themes/")
+    p.set_defaults(func=cmd_theme_from_pptx)
+
+    p = add("deliver", "record user acceptance of the built outputs")
+    p.add_argument("--note", help="optional note (e.g. who accepted, conditions)")
+    p.set_defaults(func=cmd_deliver)
 
     return parser
 

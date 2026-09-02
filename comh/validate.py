@@ -64,6 +64,84 @@ def _evidence_number_pool(evidence: dict | None) -> set[float]:
     return pool
 
 
+def validate_sources(artifacts: dict[str, dict | None], run_root: Path) -> list[Finding]:
+    """The last link of the ID chain: evidence must cite real, existing sources.
+
+    Checks that SRCxx references resolve into the sources registry, registry
+    paths exist on disk, and derived locators name real operand items. Without
+    this, the chain page→beat→claim→evidence stops at evidence.
+    """
+    findings: list[Finding] = []
+    evidence = artifacts.get("evidence") or {}
+    items = evidence.get("items", [])
+    registry: dict[str, dict] = {}
+    for entry in evidence.get("sources", []) or []:
+        if isinstance(entry, dict) and entry.get("id"):
+            registry[str(entry["id"])] = entry
+    item_ids = {i["id"] for i in items}
+
+    cites_source = any(
+        str((i.get("source") or {}).get("source", "")).startswith("SRC") for i in items
+    )
+    if not registry:
+        if cites_source:
+            findings.append(
+                Finding(
+                    "evidence", "source-registry", "warn", "fail",
+                    "items cite SRCxx but no sources registry exists; provenance "
+                    "is unverifiable", "evidence",
+                )
+            )
+        return findings
+
+    for item in items:
+        item_id = item.get("id", "?")
+        source_ref = (item.get("source") or {}).get("source", "")
+        source_ref = str(source_ref)
+        if source_ref.startswith("SRC"):
+            entry = registry.get(source_ref)
+            if entry is None:
+                findings.append(
+                    Finding(
+                        "evidence", "ref-integrity", "error", "fail",
+                        f"evidence {item_id} cites source '{source_ref}' which is not in "
+                        f"the sources registry", "evidence",
+                    )
+                )
+            else:
+                path = str(entry.get("path", ""))
+                if path and not (run_root / path).is_file():
+                    findings.append(
+                        Finding(
+                            "evidence", "ref-integrity", "error", "fail",
+                            f"evidence {item_id}: source '{source_ref}' path '{path}' does "
+                            f"not exist under the run workspace", "evidence",
+                        )
+                    )
+        locator = str((item.get("source") or {}).get("locator", ""))
+        if "derived:" in locator:
+            match = re.search(r"derived:\(([^)]*)\)", locator)
+            operands = [t.strip() for t in match.group(1).split(",")] if match else []
+            if not any(operands):
+                findings.append(
+                    Finding(
+                        "evidence", "ref-integrity", "error", "fail",
+                        f"evidence {item_id} has a derived locator with no operands "
+                        f"(expected 'derived:(E001,E002)')", "evidence",
+                    )
+                )
+            for operand in operands:
+                if operand and operand not in item_ids:
+                    findings.append(
+                        Finding(
+                            "evidence", "ref-integrity", "error", "fail",
+                            f"evidence {item_id} derived locator references missing "
+                            f"evidence '{operand}'", "evidence",
+                        )
+                    )
+    return findings
+
+
 def validate_refs(artifacts: dict[str, dict | None]) -> list[Finding]:
     """ID-chain integrity: every cross-artifact reference resolves."""
     findings: list[Finding] = []
@@ -252,7 +330,12 @@ def validate_numbers(
 
 
 def validate_coverage(artifacts: dict[str, dict | None]) -> list[Finding]:
-    """Beats confirmed at Gate 2 must not silently vanish from projections."""
+    """Beats confirmed at Gate 2 must not silently vanish from projections.
+
+    A beat may be dropped intentionally by setting ``projection.status`` to
+    ``dropped``/``appendix`` in the narrative — that yields an info finding,
+    not a warning, so the decision stays visible in qa/findings.yaml.
+    """
     findings: list[Finding] = []
     narrative = artifacts.get("narrative") or {}
     beat_ids = {b["id"] for b in narrative.get("story", [])}
@@ -262,12 +345,32 @@ def validate_coverage(artifacts: dict[str, dict | None]) -> list[Finding]:
     report_plan = artifacts.get("report_plan") or {}
     for section in report_plan.get("sections", []):
         covered |= set(section.get("beats", []))
-    for beat_id in sorted(beat_ids - covered):
+    dropped: set[str] = set()
+    for beat in narrative.get("story", []):
+        projection = beat.get("projection")
+        status = str(projection.get("status", "")) if isinstance(projection, dict) else ""
+        if status not in ("dropped", "appendix") or beat["id"] in covered:
+            continue
+        dropped.add(beat["id"])
+        note = (
+            f" ({projection['note']})"
+            if isinstance(projection, dict) and projection.get("note")
+            else ""
+        )
+        findings.append(
+            Finding(
+                "narrative", "beat-coverage", "info", "pass",
+                f"beat {beat['id']} projection.status={status}: intentionally not "
+                f"projected{note}", "narrative",
+            )
+        )
+    for beat_id in sorted(beat_ids - covered - dropped):
         findings.append(
             Finding(
                 "narrative", "beat-coverage", "warn", "fail",
                 f"beat {beat_id} is not covered by any deck page or report section; "
-                f"if intentional, say so via a demotion or appendix", "deck_plan",
+                f"add coverage or mark it projection.status: dropped/appendix in the "
+                f"narrative", "narrative",
             )
         )
     return findings
@@ -450,9 +553,11 @@ def validate_hard_constraints(
     brief = artifacts.get("brief") or {}
     hard = brief.get("constraints", {}).get("hard", [])
     report_plan = artifacts.get("report_plan") or {}
+    matched: set[int] = set()
 
-    for constraint in hard:
+    for index, constraint in enumerate(hard):
         if _BACKGROUND_FORBIDS_DARK.search(constraint):
+            matched.add(index)
             from .render.theme import resolve_style
 
             style = (artifacts.get("deck_plan") or {}).get("deck", {}).get("style")
@@ -476,21 +581,24 @@ def validate_hard_constraints(
                 )
         match = _MUST_INCLUDE.search(constraint)
         if match:
+            matched.add(index)
             phrase = match.group(1).strip()
             haystacks = [report_md_text or ""]
             sections = report_plan.get("sections", [])
             haystacks += [s.get("heading", "") for s in sections]
             haystacks += [m for s in sections for m in s.get("must_include", [])]
+            haystacks += _iter_strings(artifacts.get("deck_plan"))
             if not any(phrase in h for h in haystacks):
                 findings.append(
                     Finding(
                         "brief", "hard-constraint", "error", "fail",
                         f"constraint requires '{phrase}' but it appears in no report section "
-                        f"heading/must_include", "report_plan",
+                        f"heading/must_include and no deck text", "report_plan",
                     )
                 )
         forbidden = _FORBIDDEN_PHRASE.search(constraint)
         if forbidden:
+            matched.add(index)
             phrase = forbidden.group(1).strip().strip("'\"“”‘’「」")
             if not phrase:
                 continue
@@ -512,6 +620,18 @@ def validate_hard_constraints(
                         f"({deck_hits[0][:40]!r}…)", "deck_plan",
                     )
                 )
+    # A hard constraint that matches no pattern is neither enforced nor
+    # challenged — surface it so Gate 1 actually discusses the demotion.
+    for index, constraint in enumerate(hard):
+        if index not in matched and str(constraint).strip():
+            findings.append(
+                Finding(
+                    "brief", "hard-constraint", "warn", "pass",
+                    f"constraint '{constraint}' has no machine check; confirm at Gate 1 "
+                    f"that it was demoted to a soft preference (or add a validator "
+                    f"pattern)", "brief",
+                )
+            )
     return findings
 
 
@@ -530,6 +650,8 @@ def run_all(run_root: Path) -> list[Finding]:
     from .style_lint import validate_style
 
     findings += validate_style(artifacts, report_md_text)
+    if artifacts.get("evidence") is not None:
+        findings += validate_sources(artifacts, run_root)
     if all(artifacts.get(k) is not None for k in ("evidence", "narrative")):
         findings += validate_refs(artifacts)
         findings += validate_claims(artifacts)
@@ -571,11 +693,12 @@ def write_findings(run_root: Path, findings: list[Finding]) -> Path:
 __all__ = [
     "run_all",
     "write_findings",
-    "validate_visuals",
     "validate_claims",
     "validate_coverage",
     "validate_hard_constraints",
     "validate_numbers",
     "validate_refs",
     "validate_reveal",
+    "validate_sources",
+    "validate_visuals",
 ]
