@@ -24,7 +24,13 @@
   - `purpose`：开放词汇——`establish_problem`、`demonstrate_effect`、`concede_limit`、
     `explain_mechanism`、`recommend`、`address_risk`……可自由发明，可参考
     `references/narrative-patterns.md` 的模式词汇（参考，不是边界）。
-  - `message`：这个 beat 要让受众接受的那**一句话**。这是 narrative 的灵魂——
+  - `message`：这个 beat 要让受众接受的那**一句话**，必须**能当面说出口**：
+    念给同事听不别扭才算合格。禁止名词堆叠的密码句，也禁止破折号金句和比喻。
+    反例："平坦即证据：非重叠臂<3皮秒的完全平坦，证明效应载体是容量重叠"。
+    正例："两条链路完全分开后，干扰没有再出现；瓶颈确认是容量共用"。
+    直白 = 主谓宾 + 具体数字，**不等于**造类比（"伤害""立尺子""争抢"这类词
+    都不要）。**brief.voice 优先于本段默认纪律**：用户在 Gate 1 选定了别的
+    风格档（如 punchy / formal）或给了样本，按选定的来。这是 narrative 的灵魂——
     投影层的标题、报告的段旨都从这里长出来。
   - `claims`：本 beat 依赖的 `Cxx`。
 

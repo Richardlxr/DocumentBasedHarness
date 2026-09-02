@@ -56,7 +56,7 @@ def test_html_deck_single_file_with_fragments(tmp_path: Path):
     doc = (tmp_path / "deck.html").read_text(encoding="utf-8")
 
     assert result.theme == "slate-tech"
-    assert doc.count("<section>") == 2
+    assert doc.count("<section") == 2
     assert "Reveal.initialize" in doc and 'transition:"fade"' in doc
     # reveal.js embedded: opens offline
     assert "cdn" not in doc.lower() and len(doc) > 100_000

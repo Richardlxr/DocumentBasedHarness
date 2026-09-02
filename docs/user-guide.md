@@ -97,7 +97,10 @@ HTML 单文件双击可开：方向键翻页、点击步进动画、`S` 开演�
 PPTX 动画默认关闭（实验性）：在 `deck.style` 加 `animations: true` 可开
 appear/fade_in 点击序列，**建议先在真机 PowerPoint 验证再交付**。
 
-主题在 `deck.style.template` 选择（内置 tier1-light / slate-tech / midnight）；
+主题在 `deck.style.template` 选择（内置 tier1-light / slate-tech / midnight）。
+**用你自己的 PPT 模板出品牌主题**：`comh theme-from-pptx 模板.pptx --name brand`
+会从模板提取色板和中英文字体生成 run 级主题，然后 `deck.style.template: brand`
+即可——你的品牌色和字体贯穿幻灯片、网页、报告三端。
 `tokens_override: {colors: {accent: ...}, sizes: {body: ...}}` 按次微调；
 `runs/<name>/themes/<name>/theme.yaml` 可为单个任务自带品牌主题。
 
@@ -113,7 +116,7 @@ appear/fade_in 点击序列，**建议先在真机 PowerPoint 验证再交付**�
 | hard-constraint | 有效背景色是否违反"不要黑底"；"必须包含:X"是否存在 |
 | diagram | mermaid 语法干跑（不需要 draw.io） |
 | reveal-address | 动画元素地址写错/越界 |
-| layout | 实测布局装不下（渲染报告 qa/render-deck.yaml） |
+| layout | 实测布局装不下：pptx 几何门禁 + HTML 布局守卫（溢出/遮挡，渲染时无头实测回读） |
 
 每条 finding 标注 owning artifact——修哪层，看这里。
 
@@ -129,6 +132,34 @@ appear/fade_in 点击序列，**建议先在真机 PowerPoint 验证再交付**�
 → 数字有据吗 → 方向对吗（回 Gate 1）。**内容层修改先亮影响面再动手；渲染层直接修。**
 同一投诉修两次仍不满意：禁止第三次硬修，换诊断假设并把整条链摊给用户。
 每次修复记入 `qa/repair-journal.yaml`。
+
+## 8.4 语言风格也是样式：Gate 1 对齐，不一刀切
+
+默认风格是直白（主谓宾+数字），但风格是**每次任务可选的**：
+
+- **给样本**：贴两三句你平时汇报的原话进 `voice.samples`，全部写作向它对齐；
+- **选版本**：不给样本时，AI 会用一条真实内容按 2-3 个风格档各写一版，你选一版
+  口头微调到满意；
+- **显式开关**：`voice.rules.relax`（如 punchy 场景放行破折号金句）、
+  `extra_forbidden`（追加禁词）。
+
+`comh validate` 的风格检查执行的是**你选定的风格**——plain 是默认，不是边界。
+改风格重做的话术："voice 换成 punchy 档，relax em-dash，重投影 deck，其他不动。"
+
+## 8.5 怎么提出"重做"（话术速查）
+
+说出症状 + 期望，并指明动哪一层（agent 会先亮影响面再动手）：
+
+| 不满意的是 | 这样说 | 影响 |
+|---|---|---|
+| 措辞表达 | "改成直白说法，**只重投影，narrative 不动**" | deck_plan → 渲染；Gate 2 存活 |
+| 某页内容 | "P05 重做：重点讲 X，Y 进备注" | 单页重投影 |
+| 故事逻辑 | "先结论后方法；S04/S05 合并，重过 Gate 2" | narrative 级联 |
+| 整个方向 | "这是给管理层的，不是给专家的，重来" | 回 Gate 1 全链 |
+| 数据材料 | "results.csv 第 3 组重测了" | 重提 evidence 级联 |
+| 视觉 | "换 midnight" / "用我的模板出品牌主题" | 仅 style，内容不动 |
+
+底线：同一处修两次不满意，说"换个诊断思路"，禁止第三次硬修。
 
 ## 9. 材料更新之后
 

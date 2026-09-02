@@ -65,6 +65,7 @@ class DeckTheme:
     footer_size: int = 11
     index_number_size: int = 26
     latin_fonts: tuple[str, str] = ("Calibri", "Calibri")  # (title, body)
+    cjk_fonts: tuple[str, str] = ("Microsoft YaHei", "Microsoft YaHei")
     notes: str = ""
 
 
@@ -92,6 +93,7 @@ def load_theme(path: Path) -> DeckTheme:
     sizes = data.get("sizes") or {}
     fonts = data.get("fonts") or {}
     latin = list(fonts.get("latin") or []) + ["Calibri", "Calibri"]
+    cjk = list(fonts.get("cjk") or []) + ["Microsoft YaHei", "Microsoft YaHei"]
     kwargs = {_SIZE_FIELDS[key]: int(value) for key, value in sizes.items() if key in _SIZE_FIELDS}
     return DeckTheme(
         name=str(data["name"]),
@@ -104,6 +106,7 @@ def load_theme(path: Path) -> DeckTheme:
         card_fill=_rgb(colors["card_fill"]),
         card_line=_rgb(colors["card_line"]),
         latin_fonts=(str(latin[0]), str(latin[1])),
+        cjk_fonts=(str(cjk[0]), str(cjk[1])),
         notes=str(data.get("notes", "")),
         **kwargs,
     )
@@ -239,9 +242,9 @@ class RenderTheme:
 
 
 def fonts_for(theme: DeckTheme, language: str) -> tuple[str, str]:
-    """(title, body) font families for a language: CJK gets CJK faces."""
+    """(title, body) font families for a language: CJK gets the theme's CJK faces."""
     if language.lower().startswith("zh"):
-        return "Microsoft YaHei", "Microsoft YaHei"
+        return theme.cjk_fonts
     return theme.latin_fonts
 
 
@@ -261,3 +264,79 @@ def render_theme(
         forced_light=choice.forced_light,
         fallback_reason=choice.fallback_reason,
     )
+
+
+# -- brand themes from user pptx templates -------------------------------------
+
+
+def theme_from_pptx(pptx_path: Path, name: str, run_root: Path) -> Path:
+    """Extract a theme.yaml (palette + fonts) from a user pptx template.
+
+    Reads ppt/theme/theme1.xml: dk1/lt1 become text/background, accent1 the
+    accent, accent2 the soft accent; major/minor fonts (latin + east-asian)
+    become the theme fonts. Luminance decides is_light. Writes
+    ``themes/<name>/theme.yaml`` under the run root and returns it — the
+    renderer picks it up via ``deck.style.template: <name>``.
+    """
+    import re as re_module
+    import zipfile
+
+    with zipfile.ZipFile(pptx_path) as archive:
+        xml = archive.read("ppt/theme/theme1.xml").decode("utf-8")
+
+    def color(tag: str) -> str | None:
+        block = re_module.search(
+            rf"<a:{tag}>.*?</a:{tag}>", xml, re_module.DOTALL
+        )
+        if not block:
+            return None
+        srgb = re_module.search(r'val="([0-9A-Fa-f]{6})"', block.group(0))
+        return srgb.group(1).upper() if srgb else None
+
+    def font(tag: str, script: str) -> str | None:
+        block = re_module.search(
+            rf"<a:{tag}Font>\s*<a:latin[^/]*typeface=\"([^\"]+)\"", xml
+        )
+        if block and script == "latin":
+            return block.group(1)
+        ea = re_module.search(
+            rf"<a:{tag}Font>.*?<a:ea typeface=\"([^\"]+)\"", xml, re_module.DOTALL
+        )
+        return ea.group(1) if ea else None
+
+    dk1 = color("dk1") or "1F2937"
+    lt1 = color("lt1") or "FFFFFF"
+    accent = color("accent1") or "2563EB"
+    accent2 = color("accent2") or accent
+    is_light = background_is_light(_rgb(lt1))
+    card_fill = "FFFFFF" if is_light else lt1
+    card_line = "D8DEE6" if is_light else accent2
+    major_latin = font("major", "latin") or "Calibri"
+    minor_latin = font("minor", "latin") or major_latin
+    major_ea = font("major", "ea") or "Microsoft YaHei"
+    minor_ea = font("minor", "ea") or major_ea
+    notes = f"extracted from {pptx_path.name}"
+
+    import yaml as yaml_module
+
+    payload = {
+        "name": name,
+        "is_light": is_light,
+        "colors": {
+            "background": lt1, "text": dk1, "muted": dk1,
+            "accent": accent, "accent_soft": accent2,
+            "card_fill": card_fill, "card_line": card_line,
+        },
+        "fonts": {
+            "latin": [major_latin, minor_latin],
+            "cjk": [major_ea, minor_ea],
+        },
+        "notes": notes,
+    }
+    # muted as a lightened text tone is not derivable; reuse dk1 (CSS can soften)
+    out = run_root / "themes" / name / "theme.yaml"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        yaml_module.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
+    return out

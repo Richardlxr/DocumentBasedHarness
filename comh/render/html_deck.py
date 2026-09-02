@@ -45,6 +45,31 @@ class HtmlResult:
     findings: list[Finding] = field(default_factory=list)
 
 
+def _fitted_sizes(page: dict, theme: RenderTheme, has_visual: bool) -> tuple[int, int, float]:
+    """Server-side measured fit (same PIL metrics as the pptx renderer):
+    choose title/body px so long titles stop pushing content off the slide.
+
+    Returns (title_px, body_px, title_height_in) — the estimated rendered
+    height of the title block, used by callers that need it.
+    """
+    from .metrics import fit_box
+
+    t = theme.theme
+    title = str(page.get("title", ""))
+    # html slide ≈ 13.33in wide at reveal's default scaling; body area ~11.5in
+    title_fit = fit_box(
+        title, width_pt=11.5 * 72, height_pt=1.15 * 72,
+        max_size=t.content_title_size, min_size=20, family=theme.title_font,
+    )
+    body_fit = fit_box(
+        title, width_pt=11.5 * 72, height_pt=2.6 * 72,
+        max_size=t.banner_title_size, min_size=20, family=theme.title_font,
+    )
+    if page.get("page_role") == "content":
+        return title_fit.font_size, t.body_size, title_fit.lines * title_fit.font_size * 1.25 / 72
+    return body_fit.font_size, t.body_size, 0.0
+
+
 def render_html_deck(
     plan: dict,
     run_root: Path,
@@ -142,7 +167,8 @@ def _section(
             f'{html.escape(plan.get("deck", {}).get("title", ""))}'
             f'</span><span class="muted footer-num">{page.get("id", "")[1:]}</span></div>'
         )
-    return f"    <section>{body}{footer}{aside}</section>"
+    role = page.get("page_role", "content")
+    return f'    <section class="role-{role}">{body}{footer}{aside}</section>'
 
 
 def _cover(page: dict, orders: dict) -> str:
@@ -194,8 +220,20 @@ def _content(
     kicker = str(page.get("kicker") or "")
     if kicker:
         parts.append(f'<div class="kicker">{html.escape(kicker)}</div>')
+    title_px, _body_px, title_height = _fitted_sizes(page, theme, True)
+    if title_height > 1.5:
+        result.findings.append(
+            Finding(
+                "deck_plan", "layout", "warn", "fail",
+                f"page {page['id']}: title wraps past the title zone "
+                f"(~{title_height:.1f}in) — shorten it or demote detail to points",
+                "deck_plan",
+            )
+        )
+    max_title = theme.theme.content_title_size
+    override = f' style="--title-size:{title_px}px"' if title_px < max_title else ""
     parts.append(
-        f'<h2{_fragment_attrs("title", orders)}>{html.escape(page["title"])}</h2>'
+        f'<h2{_fragment_attrs("title", orders)}{override}>{html.escape(page["title"])}</h2>'
         '<div class="h2-rule"></div>'
     )
 
@@ -396,14 +434,18 @@ html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
   letter-spacing:0.14em; margin-bottom:6px; }
 .footer { position:absolute; bottom:20px; left:70px; right:70px; display:flex;
   justify-content:space-between; font-size:var(--footer-size); }
-.agenda { margin-top:30px; }
-.agenda-row { display:flex; align-items:baseline; gap:26px; padding:16px 0;
+.agenda { margin-top:18px; }
+.agenda-row { display:flex; align-items:baseline; gap:26px; padding:12px 0;
   border-bottom:1px solid var(--card-line); }
 .agenda-row:last-child { border-bottom:none; }
 .agenda-num { font-size:var(--index-size); font-weight:700; color:var(--accent);
   min-width:56px; }
 .agenda-item { font-size:calc(var(--body-size) + 2px); }
-.reveal section { text-align:left; }
+.reveal .slides > section { text-align:left; padding: 8px 60px 54px 60px; }
+.role-content { position:relative; }  /* corner wash removed: it read as an
+  occluding disc over the top-right figure column; only the accent strip remains */
+.role-content::before { content:""; position:absolute; top:0; left:0; right:0;
+  height:4px; background:var(--accent); }
 .muted { color:var(--muted); }
 .plain { list-style:none; padding:0; }
 .points { margin-top:12px; display:flex; flex-direction:column;
@@ -473,6 +515,47 @@ Reveal.initialize({{
   slideNumber: true,
   showNotes: false,
 }});
+</script>
+<script>
+(function () {{
+  function check() {{
+    var findings = [];
+    var slides = document.querySelectorAll('.slides > section');
+    slides.forEach(function (slide, idx) {{
+      var sr = slide.getBoundingClientRect();
+      var blocks = [];
+      slide.querySelectorAll('h1,h2,.kicker,.point,.card,.callout,figure,.chart,.agenda-row,.footer')
+        .forEach(function (el) {{
+          var r = el.getBoundingClientRect();
+          if (r.width < 2 || r.height < 2) return;
+          blocks.push({{el: el, r: r}});
+          var over = r.bottom - sr.bottom, overR = r.right - sr.right;
+          if (over > 4 || overR > 4)
+            findings.push('slide ' + (idx + 1) + ': ' +
+              (el.className.split(' ')[0] || el.tagName) + ' overflows the slide by ' +
+              Math.max(over, overR).toFixed(0) + 'px');
+        }});
+      for (var i = 0; i < blocks.length; i++)
+        for (var j = i + 1; j < blocks.length; j++) {{
+          var a = blocks[i].r, b = blocks[j].r;
+          var w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+          var h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          if (w > 4 && h > 4) {{
+            var smaller = Math.min(a.width * a.height, b.width * b.height);
+            if ((w * h) / smaller > 0.08)
+              findings.push('slide ' + (idx + 1) + ': ' +
+                (blocks[i].el.className.split(' ')[0] || blocks[i].el.tagName) +
+                ' overlaps ' +
+                (blocks[j].el.className.split(' ')[0] || blocks[j].el.tagName));
+          }}
+        }}
+    }});
+    document.body.setAttribute('data-layout-findings', JSON.stringify(findings));
+    if (findings.length) console.warn('[layout-guard] ' + findings.length + ' issue(s):', findings);
+  }}
+  if (document.readyState === 'complete') setTimeout(check, 300);
+  else window.addEventListener('load', function () {{ setTimeout(check, 300); }});
+}})();
 </script>
 </body>
 </html>

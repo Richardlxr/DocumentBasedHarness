@@ -54,6 +54,49 @@
         "soft": { "type": "array", "items": { "type": "string" } }
       }
     },
+    "voice": {
+      "type": "object",
+      "description": "Language style contract, aligned at Gate 1. Style is a per-run choice: plain is the DEFAULT profile, not a boundary. Provide samples to imitate, or let the model draft 2-3 style candidates on a real beat message and pick/tune one.",
+      "additionalProperties": true,
+      "properties": {
+        "style": { "type": "string", "description": "Open vocabulary: plain | formal | academic | punchy | warm | any custom name. Drives which lint rules are relaxed." },
+        "description": { "type": "string", "description": "One-sentence statement of the chosen voice (model-synthesized or the user's own words)." },
+        "samples": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Imitation material: 2+ sentences of the user's own writing (or a style they like). All writing aligns to these."
+        },
+        "rules": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "relax": { "type": "array", "items": { "type": "string" }, "description": "Default lint rules to switch off for this run, e.g. [em-dash, contrast-frame]." },
+            "extra_forbidden": { "type": "array", "items": { "type": "string" }, "description": "Words/phrases to forbid in addition to the defaults." },
+            "extra_metaphor_markers": { "type": "array", "items": { "type": "string" }, "description": "Additional metaphor markers for this run's vocabulary." }
+          }
+        },
+        "deck": {
+          "type": "object",
+          "description": "Deck-surface override: spoken register (short, sayable lines). Merges over the global voice.",
+          "additionalProperties": true,
+          "properties": {
+            "style": { "type": "string" },
+            "description": { "type": "string" },
+            "rules": { "type": "object", "additionalProperties": true }
+          }
+        },
+        "report": {
+          "type": "object",
+          "description": "Report-surface override: written prose (complete sentences, fuller formality). Merges over the global voice.",
+          "additionalProperties": true,
+          "properties": {
+            "style": { "type": "string" },
+            "description": { "type": "string" },
+            "rules": { "type": "object", "additionalProperties": true }
+          }
+        }
+      }
+    },
     "spec": {
       "type": "object",
       "additionalProperties": true,

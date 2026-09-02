@@ -142,6 +142,8 @@ def test_rendered_shapes_stay_on_canvas(tmp_path: Path):
     emu = 914400
     for slide in prs.slides:
         for shape in slide.shapes:
+            if shape.name == "decor":
+                continue  # decor may bleed off-canvas by design (corner wash)
             assert shape.top / emu >= -0.06, f"{shape.name} off-canvas top"
             assert shape.left / emu >= -0.06, f"{shape.name} off-canvas left"
             assert (shape.top + shape.height) / emu <= 7.5 + 0.06

@@ -19,6 +19,8 @@
 
 用 docx-harness 的 Markdown/MyST 方言写 `documents/report.md`：
 
+- **语域：报告是书面语。**完整句子、主语齐全、严谨展开——deck 上砍掉的细节
+  在这里补全；和 deck 的口语短句不是一档，brief.voice.report 可覆盖全局风格。
 - 普通 Markdown：标题、段落、列表、表格、图片、链接。公式用 `$...$` / `$$...$$`；
   示意图用 ```` ```mermaid ```` fenced 块（flowchart/graph 子集，确定性编译；
   需要 `DRAWIO_CLI` 指向 draw.io Desktop）。

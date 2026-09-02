@@ -23,8 +23,8 @@ artifacts:
       evidence: sha256:fefe8f6cafb991639a93dc10ecf395c2905d210c8b5e4d0aec64f30dd797fdf8
   deck_plan:
     path: projection/deck_plan.yaml
-    hash: sha256:f1695cd629ab3907ed44dc82aa2d3d9e416aa36a5da6bd30edb431d54cca405b
-    saved_at: '2026-09-01T11:54:58+00:00'
+    hash: sha256:0c975769baee844ae4ce796a7662bb5cb7fd34e49a650a7c50786132c0edfe28
+    saved_at: '2026-09-02T02:51:38+00:00'
     upstream:
       narrative: sha256:b6425d66f20fcfd9b8092b420c29e3dd0555304fa20d0d05b1ab3e3b3f76fe0a
       brief: sha256:35f69bb6b2b0b34b2d68ff4edfd48284d119fb22fdd3091d7e2bdeeca2577f99
@@ -37,8 +37,8 @@ artifacts:
       brief: sha256:35f69bb6b2b0b34b2d68ff4edfd48284d119fb22fdd3091d7e2bdeeca2577f99
   report_md:
     path: documents/report.md
-    hash: sha256:0dc176cf4dde2169a4d9fc52e2fc341f7a14299bff69d5a89c73df068503fe6f
-    saved_at: '2026-09-01T11:54:59+00:00'
+    hash: sha256:ceeb0654ff4ec68785d550f34f49a45f6765339f1da563c902dec431c07b6d7a
+    saved_at: '2026-09-02T02:51:38+00:00'
     upstream:
       report_plan: sha256:48d0251f4ae2a468a8016204bbeaa2a23d916a03e34ea6c3ba2903bfdfb4de7c
       narrative: sha256:b6425d66f20fcfd9b8092b420c29e3dd0555304fa20d0d05b1ab3e3b3f76fe0a

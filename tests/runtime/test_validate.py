@@ -188,6 +188,21 @@ def test_hard_constraint_must_include():
     assert not any("局限性" in f.detail and f.severity == "error" for f in findings)
 
 
+def test_hard_constraint_forbidden_phrase():
+    artifacts = _artifacts()
+    artifacts["brief"] = {"constraints": {"hard": ['不得写"KP920 硬件实测"']}}
+    findings = validate_hard_constraints(artifacts, "正文出现 KP920 硬件实测 表述")
+    assert any(f.severity == "error" and "KP920 硬件实测" in f.detail for f in findings)
+    findings = validate_hard_constraints(artifacts, "干净的正文")
+    assert not any(f.severity == "error" for f in findings)
+    artifacts["deck_plan"]["deck"]["pages"].append(
+        {"id": "P09", "title": "KP920 硬件实测结果"}
+    )
+    findings = validate_hard_constraints(artifacts, "干净的正文")
+    deck_hits = [f for f in findings if f.severity == "error" and f.owning_artifact == "deck_plan"]
+    assert deck_hits and "KP920 硬件实测" in deck_hits[0].detail
+
+
 def test_hard_constraint_dark_background_enforced(tmp_path: Path):
     artifacts = _artifacts()
     artifacts["brief"] = {"constraints": {"hard": ["不要黑底"]}}

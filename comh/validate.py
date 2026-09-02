@@ -35,7 +35,19 @@ _ELEMENT_BASES = {"title", "callout", "visual", "support_points", "metric_cards"
 _KNOWN_VERBS = {"appear", "fade_in", "emphasize", "highlight"}
 _KNOWN_TRIGGERS = {"click", "with_previous", "after"}
 _MUST_INCLUDE = re.compile(r"必须包含[:：]?\s*(.+)")
+_FORBIDDEN_PHRASE = re.compile(r"(?:不得出现|不得写|禁止出现|禁止写)[:：]?\s*(.+)")
 _BACKGROUND_FORBIDS_DARK = re.compile(r"黑底|暗色背景|深色背景|dark background", re.IGNORECASE)
+
+
+def _iter_strings(node) -> list[str]:
+    """All string values nested in a JSON-ish structure (deck titles, labels, notes…)."""
+    if isinstance(node, str):
+        return [node]
+    if isinstance(node, dict):
+        return [s for v in node.values() for s in _iter_strings(v)]
+    if isinstance(node, (list, tuple)):
+        return [s for v in node for s in _iter_strings(v)]
+    return []
 
 
 def _numbers_in(text: str) -> set[float]:
@@ -477,6 +489,29 @@ def validate_hard_constraints(
                         f"heading/must_include", "report_plan",
                     )
                 )
+        forbidden = _FORBIDDEN_PHRASE.search(constraint)
+        if forbidden:
+            phrase = forbidden.group(1).strip().strip("'\"“”‘’「」")
+            if not phrase:
+                continue
+            deck_strings = _iter_strings(artifacts.get("deck_plan"))
+            if phrase in (report_md_text or ""):
+                findings.append(
+                    Finding(
+                        "brief", "hard-constraint", "error", "fail",
+                        f"constraint forbids '{phrase}' but it appears in the report text",
+                        "report_md",
+                    )
+                )
+            deck_hits = [s for s in deck_strings if phrase in s]
+            if deck_hits:
+                findings.append(
+                    Finding(
+                        "brief", "hard-constraint", "error", "fail",
+                        f"constraint forbids '{phrase}' but it appears in deck text "
+                        f"({deck_hits[0][:40]!r}…)", "deck_plan",
+                    )
+                )
     return findings
 
 
@@ -492,6 +527,9 @@ def run_all(run_root: Path) -> list[Finding]:
     report_path = run_root / manifest.data["artifacts"]["report_md"]["path"]
     report_md_text = report_path.read_text(encoding="utf-8") if report_path.is_file() else None
 
+    from .style_lint import validate_style
+
+    findings += validate_style(artifacts, report_md_text)
     if all(artifacts.get(k) is not None for k in ("evidence", "narrative")):
         findings += validate_refs(artifacts)
         findings += validate_claims(artifacts)

@@ -410,6 +410,16 @@ def _render_content(
     underline.fill.fore_color.rgb = t.accent
     underline.line.fill.background()
 
+    # decorative furniture: top accent strip only. The former corner wash
+    # (a filled 5.6in oval under the figure column) read as an occluding
+    # disc against top-right content, so it was removed — decoration must
+    # not visually cross the content zone.
+    strip = slide.shapes.add_shape(1, Inches(0), Inches(0), _SLIDE_W, Pt(5))
+    strip.name = "decor"
+    strip.fill.solid()
+    strip.fill.fore_color.rgb = t.accent
+    strip.line.fill.background()
+
     content_top = _BODY_TOP if title_top < 0.5 else _BODY_TOP + 0.2
     if cards:
         _render_metric_cards(
@@ -426,7 +436,10 @@ def _render_content(
         )
         body_width = 5.35
     elif diagram_spec is not None:
-        _add_diagram(slide, page_id, diagram_spec, theme, result, run_root, shapes)
+        _add_diagram(
+            slide, page_id, diagram_spec, theme, result, run_root, shapes,
+            has_callout=bool(page.get("callout")),
+        )
         body_width = 5.35
     else:
         _add_figure(slide, page, run_root, theme, result, shapes)
@@ -456,7 +469,7 @@ def _asset_entries(page: dict) -> list[dict]:
     ]
 
 
-def _fit_image(slide, png: Path, *, x: float, y: float, max_w: float, max_h: float) -> None:
+def _fit_image(slide, png: Path, *, x: float, y: float, max_w: float, max_h: float):
     """Place a PNG inside the (max_w, max_h) box, preserving aspect ratio."""
     from PIL import Image
 
@@ -466,12 +479,12 @@ def _fit_image(slide, png: Path, *, x: float, y: float, max_w: float, max_h: flo
     picture = slide.shapes.add_picture(
         str(png), Inches(x), Inches(y), Inches(width_px * scale), Inches(height_px * scale)
     )
-    return picture.shape_id
+    return picture
 
 
 def _add_diagram(
     slide, page_id: str, spec: dict, theme: RenderTheme, result: RenderResult,
-    run_root: Path, shapes: dict,
+    run_root: Path, shapes: dict, *, has_callout: bool = False,
 ) -> None:
     from docx_harness.errors import DocumentError
 
@@ -482,13 +495,13 @@ def _add_diagram(
         png = diagram_png(mermaid, run_root)
     except DocumentError as error:
         raise RuntimeError(f"page {page_id} diagram failed to compile: {error}") from error
-    shapes["visual"] = _fit_image(
-        slide, png, x=6.55, y=_BODY_TOP,
-        max_w=5.9, max_h=_BODY_BOTTOM - _BODY_TOP,
-    )
+    max_h = _visual_max_h(has_callout)
+    picture = _fit_image(slide, png, x=6.55, y=_BODY_TOP, max_w=5.9, max_h=max_h)
+    shapes["visual"] = picture.shape_id
     caption = spec.get("caption")
     if caption:
-        box = _textbox(slide, Inches(6.55), Inches(6.05), Inches(5.9), Inches(0.4))
+        bottom = (picture.top + picture.height) / _EMU_PER_IN
+        box = _textbox(slide, Inches(6.55), Inches(bottom + 0.06), Inches(5.9), Inches(0.4))
         paragraph = box.text_frame.paragraphs[0]
         paragraph.alignment = PP_ALIGN.CENTER
         _set(
@@ -502,7 +515,6 @@ def _add_figure(
 ) -> None:
     for entry in _asset_entries(page):
         image = run_root / entry["ref"]
-        image = run_root / entry["ref"]
         if not image.is_file():
             result.findings.append(
                 Finding(
@@ -512,13 +524,13 @@ def _add_figure(
                 )
             )
             continue
-        picture = slide.shapes.add_picture(
-            str(image), Inches(6.55), Inches(_BODY_TOP), width=Inches(5.9)
-        )
+        max_h = _visual_max_h(bool(page.get("callout")))
+        picture = _fit_image(slide, image, x=6.55, y=_BODY_TOP, max_w=5.9, max_h=max_h)
         shapes["visual"] = [picture.shape_id]
         caption = entry.get("caption")
         if caption:
-            box = _textbox(slide, Inches(6.55), Inches(6.05), Inches(5.9), Inches(0.4))
+            bottom = (picture.top + picture.height) / _EMU_PER_IN
+            box = _textbox(slide, Inches(6.55), Inches(bottom + 0.06), Inches(5.9), Inches(0.4))
             paragraph = box.text_frame.paragraphs[0]
             paragraph.alignment = PP_ALIGN.CENTER
             _set(
@@ -526,6 +538,14 @@ def _add_figure(
                 font=theme.body_font, color=theme.theme.muted,
             )
         return
+
+
+def _visual_max_h(has_callout: bool) -> float:
+    """Height cap for the right-column visual so it (plus its caption, which
+    hugs the image bottom) stays clear of the callout band and the footer."""
+    if has_callout:
+        return 5.5 - _BODY_TOP  # image bottom ≤5.5, caption ends ≤5.96 < callout 6.1
+    return 6.5 - _BODY_TOP     # image bottom ≤6.5, caption ends ≤6.96 < footer 7.06
 
 
 def _render_metric_cards(

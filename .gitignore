@@ -9,3 +9,6 @@ dist/
 # per-run generated outputs and machine-local state (see runs/*/ template)
 runs/*/build/
 runs/*/.workspace/
+
+# private runs: real client/project data must not be committed
+runs/my-report/

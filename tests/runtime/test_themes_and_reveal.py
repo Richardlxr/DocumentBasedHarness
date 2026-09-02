@@ -196,3 +196,19 @@ def test_agenda_overflow_gets_layout_finding(tmp_path: Path):
     result = render_deck(plan, tmp_path, tmp_path / "agenda.pptx")
     overflow = [f for f in result.findings if f.check == "layout" and "agenda rows" in f.detail]
     assert overflow and overflow[0].owning_artifact == "deck_plan"
+
+
+def test_theme_from_pptx_extracts_brand(tmp_path: Path):
+    from pptx import Presentation as BuildPresentation
+
+    from comh.render.theme import resolve_style, theme_from_pptx
+
+    template = tmp_path / "brand.pptx"
+    BuildPresentation().save(str(template))
+    out = theme_from_pptx(template, "brand", tmp_path)
+    assert out.is_file()
+    choice = resolve_style({"template": "brand"}, run_root=tmp_path)
+    assert choice.theme.name == "brand"
+    assert choice.theme.is_light  # default office template is light
+    assert str(choice.theme.accent) == "4F81BD"  # office default template accent1
+    assert choice.theme.cjk_fonts[0]  # CJK fonts present (default fallback ok)

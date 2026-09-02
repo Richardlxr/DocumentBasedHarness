@@ -47,6 +47,9 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Run sources are user-dropped upstream materials (static copies, evidence base),
+# not harness code — never lint or modify them.
+extend-exclude = ["runs/*/sources"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]

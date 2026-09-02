@@ -22,7 +22,7 @@ from pathlib import Path
 
 import yaml
 
-from .artifacts import ARTIFACT_KEYS, load_artifact, validate_schema
+from .artifacts import ARTIFACT_KEYS, Finding, load_artifact, validate_schema
 from .evidence_pack import build_pack, format_pack
 from .manifest import DERIVATION, GATE_OF_ARTIFACT, Manifest, RunError, find_run_root
 from .render import render_deck, render_html_deck, render_report
@@ -212,6 +212,7 @@ def cmd_render(args: argparse.Namespace) -> int:
             evidence=evidence,
             allow_dark=allow_dark,
         )
+        _headless_layout_check(output, result)
         for finding in result.findings:
             print(f"  [△] render: {finding.detail}")
         print(
@@ -220,6 +221,53 @@ def cmd_render(args: argparse.Namespace) -> int:
         )
         return 0
     raise RunError("render target must be 'deck', 'deck-html' or 'report'")
+
+
+def _headless_layout_check(html_path: Path, result) -> None:
+    """Run the embedded layout guard in headless Chrome and fold its findings
+    into the render report — the HTML twin of the pptx geometry gate."""
+    import json as json_module
+    import re as re_module
+    import subprocess as subprocess_module
+
+    from .render.icons import _chrome
+
+    chrome = _chrome()
+    if chrome is None:
+        return
+    completed = subprocess_module.run(
+        [chrome, "--headless=new", "--disable-gpu", "--virtual-time-budget=4000",
+         "--window-size=1600,900", "--dump-dom", html_path.as_uri()],
+        capture_output=True, text=True, timeout=120, check=False,
+    )
+    match = re_module.search(r'data-layout-findings="(.*?)"', completed.stdout or "")
+    if not match:
+        return
+    import html as html_module
+
+    try:
+        issues = json_module.loads(
+            html_module.unescape(match.group(1)).encode().decode("unicode_escape")
+        )
+    except (ValueError, UnicodeDecodeError):
+        return
+    for issue in issues[:20]:
+        result.findings.append(
+            Finding("deck_plan", "layout", "warn", "fail", f"[html] {issue}", "deck_plan")
+        )
+
+
+def cmd_theme_from_pptx(args: argparse.Namespace) -> int:
+    from .render.theme import theme_from_pptx
+
+    source = Path(args.pptx)
+    if not source.is_file():
+        raise RunError(f"template not found: {source}")
+    run_root = _resolve_run(args)
+    output = theme_from_pptx(source, args.name, run_root)
+    print(f"extracted theme '{args.name}' → {output}")
+    print(f"use it: deck.style.template: {args.name}")
+    return 0
 
 
 def cmd_evidence_pack(args: argparse.Namespace) -> int:
