@@ -217,7 +217,7 @@ def _section_background(
     overlay_type = str(bg_spec.get("overlay", "theme")).lower()
     frosted = " frosted" if overlay_type == "frosted-glass" else ""
     style = (
-        f' style="--slide-bg-img:url(\'data:{scrim_res.mime_type};base64,{b64}\'); '
+        f" style=\"--slide-bg-img:url('data:{scrim_res.mime_type};base64,{b64}'); "
         f'--scrim-color:{scrim_rgba}"'
     )
     return f" has-bg{frosted}", style
@@ -448,9 +448,7 @@ def _hero_split(
         f'<div class="hero-text">{kicker_html}{title_html}'
         f'<div class="h2-rule"></div>{points_html}{callout_html}</div>'
     )
-    visual_column = (
-        f'<div class="hero-col"{_fragment_attrs("visual", orders)}>{visual_html}</div>'
-    )
+    visual_column = f'<div class="hero-col"{_fragment_attrs("visual", orders)}>{visual_html}</div>'
     return f'<div class="hero-split">{text_column}{visual_column}</div>'
 
 

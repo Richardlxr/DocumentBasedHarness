@@ -302,11 +302,7 @@ def _versus_labels(page: dict, result) -> tuple[str, str]:
     renderer must not invent content, so a missing spec degrades to bare A/B
     with a warn pointing at the field."""
     columns = (page.get("visual") or {}).get("columns")
-    if (
-        isinstance(columns, list)
-        and len(columns) == 2
-        and all(str(c).strip() for c in columns)
-    ):
+    if isinstance(columns, list) and len(columns) == 2 and all(str(c).strip() for c in columns):
         return str(columns[0]).strip(), str(columns[1]).strip()
     result.findings.append(
         Finding(
