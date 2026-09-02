@@ -94,6 +94,7 @@ Gate 后改文件会自动作废确认，需要重新拍板——代价可见是
 | "渲染出来看看" | 渲染三件套：`build/deck.pptx`、`build/deck.html`（reveal.js 单文件：方向键翻页、点击步进动画、`S` 演讲者视图）、`build/report.docx`（`documents/report.md` 是正主） |
 | "换个主题" / "要吸睛一点" / "像杂志" | 从内置方向选型（tier1-light / slate-tech / midnight / poster-pop / gallery-noir，学术到创意艺术）或按次微调 token，重渲染 |
 | "用我的模板出品牌主题" | 从你的 pptx 提取色板和中英文字体生成 run 级主题，三端贯穿 |
+| "定一套'赛博霓虹'主题" | 气质没被内置命中时现场生成 run 级主题（纯数据），自动过对比度/可读性体检，样张对齐后三端贯穿 |
 | "这页放张照片" / "去找点素材" | 征得同意后检索，落盘 `assets/` 并登记出处（`assets/manifest.yaml`：来源+许可），出版本对齐 |
 | "PPTX 动画打开试试" | deck.style 开 `animations: true`（实验性，**先在真机 PowerPoint 验证再交付**） |
 
@@ -123,6 +124,7 @@ save / confirm / render 都会自动先跑校验、**有 error 直接拒绝**—
 | hard-constraint | 有效背景色是否违反"不要黑底"；"必须包含:X"是否存在 |
 | diagram | mermaid 语法干跑（不需要 draw.io） |
 | asset-provenance | 检索素材的出处链：登记的文件缺失=error；引用未登记素材=warn；用着素材却没有 manifest=info |
+| theme | 定制主题的质量下限：正文/背景对比度 <4.5:1 = error（阻断渲染）；muted/强调色 <3:1、is_light 与实际底色不符、字号低于可读下限 = warn |
 | reveal-address | 动画元素地址写错/越界 |
 | layout | 实测布局装不下：pptx 几何门禁 + HTML 布局守卫（溢出/遮挡，渲染时无头实测回读） |
 

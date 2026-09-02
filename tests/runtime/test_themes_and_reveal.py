@@ -238,3 +238,14 @@ def test_theme_from_pptx_extracts_brand(tmp_path: Path):
     assert choice.theme.is_light  # default office template is light
     assert str(choice.theme.accent) == "4F81BD"  # office default template accent1
     assert choice.theme.cjk_fonts[0]  # CJK fonts present (default fallback ok)
+
+
+def test_contrast_ratio_math() -> None:
+    from pptx.dml.color import RGBColor
+
+    from comh.render.theme import contrast_ratio
+
+    black, white = RGBColor.from_string("000000"), RGBColor.from_string("FFFFFF")
+    assert round(contrast_ratio(black, white), 1) == 21.0
+    assert contrast_ratio(white, black) == contrast_ratio(black, white)  # symmetric
+    assert contrast_ratio(white, white) == 1.0

@@ -72,7 +72,10 @@ upstream by replacing the package directory and re-running `tests/compiler/`.
   which takes precedence). Theme files change tokens only. Future per-role layout
   implementations in themes must compose the measured primitives in
   `comh/render/metrics.py` (`fit_box`/`wrap_lines`) — a theme may never compute raw
-  coordinates itself, or overflow findings stop being guaranteed.
+  coordinates itself, or overflow findings stop being guaranteed. AI-authored
+  custom themes are first-class; the effective theme (template + tokens_override)
+  is quality-gated — text/background contrast below 4.5:1 is an error, so an
+  unreadable theme never renders.
 - Reveal/emphasis are fragment-style semantics: element addresses resolve
   deterministically at validation time; renderers (pptx timing XML, HTML fragments)
   execute the same steps. Keep the verb set small.

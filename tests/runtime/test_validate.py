@@ -244,3 +244,61 @@ def test_asset_provenance_manifest_checks(tmp_path: Path) -> None:
     plain = {"deck_plan": {"deck": {"title": "t", "pages": [
         {"id": "P01", "page_role": "content", "title": "x"}]}}}
     assert validate_assets(plain, tmp_path) == []
+
+
+def test_theme_quality_floor(tmp_path: Path) -> None:
+    from comh.validate import validate_theme
+
+    def deck_with_style(style: dict) -> dict:
+        return {"deck_plan": {"deck": {"title": "t", "style": style,
+            "pages": [{"id": "P01", "page_role": "content", "title": "x"}]}}}
+
+    def write_theme(name: str, colors: dict, is_light: bool, sizes: dict | None = None):
+        # its own run root per theme: the registry is lru_cached by run path
+        root = tmp_path / name
+        d = root / "themes" / name
+        d.mkdir(parents=True)
+        lines = [f"name: {name}", f"is_light: {is_light}", "colors:"]
+        lines += [f"  {k}: '{v}'" for k, v in colors.items()]
+        if sizes:
+            lines.append("sizes:")
+            lines += [f"  {k}: {v}" for k, v in sizes.items()]
+        (d / "theme.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return root
+
+    full = {"background": "FFFFFF", "text": "111111", "muted": "6B7280",
+            "accent": "B91C1C", "accent_soft": "FCA5A5",
+            "card_fill": "F8FAFC", "card_line": "E2E8F0"}
+    # AI-authored theme with unreadable text on a mid-gray bg -> error blocks render
+    noisy = dict(full, background="9CA3AF", text="6B7280", muted="4B5563")
+    root = write_theme("noisy", noisy, is_light=True)
+    findings = validate_theme(deck_with_style({"template": "noisy"}), root)
+    assert any(f.severity == "error" and "4.5:1" in f.detail for f in findings)
+    # is_light lies about a white background
+    root = write_theme("liar", full, is_light=False)
+    findings = validate_theme(deck_with_style({"template": "liar"}), root)
+    assert any(f.check == "theme-declaration" and f.severity == "warn" for f in findings)
+    # sizes below the legibility floors
+    root = write_theme("tiny", full, is_light=True, sizes={"body": 10, "detail": 8, "caption": 7})
+    findings = validate_theme(deck_with_style({"template": "tiny"}), root)
+    assert len([f for f in findings if f.check == "theme-legibility"]) == 3
+    # a clean creative theme passes untouched
+    root = write_theme("clean", full, is_light=True)
+    assert validate_theme(deck_with_style({"template": "clean"}), root) == []
+    # tokens_override can break an otherwise fine template and gets caught too
+    bad_override = {"template": "slate-tech",
+                    "tokens_override": {"colors": {"text": "E2E8F0"}}}
+    findings = validate_theme(deck_with_style(bad_override), tmp_path)
+    assert any(f.severity == "error" for f in findings)
+
+
+def test_builtin_themes_pass_the_quality_floor(tmp_path: Path) -> None:
+    from comh.render.theme import available_themes
+    from comh.validate import validate_theme
+
+    for name in available_themes():
+        deck = {"deck_plan": {"deck": {"title": "t",
+            "style": {"template": name},
+            "pages": [{"id": "P01", "page_role": "content", "title": "x"}]}}}
+        findings = validate_theme(deck, tmp_path)
+        assert findings == [], f"{name}: {[f.detail for f in findings]}"

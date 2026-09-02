@@ -599,6 +599,65 @@ def validate_assets(artifacts: dict[str, dict | None], run_root: Path) -> list[F
     return findings
 
 
+def validate_theme(artifacts: dict[str, dict | None], run_root: Path) -> list[Finding]:
+    """Quality floor for customized themes (AI-authored or hand-edited): the
+    effective theme's contrast and legibility are machine-checked, so creative
+    freedom never ships an unreadable deck. Checks the theme as requested
+    (pre light-pinning) — pinning has its own hard-constraint finding."""
+    deck = artifacts.get("deck_plan") or {}
+    style = deck.get("deck", {}).get("style") or {}
+    if not (style.get("template") or style.get("tokens_override")):
+        return []  # default theme; the built-ins are guarded by their own test
+    from .render.theme import background_is_light, contrast_ratio, resolve_style
+
+    theme = resolve_style(style, allow_dark=True, run_root=run_root).theme
+    findings: list[Finding] = []
+    text_ratio = contrast_ratio(theme.text, theme.background)
+    if text_ratio < 4.5:
+        findings.append(
+            Finding(
+                "deck_plan", "theme-contrast", "error", "fail",
+                f"theme '{theme.name}': text/background contrast {text_ratio:.1f}:1 "
+                f"is below 4.5:1 — body text would be unreadable; darken the text "
+                f"or lighten the background", "deck_plan",
+            )
+        )
+    for role, color in (("muted", theme.muted), ("accent", theme.accent)):
+        ratio = contrast_ratio(color, theme.background)
+        if ratio < 3.0:
+            findings.append(
+                Finding(
+                    "deck_plan", "theme-contrast", "warn", "pass",
+                    f"theme '{theme.name}': {role} color contrast {ratio:.1f}:1 is "
+                    f"below 3:1 — captions/kicker/accents may be hard to see",
+                    "deck_plan",
+                )
+            )
+    if theme.is_light != background_is_light(theme.background):
+        actual = "light" if background_is_light(theme.background) else "dark"
+        findings.append(
+            Finding(
+                "deck_plan", "theme-declaration", "warn", "pass",
+                f"theme '{theme.name}' declares is_light={theme.is_light} but its "
+                f"background '{theme.background}' reads {actual}; dark-forbidding "
+                f"briefs pin on the actual color, fix the flag", "deck_plan",
+            )
+        )
+    for role, size, floor in (
+        ("body", theme.body_size, 14), ("detail", theme.detail_size, 11),
+        ("caption", theme.caption_size, 9),
+    ):
+        if size < floor:
+            findings.append(
+                Finding(
+                    "deck_plan", "theme-legibility", "warn", "pass",
+                    f"theme '{theme.name}': {role} size {size}pt is below the "
+                    f"{floor}pt legibility floor", "deck_plan",
+                )
+            )
+    return findings
+
+
 def validate_hard_constraints(
     artifacts: dict[str, dict | None], report_md_text: str | None
 ) -> list[Finding]:
@@ -715,6 +774,7 @@ def run_all(run_root: Path) -> list[Finding]:
         findings += validate_reveal(artifacts)
     if artifacts.get("deck_plan") is not None:
         findings += validate_assets(artifacts, run_root)
+        findings += validate_theme(artifacts, run_root)
     if artifacts.get("brief") is not None:
         findings += validate_hard_constraints(artifacts, report_md_text)
 
@@ -757,5 +817,6 @@ __all__ = [
     "validate_refs",
     "validate_reveal",
     "validate_sources",
+    "validate_theme",
     "validate_visuals",
 ]

@@ -197,6 +197,24 @@ def background_is_light(color: RGBColor) -> bool:
     return (299 * r + 587 * g + 114 * b) / 1000 >= 128
 
 
+def relative_luminance(color: RGBColor) -> float:
+    """WCAG relative luminance (sRGB linearization) — the basis for contrast math."""
+
+    def channel(value: float) -> float:
+        return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+
+    r, g, b = (channel(int(str(color)[i : i + 2], 16) / 255) for i in (0, 2, 4))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast_ratio(a: RGBColor, b: RGBColor) -> float:
+    """WCAG contrast ratio (1..21); 4.5:1 is the normal-text floor, 3:1 the
+    large-text/graphics floor. Theme quality gates are computed with this."""
+    la, lb = relative_luminance(a), relative_luminance(b)
+    lighter, darker = max(la, lb), min(la, lb)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
 def merge_tokens(theme: DeckTheme, override: dict | None) -> DeckTheme:
     """Apply ``deck.style.tokens_override`` (same shape as theme.yaml sections)
     on top of a theme. Colors accept hex strings; sizes accept ints; fonts

@@ -1,7 +1,7 @@
 # Stage: QA（质检）
 
 机械检查由 `comh validate all` 完成（schema、引用链、数字一致性、beat 覆盖、硬约束、
-Gate 有效性），结果在 `qa/findings.yaml`。**你负责判断型检查**，同样以 finding 记录
+素材出处、主题体检、Gate 有效性），结果在 `qa/findings.yaml`。**你负责判断型检查**，同样以 finding 记录
 （`check` 用 `model:` 前缀），追加进 `qa/findings.yaml` 的 `findings` 列表并同步
 `count`。每条 finding 必须写 `owning_artifact`——修复循环靠它定位归属层。
 
