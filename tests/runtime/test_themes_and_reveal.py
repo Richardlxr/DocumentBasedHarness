@@ -10,11 +10,37 @@ from comh.validate import validate_reveal
 
 def test_builtin_themes_load_from_yaml() -> None:
     themes = available_themes()
-    assert {"tier1-light", "slate-tech", "midnight"} <= set(themes)
+    assert {"tier1-light", "slate-tech", "midnight", "poster-pop", "gallery-noir"} <= set(themes)
     assert themes["slate-tech"].is_light
     assert not themes["midnight"].is_light
     assert themes["slate-tech"].accent is not None
     assert themes["midnight"].body_size == 22  # sizes survive the yaml round trip
+
+
+def test_creative_themes_reach_the_surfaces(tmp_path: Path) -> None:
+    from comh.render.html_deck import render_html_deck
+
+    themes = available_themes()
+    pop, noir = themes["poster-pop"], themes["gallery-noir"]
+    assert pop.is_light and not noir.is_light  # luminance pins apply to both directions
+    assert pop.cover_title_size > themes["tier1-light"].cover_title_size  # poster scale
+    assert noir.cjk_fonts[0] != pop.cjk_fonts[0]  # serif gallery vs sans poster
+
+    plan = {
+        "version": 1,
+        "deck": {
+            "title": "t",
+            "style": {"template": "poster-pop"},
+            "pages": [{"id": "P01", "page_role": "cover", "title": "发布",
+                       "support_points": ["副标"]}],
+        },
+    }
+    render_html_deck(plan, tmp_path, tmp_path / "pop.html", language="zh-CN")
+    doc = (tmp_path / "pop.html").read_text(encoding="utf-8")
+    assert "--accent:#E8452C" in doc and "--bg:#FFF6E5" in doc  # vermilion on cream
+    # a dark-forbidding brief pins gallery-noir back to light, same as midnight
+    pinned = select_theme({"template": "gallery-noir"}, allow_dark=False)
+    assert pinned.forced_light and pinned.theme.is_light
 
 
 def test_run_local_theme_takes_precedence(tmp_path: Path) -> None:

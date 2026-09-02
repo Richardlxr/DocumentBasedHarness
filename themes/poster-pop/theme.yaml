@@ -1,0 +1,32 @@
+name: poster-pop
+is_light: true
+
+# 海报波普：奶油纸底、墨黑骨架、朱红+万寿菊黄。吸睛来自尺度与对比，
+# 不靠堆装饰。创意提案、发布周、需要被记住的场合。
+colors:
+  background: "FFF6E5"
+  text: "141210"
+  muted: "6E5F49"
+  accent: "E8452C"
+  accent_soft: "F4B942"
+  card_fill: "FFFFFF"
+  card_line: "141210"
+
+fonts:
+  latin: ["Arial Black", "Arial"]
+  cjk: ["Microsoft YaHei", "Microsoft YaHei"]
+
+sizes:
+  cover_title: 64
+  banner_title: 48
+  content_title: 38
+  body: 24
+  body_wide: 26
+  detail: 18
+  caption: 14
+  card_value: 60
+  card_label: 15
+  callout: 22
+  kicker: 15
+  footer: 12
+  index_number: 36

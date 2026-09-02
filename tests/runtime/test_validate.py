@@ -208,3 +208,39 @@ def test_hard_constraint_dark_background_enforced(tmp_path: Path):
     artifacts["brief"] = {"constraints": {"hard": ["不要黑底"]}}
     findings = validate_hard_constraints(artifacts, None)
     assert any(f.severity == "info" and f.verdict == "pass" for f in findings)
+
+
+def test_asset_provenance_manifest_checks(tmp_path: Path) -> None:
+    from comh.validate import validate_assets
+
+    def deck_with_asset(ref: str) -> dict:
+        return {"deck_plan": {"deck": {"title": "t", "pages": [
+            {"id": "P01", "page_role": "content", "title": "x",
+             "visual": {"asset_refs": [{"ref": ref, "caption": "c"}]}}]}}}
+
+    # assets in use but no manifest at all -> info nudge, never a blocker
+    findings = validate_assets(deck_with_asset("assets/a.jpg"), tmp_path)
+    assert [f.severity for f in findings] == ["info"]
+
+    assets_dir = tmp_path / "assets"
+    assets_dir.mkdir()
+    (assets_dir / "a.jpg").write_bytes(b"img")
+    (assets_dir / "manifest.yaml").write_text(
+        "assets:\n  - {file: assets/missing.png, origin_url: 'https://x', license: CC0}\n",
+        encoding="utf-8",
+    )
+    findings = validate_assets(deck_with_asset("assets/a.jpg"), tmp_path)
+    # registered-but-missing = error; used-but-unregistered = warn
+    assert any(f.severity == "error" and "assets/missing.png" in f.detail for f in findings)
+    assert any(f.severity == "warn" and "assets/a.jpg" in f.detail for f in findings)
+
+    (assets_dir / "manifest.yaml").write_text(
+        "assets:\n  - {file: assets/a.jpg, origin_url: 'https://x', license: CC0}\n",
+        encoding="utf-8",
+    )
+    assert validate_assets(deck_with_asset("assets/a.jpg"), tmp_path) == []
+
+    # no asset_refs anywhere -> the check stays silent
+    plain = {"deck_plan": {"deck": {"title": "t", "pages": [
+        {"id": "P01", "page_role": "content", "title": "x"}]}}}
+    assert validate_assets(plain, tmp_path) == []

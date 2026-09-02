@@ -53,9 +53,15 @@ upstream by replacing the package directory and re-running `tests/compiler/`.
   from it by pure code (no model in the loop at render time). Visual upgrades (templates,
   layout engine, constrained animation vocabulary, HTML surface) must stay renderer-side
   and must not leak visual fields back into the narrative.
+- Web-sourced assets (photos, illustrations) are dialogue-gated: the agent asks for
+  consent before any network fetch, downloads into the run workspace, and registers
+  provenance in `runs/<name>/assets/manifest.yaml` (file, origin_url, license,
+  fetched_at); renderers read local files only. Images are decoration, never
+  evidence — they stay out of the ID chain (meaning attaches via `asset_refs`
+  caption/evidence).
 - Mermaid/draw.io diagram compilation is available through the vendored compiler but is
-  not wired into authoring instructions yet; diagrams are deferred (use existing images
-  under `assets/` and tables for now).
+  not wired into authoring instructions yet; diagrams are deferred (use images under
+  `assets/` and tables for now).
 
 ## Engineering
 

@@ -72,6 +72,9 @@ def test_html_deck_single_file_with_fragments(tmp_path: Path):
     assert len(re.findall(r'class="bar-fill"', doc)) == 2
     assert "结论条" in doc and "<aside class=\"notes\">讲稿</aside>" in doc
     assert "--accent" in doc  # theme tokens as CSS variables
+    # reveal.js paints .reveal-viewport (applied to <body>) white; our override
+    # must re-pin it to the theme background or every deck renders on white
+    assert ".reveal-viewport" in doc and "background:var(--bg)" in doc
 
 
 def test_html_deck_line_chart_falls_back_to_table(tmp_path: Path):

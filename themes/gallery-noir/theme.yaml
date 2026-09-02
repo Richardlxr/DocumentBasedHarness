@@ -1,0 +1,32 @@
+name: gallery-noir
+is_light: false
+
+# 画廊黑金：暖黑展厅、象牙文字、鎏金强调、衬线标题。内容当展品。
+# 颁奖、作品集、周年叙事。投屏环境要够暗；打印不是它的场。
+colors:
+  background: "161311"
+  text: "F3EDE2"
+  muted: "A99F8E"
+  accent: "C9A227"
+  accent_soft: "8C7326"
+  card_fill: "201C18"
+  card_line: "3B342B"
+
+fonts:
+  latin: ["Georgia", "Georgia"]
+  cjk: ["Songti SC", "Songti SC"]
+
+sizes:
+  cover_title: 54
+  banner_title: 42
+  content_title: 34
+  body: 22
+  body_wide: 24
+  detail: 17
+  caption: 13
+  card_value: 48
+  card_label: 14
+  callout: 19
+  kicker: 14
+  footer: 11
+  index_number: 30

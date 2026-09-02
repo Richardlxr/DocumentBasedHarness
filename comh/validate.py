@@ -545,6 +545,60 @@ def validate_reveal(artifacts: dict[str, dict | None]) -> list[Finding]:
     return findings
 
 
+def validate_assets(artifacts: dict[str, dict | None], run_root: Path) -> list[Finding]:
+    """Asset provenance: materials fetched into the run must be registered in
+    ``assets/manifest.yaml`` (file, origin_url, license, fetched_at) and must
+    exist on disk. Images are decoration, never evidence — this guards
+    provenance, not grounding."""
+    deck = artifacts.get("deck_plan") or {}
+    refs: list[tuple[str, str]] = []
+    for page in deck.get("deck", {}).get("pages", []):
+        for item in (page.get("visual") or {}).get("asset_refs", []):
+            entry = item if isinstance(item, dict) else {"ref": item}
+            ref = str(entry.get("ref", "")).strip()
+            if ref:
+                refs.append((page["id"], ref))
+    if not refs:
+        return []
+    manifest_path = run_root / "assets" / "manifest.yaml"
+    if not manifest_path.is_file():
+        return [
+            Finding(
+                "deck_plan", "asset-provenance", "info", "pass",
+                f"{len({ref for _, ref in refs})} asset(s) in use without a manifest; "
+                "materials fetched from outside should be registered in "
+                "assets/manifest.yaml {file, origin_url, license, fetched_at}",
+                "deck_plan",
+            )
+        ]
+    registered = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+    entries = {
+        str(entry.get("file", "")).strip(): entry
+        for entry in (registered.get("assets") or [])
+        if isinstance(entry, dict)
+    }
+    findings: list[Finding] = []
+    for name in sorted(entries):
+        if not (run_root / name).is_file():
+            findings.append(
+                Finding(
+                    "deck_plan", "asset-provenance", "error", "fail",
+                    f"manifest registers '{name}' but the file is missing", "deck_plan",
+                )
+            )
+    for page_id, ref in refs:
+        if ref not in entries:
+            findings.append(
+                Finding(
+                    "deck_plan", "asset-provenance", "warn", "pass",
+                    f"page {page_id} uses '{ref}' which assets/manifest.yaml does not "
+                    "register (fetched materials must record origin and license)",
+                    "deck_plan",
+                )
+            )
+    return findings
+
+
 def validate_hard_constraints(
     artifacts: dict[str, dict | None], report_md_text: str | None
 ) -> list[Finding]:
@@ -659,6 +713,8 @@ def run_all(run_root: Path) -> list[Finding]:
         findings += validate_coverage(artifacts)
         findings += validate_visuals(artifacts)
         findings += validate_reveal(artifacts)
+    if artifacts.get("deck_plan") is not None:
+        findings += validate_assets(artifacts, run_root)
     if artifacts.get("brief") is not None:
         findings += validate_hard_constraints(artifacts, report_md_text)
 
@@ -693,6 +749,7 @@ def write_findings(run_root: Path, findings: list[Finding]) -> Path:
 __all__ = [
     "run_all",
     "write_findings",
+    "validate_assets",
     "validate_claims",
     "validate_coverage",
     "validate_hard_constraints",

@@ -422,6 +422,9 @@ def _css(theme: RenderTheme) -> str:
     return f":root{{{variables}}}" + """
 html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
   font-family:'Microsoft YaHei','Segoe UI',Calibri,sans-serif; }
+/* reveal.css paints .reveal-viewport (which reveal.js puts on <body>) white with
+   class specificity; same-specificity override later in order keeps the theme bg */
+.reveal-viewport { background:var(--bg); color:var(--text); }
 .reveal { font-size:var(--body-size); }
 .reveal h1 { font-size:var(--banner-size, 40px); color:var(--text); }
 .cover-title { font-size:var(--cover-size) !important; text-align:left; margin:0.3em 0 0 0;
