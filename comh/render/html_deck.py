@@ -211,13 +211,16 @@ def _section_background(
     bg_b = int(str(theme.theme.background)[4:6], 16)
     scrim_rgba = f"rgba({bg_r}, {bg_g}, {bg_b}, {scrim_res.alpha})"
 
+    # frosted-glass blurs the ::after scrim layer, i.e. the background image
+    # under it — backdrop-filter on the section itself could never blur the
+    # section's own background-image
     overlay_type = str(bg_spec.get("overlay", "theme")).lower()
-    blur_style = " backdrop-filter: blur(12px);" if overlay_type == "frosted-glass" else ""
+    frosted = " frosted" if overlay_type == "frosted-glass" else ""
     style = (
         f' style="--slide-bg-img:url(\'data:{scrim_res.mime_type};base64,{b64}\'); '
-        f'--scrim-color:{scrim_rgba};{blur_style}"'
+        f'--scrim-color:{scrim_rgba}"'
     )
-    return " has-bg", style
+    return f" has-bg{frosted}", style
 
 
 def _section(
@@ -567,6 +570,8 @@ def _versus(
     orders: dict,
 ) -> str:
     """Versus: 2-column comparison layout."""
+    from .deck import _versus_labels
+
     kicker = str(page.get("kicker") or "")
     kicker_html = f'<div class="kicker">{html.escape(kicker)}</div>' if kicker else ""
     title_px, _body_px, _ = _fitted_sizes(page, theme, False)
@@ -602,8 +607,9 @@ def _versus(
             f'<div class="versus-body">{"".join(rendered)}</div></div>'
         )
 
-    left_col = col_html(left_entries, "方案 A / BASELINE", 0)
-    right_col = col_html(right_entries, "方案 B / PROPOSED", half)
+    left_label, right_label = _versus_labels(page, result)
+    left_col = col_html(left_entries, html.escape(left_label), 0)
+    right_col = col_html(right_entries, html.escape(right_label), half)
     cols = f'<div class="versus">{left_col}{right_col}</div>'
 
     callout = page.get("callout")
@@ -654,8 +660,13 @@ def _card_value(card: dict, evidence: dict | None, result: HtmlResult, page_id: 
     unit_str = f" {unit}" if unit else ""
     full_str = html.escape(num_str + unit_str)
     # Wrap in data-target and data-unit for client-side count-up ticker
+    # data-original carries the exact authored formatting (incl. %g science
+    # notation); the count-up ticker restores it when it finishes
     unit_attr = f' data-unit="{html.escape(unit_str)}"' if unit_str else ""
-    return f'<span class="card-num" data-target="{num_str}"{unit_attr}>{full_str}</span>'
+    return (
+        f'<span class="card-num" data-target="{num_str}" data-original="{full_str}"'
+        f"{unit_attr}>{full_str}</span>"
+    )
 
 
 def _css_chart(spec: dict, evidence: dict | None, result: HtmlResult, page_id: str, theme) -> str:
@@ -785,6 +796,10 @@ html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
   background:var(--scrim-color, transparent); z-index:0; pointer-events:none;
 }
 .has-bg > * { position:relative; z-index:1; }
+/* frosted-glass: blur what sits under the scrim layer (the bg image) */
+.has-bg.frosted::after {
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
 
 .muted { color:var(--muted); }
 .plain { list-style:none; padding:0; }
@@ -906,6 +921,9 @@ def _document(title: str, theme: RenderTheme, transition: str | None, sections: 
 <script>
 Reveal.initialize({{
   embedded: false,
+  width: 1280,
+  height: 720,
+  margin: 0,
   {transition_attr}
   hash: true,
   slideNumber: true,
@@ -914,12 +932,20 @@ Reveal.initialize({{
 </script>
 <script>
 (function () {{
+  // an element inside a reveal fragment only animates when that fragment
+  // has been shown — slide entry must not consume the animation early
+  function shown(el) {{
+    var frag = el.closest('.fragment');
+    return !frag || frag.classList.contains('visible');
+  }}
   function runCountUp(container) {{
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     var nums = (container || document).querySelectorAll('.card-num:not([data-counted])');
     nums.forEach(function (el) {{
+      if (!shown(el)) return;
       var target = parseFloat(el.getAttribute('data-target'));
       if (isNaN(target)) return;
+      var original = el.getAttribute('data-original') || el.textContent;
       el.setAttribute('data-counted', 'true');
       var start = 0;
       var duration = 800;
@@ -933,15 +959,36 @@ Reveal.initialize({{
         var ease = 1.0 - Math.pow(2, -10 * progress);
         var cur = start + (target - start) * ease;
         if (progress < 1.0) el.textContent = cur.toFixed(decimals) + unit;
-        else el.textContent = target.toFixed(decimals) + unit;
+        else el.textContent = original;
       }}
       requestAnimationFrame(tick);
     }});
   }}
+  function growBars(container) {{
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var bars = (container || document).querySelectorAll('.bar-fill:not([data-grown])');
+    bars.forEach(function (el) {{
+      if (!shown(el)) return;
+      el.setAttribute('data-grown', 'true');
+      var target = el.style.width;
+      if (!target) return;
+      el.style.transition = 'none';
+      el.style.width = '0%';
+      void el.offsetWidth; /* reflow so the reset lands before restoring */
+      el.style.transition = '';
+      el.style.width = target;
+    }});
+  }}
 
-  Reveal.on('slidechanged', function (e) {{ runCountUp(e.currentSlide); }});
-  Reveal.on('fragmentshown', function (e) {{ runCountUp(e.fragment); }});
-  Reveal.on('ready', function (e) {{ runCountUp(e.currentSlide); }});
+  Reveal.on('slidechanged', function (e) {{
+    runCountUp(e.currentSlide); growBars(e.currentSlide);
+  }});
+  Reveal.on('fragmentshown', function (e) {{
+    runCountUp(e.fragment); growBars(e.fragment);
+  }});
+  Reveal.on('ready', function (e) {{
+    runCountUp(e.currentSlide); growBars(e.currentSlide);
+  }});
 
   function check() {{
     var findings = [];

@@ -297,6 +297,31 @@ def _fmt(number: float) -> str:
     return f"{number:g}"
 
 
+def _versus_labels(page: dict, result) -> tuple[str, str]:
+    """Versus column labels come from visual.columns: [left, right] — the
+    renderer must not invent content, so a missing spec degrades to bare A/B
+    with a warn pointing at the field."""
+    columns = (page.get("visual") or {}).get("columns")
+    if (
+        isinstance(columns, list)
+        and len(columns) == 2
+        and all(str(c).strip() for c in columns)
+    ):
+        return str(columns[0]).strip(), str(columns[1]).strip()
+    result.findings.append(
+        Finding(
+            "deck_plan",
+            "layout",
+            "warn",
+            "pass",
+            f"page {page.get('id', '')}: versus needs visual.columns: [left, right] "
+            "column labels; rendering bare A/B for now",
+            "deck_plan",
+        )
+    )
+    return "A", "B"
+
+
 # -- page kinds --------------------------------------------------------------
 
 
@@ -1354,9 +1379,34 @@ def _render_timeline(
             bold=True,
         )
         if pt_detail:
+            # detail must fit the card too: measure it, shrink toward the
+            # floor, and report when even the floor overflows
+            box_h = card_h - 1.0
+            inner_w = (card_w - 0.6) * _PT_PER_IN
+            title_lines = len(wrap_lines(pt_text, pt_size, inner_w, theme.body_font))
+            budget = box_h * _PT_PER_IN - 8 - title_lines * pt_size * _LINE_SPACING
+            detail_size = t.detail_size
+            for candidate in range(t.detail_size, 10, -1):
+                lines = wrap_lines(pt_detail, candidate, inner_w, theme.body_font)
+                if len(lines) * candidate * 1.3 <= budget:
+                    detail_size = candidate
+                    break
+            else:
+                detail_size = 11
+                result.findings.append(
+                    Finding(
+                        "deck_plan",
+                        "layout",
+                        "warn",
+                        "fail",
+                        f"page {page_id}: milestone[{i}] detail does not fit the card "
+                        f"even at 11pt — trim it or demote to notes",
+                        "deck_plan",
+                    )
+                )
             p = box.text_frame.add_paragraph()
             p.space_before = Pt(8)
-            _set(p, pt_detail, size=t.detail_size, font=theme.body_font, color=t.muted)
+            _set(p, pt_detail, size=detail_size, font=theme.body_font, color=t.muted)
         shapes[f"support_points[{i}]"] = [card.shape_id, box.shape_id]
 
 
@@ -1423,11 +1473,9 @@ def _render_versus(
     card_y = hair_y + 0.25
     card_h = 4.4
 
-    for col_idx, (col_items, col_label, _col_start) in enumerate(
-        [
-            (left_entries, "方案 A / BASELINE", 0),
-            (right_entries, "方案 B / PROPOSED", half),
-        ]
+    left_label, right_label = _versus_labels(page, result)
+    for col_idx, (col_items, col_label) in enumerate(
+        [(left_entries, left_label), (right_entries, right_label)]
     ):
         cx = _MARGIN_X + col_idx * (card_w + 0.4)
         card = slide.shapes.add_shape(

@@ -88,6 +88,10 @@ def test_html_deck_single_file_with_fragments(tmp_path: Path):
     assert len(re.findall(r'class="bar-fill"', doc)) == 2
     assert "结论条" in doc and '<aside class="notes">讲稿</aside>' in doc
     assert "--accent" in doc  # theme tokens as CSS variables
+    # count-up keeps the authored string and restores it when it finishes
+    assert "data-original=" in doc and "220 ms" in doc
+    # slide entry must not consume animations of not-yet-shown fragments
+    assert "closest('.fragment')" in doc
     # reveal.js paints .reveal-viewport (applied to <body>) white; our override
     # must re-pin it to the theme background or every deck renders on white
     assert ".reveal-viewport" in doc and "background:var(--bg)" in doc

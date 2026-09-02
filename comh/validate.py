@@ -585,6 +585,24 @@ def validate_visuals(artifacts: dict[str, dict | None]) -> list[Finding]:
                     "deck_plan",
                 )
             )
+        if page.get("page_role") == "versus":
+            columns = (page.get("visual") or {}).get("columns")
+            if not (
+                isinstance(columns, list)
+                and len(columns) == 2
+                and all(str(c).strip() for c in columns)
+            ):
+                findings.append(
+                    Finding(
+                        "deck_plan",
+                        "layout",
+                        "warn",
+                        "pass",
+                        f"page {page_id}: versus needs visual.columns: [left, right] "
+                        "column labels (renderers will not invent them)",
+                        "deck_plan",
+                    )
+                )
     return findings
 
 

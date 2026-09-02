@@ -94,7 +94,7 @@
   - `hero_split`：左图右文或左文右图 Hero 分栏，图文顶格等高。
   - `fullscreen_backdrop`：全幅背景图 + 居中悬浮半透明卡片（`backdrop_card`），沉浸式叙事。
   - `timeline`：横向里程碑时间轴（推荐 3-4 节点，超出出 warning），带步骤徽标与展开要点。
-  - `versus`：双栏并列对比（方案 A vs 方案 B / 基线 vs 优化），结构化对称展示。
+  - `versus`：双栏并列对比（如基线 vs 优化）。列名由 `visual.columns: [左列名, 右列名]` 给出——渲染器不发明文案，缺失时降级为裸 A/B 并出 warning。
 
 - **背景图与蒙层（`visual.background`）**：
   - 语法：`visual.background: {asset: "assets/hero.jpg", opacity: 0.15, overlay: theme|frosted-glass}`
