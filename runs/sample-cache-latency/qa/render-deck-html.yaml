@@ -1,0 +1,8 @@
+output: /Users/richard/Vault/Code/Fun/DocumentBasedHarness/runs/sample-cache-latency/build/deck.html
+theme: slate-tech
+transition: fade
+count:
+  error: 0
+  warn: 0
+  info: 0
+findings: []
