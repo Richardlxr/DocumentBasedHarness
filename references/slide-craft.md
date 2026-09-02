@@ -63,10 +63,23 @@ reveal:
   用图标凑数。
 - 图标颜色跟随主题 accent，不要在内容里指定颜色。
 
+## 版式原型（Layout Archetypes）
+- `content`：标准上下/双栏图文排版，最适合通用论点展开。
+- `hero_split`：左图右文或左文右图，适合架构图、重大数据可视化、产品截图等 Hero 视觉。
+- `fullscreen_backdrop`：全屏图片底图 + 居中悬浮半透明卡片，适合宏观愿景、战略发布或总结升华。
+- `timeline`：横向 3-4 个里程碑节点卡片，适合阶段演进、历史回顾、路线图。
+- `versus`：双栏并列对比（基线 vs 优化 / 方案 A vs 方案 B），适合方案评估与选型决策。
+
+## 动画与微动效（HTML Deck）
+- **大数字跳动（Count-up）**：进入页面（或触发 fragment 时）KPI 卡片数字从 0 匀速插值跃升至目标值（800ms，带 easeOutExpo 减速缓动）。
+- **柱状图生长（Bar Growth）**：CSS transition 平滑展开宽度。
+- **无障碍降级**：当系统开启 `prefers-reduced-motion: reduce` 时，所有动效自动关闭，呈现静态终态。
+
 ## 素材与照片
 
 - 图片气质跟主题走：poster-pop 配高对比照片，gallery-noir 配少而精的大图；
   素材和页面气质不一致时，宁可换素材。
+- **背景图（`visual.background`）**：支持 `{asset, opacity, overlay}`。PIL 实测 worst-case 动态加深蒙层至 ≥4.5:1，坚守可读性底线。PPTX 端自动降级为半透明实色矩形。
 - 图是装饰不是证据：图上读出的数字走 evidence（标估读）；检索来的素材必须
   征得同意、落盘登记出处（协议见 stages/deck.md「素材」）。
 - 克制同图标：一页一张主图足够，两张以上就开始互相打架。

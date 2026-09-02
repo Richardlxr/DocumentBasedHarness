@@ -136,12 +136,18 @@ def icon_png(name: str, *, color, background, px: int, run_root: Path) -> Path:
     try:
         subprocess.run(
             [
-                chrome, "--headless=new", "--disable-gpu", "--hide-scrollbars",
-                f"--screenshot={png}", f"--window-size={px},{px}",
+                chrome,
+                "--headless=new",
+                "--disable-gpu",
+                "--hide-scrollbars",
+                f"--screenshot={png}",
+                f"--window-size={px},{px}",
                 "--default-background-color=00000000",
                 html_path.as_uri(),
             ],
-            capture_output=True, check=True, timeout=60,
+            capture_output=True,
+            check=True,
+            timeout=60,
         )
     finally:
         html_path.unlink(missing_ok=True)

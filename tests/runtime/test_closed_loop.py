@@ -160,14 +160,30 @@ def test_validate_sources_catches_broken_chain(tmp_path: Path):
                 {"id": "SRC02", "path": "sources/gone.csv"},
             ],
             "items": [
-                {"id": "E001", "kind": "datum", "content": "a",
-                 "source": {"source": "SRC01", "locator": "r1"}},
-                {"id": "E002", "kind": "datum", "content": "b",
-                 "source": {"source": "SRC02", "locator": "r1"}},
-                {"id": "E003", "kind": "datum", "content": "c",
-                 "source": {"source": "SRC09", "locator": "r1"}},
-                {"id": "E004", "kind": "datum", "content": "d",
-                 "source": {"source": "derived", "locator": "derived:(E001,E888)"}},
+                {
+                    "id": "E001",
+                    "kind": "datum",
+                    "content": "a",
+                    "source": {"source": "SRC01", "locator": "r1"},
+                },
+                {
+                    "id": "E002",
+                    "kind": "datum",
+                    "content": "b",
+                    "source": {"source": "SRC02", "locator": "r1"},
+                },
+                {
+                    "id": "E003",
+                    "kind": "datum",
+                    "content": "c",
+                    "source": {"source": "SRC09", "locator": "r1"},
+                },
+                {
+                    "id": "E004",
+                    "kind": "datum",
+                    "content": "d",
+                    "source": {"source": "derived", "locator": "derived:(E001,E888)"},
+                },
             ],
         }
     }
@@ -192,8 +208,13 @@ def test_coverage_respects_dropped_projection_status():
         "narrative": {
             "story": [
                 {"id": "S01", "purpose": "p", "message": "m", "claims": []},
-                {"id": "S02", "purpose": "p", "message": "m", "claims": [],
-                 "projection": {"status": "dropped", "note": "附录材料"}},
+                {
+                    "id": "S02",
+                    "purpose": "p",
+                    "message": "m",
+                    "claims": [],
+                    "projection": {"status": "dropped", "note": "附录材料"},
+                },
             ]
         },
         "deck_plan": {"deck": {"pages": [{"id": "P01", "beat": "S01", "title": "t"}]}},
@@ -244,9 +265,15 @@ def test_broken_theme_file_gets_specific_message(tmp_path: Path):
 def test_html_css_colors_carry_hash_prefix(tmp_path: Path):
     from comh.render.html_deck import render_html_deck
 
-    plan = {"version": 1, "deck": {"title": "t", "pages": [
-        {"id": "P01", "page_role": "content", "title": "标题", "support_points": ["点"]}
-    ]}}
+    plan = {
+        "version": 1,
+        "deck": {
+            "title": "t",
+            "pages": [
+                {"id": "P01", "page_role": "content", "title": "标题", "support_points": ["点"]}
+            ],
+        },
+    }
     render_html_deck(plan, tmp_path, tmp_path / "deck.html", language="zh-CN")
     css = (tmp_path / "deck.html").read_text(encoding="utf-8")
     assert "--bg:#" in css and "--accent:#" in css and "--text:#" in css, (

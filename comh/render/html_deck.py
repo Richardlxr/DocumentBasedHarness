@@ -5,16 +5,15 @@ nearly free because reveal.js fragments execute the reveal/emphasis semantics
 directly. The output is one self-contained HTML file (reveal.js and reveal.css
 embedded, images inlined as data URIs) that opens offline in any browser.
 
-Mapping (v1):
+Mapping:
 - reveal steps -> fragment classes with explicit data-fragment-index
-  (click steps sequentially; with_previous shares the previous index;
-  trigger=after is treated as sequential)
 - verbs: appear -> "fragment", fade_in -> "fragment fade-in",
   emphasize/highlight -> "fragment highlight-current"
 - charts: bar/column render as deterministic CSS bars from evidence values
-  (offline, no JS chart lib); other types fall back to a data table
 - diagrams/figures: inlined as data URIs from the PNG cache
-- theme tokens -> CSS variables; style.transition -> reveal transition
+- backgrounds: downsampled (<=1920px) and inlined with empirical PIL scrim
+- micro-animations: count-up on KPI cards + bar growth transition
+- layout archetypes: content, hero_split, fullscreen_backdrop, timeline, versus
 """
 
 from __future__ import annotations
@@ -25,6 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..artifacts import Finding
+from .scrim import solve_scrim
 from .theme import RenderTheme, render_theme
 
 _WEB_DIR = Path(__file__).parent / "web"
@@ -56,16 +56,29 @@ def _fitted_sizes(page: dict, theme: RenderTheme, has_visual: bool) -> tuple[int
 
     t = theme.theme
     title = str(page.get("title", ""))
-    # html slide ≈ 13.33in wide at reveal's default scaling; body area ~11.5in
     title_fit = fit_box(
-        title, width_pt=11.5 * 72, height_pt=1.15 * 72,
-        max_size=t.content_title_size, min_size=20, family=theme.title_font,
+        title,
+        width_pt=11.5 * 72,
+        height_pt=1.15 * 72,
+        max_size=t.content_title_size,
+        min_size=20,
+        family=theme.title_font,
     )
     body_fit = fit_box(
-        title, width_pt=11.5 * 72, height_pt=2.6 * 72,
-        max_size=t.banner_title_size, min_size=20, family=theme.title_font,
+        title,
+        width_pt=11.5 * 72,
+        height_pt=2.6 * 72,
+        max_size=t.banner_title_size,
+        min_size=20,
+        family=theme.title_font,
     )
-    if page.get("page_role") == "content":
+    if page.get("page_role") in (
+        "content",
+        "hero_split",
+        "timeline",
+        "versus",
+        "fullscreen_backdrop",
+    ):
         return title_fit.font_size, t.body_size, title_fit.lines * title_fit.font_size * 1.25 / 72
     return body_fit.font_size, t.body_size, 0.0
 
@@ -83,7 +96,8 @@ def render_html_deck(
         plan.get("deck", {}).get("style"), language, allow_dark=allow_dark, run_root=run_root
     )
     result = HtmlResult(
-        output=output, theme=theme.theme.name,
+        output=output,
+        theme=theme.theme.name,
         transition=_TRANSITION_MAP.get(
             str((plan.get("deck", {}).get("style") or {}).get("transition", "")).lower()
         ),
@@ -146,9 +160,73 @@ def _fragment_attrs(address: str, orders: dict[str, tuple[str, int]], base: str 
     return f' class="{merged}" data-fragment-index="{index}"'
 
 
+def _section_background(
+    page: dict, theme: RenderTheme, result: HtmlResult, run_root: Path
+) -> tuple[str, str]:
+    """Returns (extra_classes, inline_style) for section background."""
+    bg_spec = (page.get("visual") or {}).get("background") or page.get("background")
+    if not bg_spec or not isinstance(bg_spec, dict) or not bg_spec.get("asset"):
+        return "", ""
+
+    asset_path = run_root / str(bg_spec["asset"])
+    if not asset_path.is_file():
+        result.findings.append(
+            Finding(
+                "deck_plan",
+                "asset",
+                "warn",
+                "fail",
+                f"page {page.get('id', '')} background image not found: {bg_spec['asset']}",
+                "deck_plan",
+            )
+        )
+        return "", ""
+
+    base_opacity = float(bg_spec.get("opacity") or 0.0)
+    scrim_res = solve_scrim(
+        asset_path,
+        theme.theme.text,
+        theme.theme.background,
+        base_alpha=base_opacity,
+    )
+    if not scrim_res.passed:
+        result.findings.append(
+            Finding(
+                "deck_plan",
+                "background-contrast",
+                "error",
+                "fail",
+                f"page {page.get('id', '')}: background image contrast against theme "
+                "text is below 4.5:1 even at alpha=0.90",
+                "deck_plan",
+            )
+        )
+
+    if not scrim_res.image_bytes:
+        return "", ""
+
+    b64 = base64.b64encode(scrim_res.image_bytes).decode("ascii")
+    bg_r = int(str(theme.theme.background)[0:2], 16)
+    bg_g = int(str(theme.theme.background)[2:4], 16)
+    bg_b = int(str(theme.theme.background)[4:6], 16)
+    scrim_rgba = f"rgba({bg_r}, {bg_g}, {bg_b}, {scrim_res.alpha})"
+
+    overlay_type = str(bg_spec.get("overlay", "theme")).lower()
+    blur_style = " backdrop-filter: blur(12px);" if overlay_type == "frosted-glass" else ""
+    style = (
+        f' style="--slide-bg-img:url(\'data:{scrim_res.mime_type};base64,{b64}\'); '
+        f'--scrim-color:{scrim_rgba};{blur_style}"'
+    )
+    return " has-bg", style
+
+
 def _section(
-    page: dict, plan: dict, theme: RenderTheme, result: HtmlResult,
-    run_root: Path, evidence: dict | None,
+    page: dict,
+    plan: dict,
+    theme: RenderTheme,
+    result: HtmlResult,
+    run_root: Path,
+    evidence: dict | None,
 ) -> str:
     role = page.get("page_role", "content")
     orders = _fragment_orders(page)
@@ -156,19 +234,29 @@ def _section(
         body = _cover(page, orders)
     elif role in ("agenda", "section_divider", "closing"):
         body = _banner(page, orders)
+    elif role == "hero_split":
+        body = _hero_split(page, theme, result, run_root, evidence, orders)
+    elif role == "fullscreen_backdrop":
+        body = _fullscreen_backdrop(page, theme, result, run_root, evidence, orders)
+    elif role == "timeline":
+        body = _timeline(page, theme, result, run_root, evidence, orders)
+    elif role == "versus":
+        body = _versus(page, theme, result, run_root, evidence, orders)
     else:
         body = _content(page, theme, result, run_root, evidence, orders)
+
     notes = page.get("notes")
     aside = f'<aside class="notes">{html.escape(str(notes))}</aside>' if notes else ""
     footer = ""
-    if page.get("page_role") != "cover":
+    if role != "cover":
         footer = (
             f'<div class="footer"><span class="muted">'
-            f'{html.escape(plan.get("deck", {}).get("title", ""))}'
+            f"{html.escape(plan.get('deck', {}).get('title', ''))}"
             f'</span><span class="muted footer-num">{page.get("id", "")[1:]}</span></div>'
         )
-    role = page.get("page_role", "content")
-    return f'    <section class="role-{role}">{body}{footer}{aside}</section>'
+
+    bg_class, bg_style = _section_background(page, theme, result, run_root)
+    return f'    <section class="role-{role}{bg_class}"{bg_style}>{body}{footer}{aside}</section>'
 
 
 def _cover(page: dict, orders: dict) -> str:
@@ -186,22 +274,22 @@ def _banner(page: dict, orders: dict) -> str:
         rows = "".join(
             f'<div class="agenda-row">'
             f'<span class="agenda-num"{_fragment_attrs(f"support_points[{i}]", orders)}>'
-            f'{i + 1:02d}</span>'
+            f"{i + 1:02d}</span>"
             f'<span class="agenda-item"{_fragment_attrs(f"support_points[{i}]", orders)}>'
-            f'{html.escape(_point_text(entry)[0])}</span></div>'
+            f"{html.escape(_point_text(entry)[0])}</span></div>"
             for i, entry in enumerate(entries)
         )
         return (
-            f'<h1{_fragment_attrs("title", orders)}>{html.escape(page["title"])}</h1>'
+            f"<h1{_fragment_attrs('title', orders)}>{html.escape(page['title'])}</h1>"
             f'<div class="agenda">{rows}</div>'
         )
     items = "".join(
-        f'<li{_fragment_attrs(f"support_points[{i}]", orders, "muted")}>'
-        f'{html.escape(_point_text(entry)[0])}</li>'
+        f"<li{_fragment_attrs(f'support_points[{i}]', orders, 'muted')}>"
+        f"{html.escape(_point_text(entry)[0])}</li>"
         for i, entry in enumerate(entries)
     )
     return (
-        f'<h1{_fragment_attrs("title", orders)}>{html.escape(page["title"])}</h1>'
+        f"<h1{_fragment_attrs('title', orders)}>{html.escape(page['title'])}</h1>"
         f'<ul class="plain">{items}</ul>'
     )
 
@@ -213,8 +301,12 @@ def _point_text(entry) -> tuple[str, str | None]:
 
 
 def _content(
-    page: dict, theme: RenderTheme, result: HtmlResult, run_root: Path,
-    evidence: dict | None, orders: dict,
+    page: dict,
+    theme: RenderTheme,
+    result: HtmlResult,
+    run_root: Path,
+    evidence: dict | None,
+    orders: dict,
 ) -> str:
     parts: list[str] = []
     kicker = str(page.get("kicker") or "")
@@ -224,7 +316,10 @@ def _content(
     if title_height > 1.5:
         result.findings.append(
             Finding(
-                "deck_plan", "layout", "warn", "fail",
+                "deck_plan",
+                "layout",
+                "warn",
+                "fail",
                 f"page {page['id']}: title wraps past the title zone "
                 f"(~{title_height:.1f}in) — shorten it or demote detail to points",
                 "deck_plan",
@@ -233,7 +328,7 @@ def _content(
     max_title = theme.theme.content_title_size
     override = f' style="--title-size:{title_px}px"' if title_px < max_title else ""
     parts.append(
-        f'<h2{_fragment_attrs("title", orders)}{override}>{html.escape(page["title"])}</h2>'
+        f"<h2{_fragment_attrs('title', orders)}{override}>{html.escape(page['title'])}</h2>"
         '<div class="h2-rule"></div>'
     )
 
@@ -255,8 +350,8 @@ def _content(
                     icon_html = f'<div class="card-icon">{svg}</div>'
             card_top = icon_html or '<div class="card-topbar"></div>'
             items.append(
-                f'<div{_fragment_attrs(f"metric_cards[{index}]", orders, "card")}>'
-                f'{card_top}'
+                f"<div{_fragment_attrs(f'metric_cards[{index}]', orders, 'card')}>"
+                f"{card_top}"
                 f'<div class="card-value">{value_html}</div>'
                 f'<div class="card-label muted">{label}</div></div>'
             )
@@ -267,20 +362,21 @@ def _content(
     if visual.get("chart"):
         chart_html = _css_chart(visual["chart"], evidence, result, page["id"], theme)
         if chart_html:
-            visual_html = f'<div{_fragment_attrs("visual", orders)}>{chart_html}</div>'
+            visual_html = f"<div{_fragment_attrs('visual', orders)}>{chart_html}</div>"
     elif visual.get("diagram"):
         visual_html = _image_block(run_root, "visual", visual["diagram"], theme, orders)
     elif visual.get("asset_refs"):
-        entries = [
-            e if isinstance(e, dict) else {"ref": e} for e in visual["asset_refs"]
-        ]
+        entries = [e if isinstance(e, dict) else {"ref": e} for e in visual["asset_refs"]]
         existing = next((e for e in entries if (run_root / e["ref"]).is_file()), None)
         if existing:
             visual_html = _image_block(run_root, "visual", existing, theme, orders)
         else:
             result.findings.append(
                 Finding(
-                    "deck_plan", "asset", "warn", "fail",
+                    "deck_plan",
+                    "asset",
+                    "warn",
+                    "fail",
                     f"page {page['id']} figure not found under the run root (html)",
                     "deck_plan",
                 )
@@ -288,8 +384,10 @@ def _content(
 
     points_html = _points(page, orders, bool(visual_html))
     if visual_html:
-        parts.append(f'<div class="columns"><div class="col">{points_html}</div>'
-                     f'<div class="col">{visual_html}</div></div>')
+        parts.append(
+            f'<div class="columns"><div class="col">{points_html}</div>'
+            f'<div class="col">{visual_html}</div></div>'
+        )
     elif points_html:
         parts.append(points_html)
 
@@ -297,10 +395,226 @@ def _content(
     if callout:
         text = html.escape(str(callout.get("text", "")))
         parts.append(
-            f'<div{_fragment_attrs("callout", orders, "callout")}>'
+            f"<div{_fragment_attrs('callout', orders, 'callout')}>"
             f'<span class="callout-bar"></span>{text}</div>'
         )
     return "".join(parts)
+
+
+def _hero_split(
+    page: dict,
+    theme: RenderTheme,
+    result: HtmlResult,
+    run_root: Path,
+    evidence: dict | None,
+    orders: dict,
+) -> str:
+    """Hero Split: full-height hero visual on one side, title/points on the other."""
+    visual = page.get("visual") or {}
+    visual_html = ""
+    if visual.get("asset_refs"):
+        entries = [e if isinstance(e, dict) else {"ref": e} for e in visual["asset_refs"]]
+        existing = next((e for e in entries if (run_root / e["ref"]).is_file()), None)
+        if existing:
+            visual_html = _image_block(run_root, "visual", existing, theme, orders)
+    elif visual.get("diagram"):
+        visual_html = _image_block(run_root, "visual", visual["diagram"], theme, orders)
+    elif visual.get("chart"):
+        visual_html = _css_chart(visual["chart"], evidence, result, page["id"], theme)
+
+    kicker = str(page.get("kicker") or "")
+    kicker_html = f'<div class="kicker">{html.escape(kicker)}</div>' if kicker else ""
+    title_px, _body_px, _ = _fitted_sizes(page, theme, True)
+    override = (
+        f' style="--title-size:{title_px}px"' if title_px < theme.theme.content_title_size else ""
+    )
+    title_html = (
+        f"<h2{_fragment_attrs('title', orders)}{override}>{html.escape(page['title'])}</h2>"
+    )
+
+    points_html = _points(page, orders, False)
+    callout = page.get("callout")
+    callout_html = ""
+    if callout:
+        callout_html = (
+            f"<div{_fragment_attrs('callout', orders, 'callout')}>"
+            f'<span class="callout-bar"></span>{html.escape(str(callout.get("text", "")))}</div>'
+        )
+
+    text_column = (
+        f'<div class="hero-text">{kicker_html}{title_html}'
+        f'<div class="h2-rule"></div>{points_html}{callout_html}</div>'
+    )
+    visual_column = (
+        f'<div class="hero-col"{_fragment_attrs("visual", orders)}>{visual_html}</div>'
+    )
+    return f'<div class="hero-split">{text_column}{visual_column}</div>'
+
+
+def _fullscreen_backdrop(
+    page: dict,
+    theme: RenderTheme,
+    result: HtmlResult,
+    run_root: Path,
+    evidence: dict | None,
+    orders: dict,
+) -> str:
+    """Fullscreen Backdrop: focused floating card against full-bleed background."""
+    kicker = str(page.get("kicker") or "")
+    kicker_html = f'<div class="kicker">{html.escape(kicker)}</div>' if kicker else ""
+    title_px, _body_px, _ = _fitted_sizes(page, theme, False)
+    override = (
+        f' style="--title-size:{title_px}px"' if title_px < theme.theme.content_title_size else ""
+    )
+    title_html = (
+        f"<h2{_fragment_attrs('title', orders)}{override}>{html.escape(page['title'])}</h2>"
+    )
+
+    points_html = _points(page, orders, False)
+    callout = page.get("callout")
+    callout_html = ""
+    if callout:
+        callout_html = (
+            f"<div{_fragment_attrs('callout', orders, 'callout')}>"
+            f'<span class="callout-bar"></span>{html.escape(str(callout.get("text", "")))}</div>'
+        )
+
+    return (
+        f'<div class="backdrop-card">{kicker_html}{title_html}'
+        f'<div class="h2-rule"></div>{points_html}{callout_html}</div>'
+    )
+
+
+def _timeline(
+    page: dict,
+    theme: RenderTheme,
+    result: HtmlResult,
+    run_root: Path,
+    evidence: dict | None,
+    orders: dict,
+) -> str:
+    """Timeline: 3-4 sequential horizontal milestones."""
+    entries = page.get("support_points") or []
+    if len(entries) > 4:
+        result.findings.append(
+            Finding(
+                "deck_plan",
+                "layout",
+                "warn",
+                "pass",
+                f"page {page['id']}: timeline has {len(entries)} milestones "
+                "(recommended 3-4) — excess items may cause layout crowding",
+                "deck_plan",
+            )
+        )
+
+    kicker = str(page.get("kicker") or "")
+    kicker_html = f'<div class="kicker">{html.escape(kicker)}</div>' if kicker else ""
+    title_px, _body_px, _ = _fitted_sizes(page, theme, False)
+    override = (
+        f' style="--title-size:{title_px}px"' if title_px < theme.theme.content_title_size else ""
+    )
+    title_html = (
+        f"<h2{_fragment_attrs('title', orders)}{override}>{html.escape(page['title'])}</h2>"
+    )
+
+    items = []
+    for i, entry in enumerate(entries):
+        pt_text, pt_detail = _point_text(entry)
+        detail_html = (
+            f'<div class="detail muted">{html.escape(str(pt_detail))}</div>' if pt_detail else ""
+        )
+        icon_name = str(entry.get("icon") or "") if isinstance(entry, dict) else ""
+        icon_svg_html = ""
+        if icon_name:
+            from .icons import icon_exists, icon_svg
+
+            if icon_exists(icon_name):
+                icon_svg_html = (
+                    icon_svg(icon_name, "var(--bg)")
+                    .replace('width="24"', 'width="18"')
+                    .replace('height="24"', 'height="18"')
+                )
+        badge = icon_svg_html or f"{i + 1:02d}"
+
+        items.append(
+            f"<div{_fragment_attrs(f'support_points[{i}]', orders, 'milestone')}>"
+            f'<div class="milestone-badge">{badge}</div>'
+            f'<div class="point-line"><b>{html.escape(pt_text)}</b></div>'
+            f"{detail_html}</div>"
+        )
+
+    callout = page.get("callout")
+    callout_html = ""
+    if callout:
+        callout_html = (
+            f"<div{_fragment_attrs('callout', orders, 'callout')}>"
+            f'<span class="callout-bar"></span>{html.escape(str(callout.get("text", "")))}</div>'
+        )
+
+    return (
+        f'{kicker_html}{title_html}<div class="h2-rule"></div>'
+        f'<div class="timeline">{"".join(items)}</div>{callout_html}'
+    )
+
+
+def _versus(
+    page: dict,
+    theme: RenderTheme,
+    result: HtmlResult,
+    run_root: Path,
+    evidence: dict | None,
+    orders: dict,
+) -> str:
+    """Versus: 2-column comparison layout."""
+    kicker = str(page.get("kicker") or "")
+    kicker_html = f'<div class="kicker">{html.escape(kicker)}</div>' if kicker else ""
+    title_px, _body_px, _ = _fitted_sizes(page, theme, False)
+    override = (
+        f' style="--title-size:{title_px}px"' if title_px < theme.theme.content_title_size else ""
+    )
+    title_html = (
+        f"<h2{_fragment_attrs('title', orders)}{override}>{html.escape(page['title'])}</h2>"
+    )
+
+    entries = page.get("support_points") or []
+    half = (len(entries) + 1) // 2
+    left_entries = entries[:half]
+    right_entries = entries[half:]
+
+    def col_html(col_items, col_label, col_idx_start):
+        rendered = []
+        for i, entry in enumerate(col_items):
+            pt_text, pt_detail = _point_text(entry)
+            detail = (
+                f'<div class="detail muted">{html.escape(str(pt_detail))}</div>'
+                if pt_detail
+                else ""
+            )
+            frag = _fragment_attrs(f"support_points[{col_idx_start + i}]", orders, "versus-item")
+            rendered.append(
+                f"<div{frag}>"
+                f'<div class="point-line"><b>{html.escape(pt_text)}</b></div>'
+                f"{detail}</div>"
+            )
+        return (
+            f'<div class="versus-col"><div class="versus-header kicker">{col_label}</div>'
+            f'<div class="versus-body">{"".join(rendered)}</div></div>'
+        )
+
+    left_col = col_html(left_entries, "方案 A / BASELINE", 0)
+    right_col = col_html(right_entries, "方案 B / PROPOSED", half)
+    cols = f'<div class="versus">{left_col}{right_col}</div>'
+
+    callout = page.get("callout")
+    callout_html = ""
+    if callout:
+        callout_html = (
+            f"<div{_fragment_attrs('callout', orders, 'callout')}>"
+            f'<span class="callout-bar"></span>{html.escape(str(callout.get("text", "")))}</div>'
+        )
+
+    return f'{kicker_html}{title_html}<div class="h2-rule"></div>{cols}{callout_html}'
 
 
 def _points(page: dict, orders: dict, has_visual: bool) -> str:
@@ -320,8 +634,10 @@ def _points(page: dict, orders: dict, has_visual: bool) -> str:
                 svg = icon_svg(icon_name, "var(--accent)")
                 svg = svg.replace('width="24"', 'width="22"').replace('height="24"', 'height="22"')
                 icon_inline = f'<span class="point-icon">{svg}</span>'
-        items.append(f'<div{fragment}><div class="point-line">'
-                     f'{icon_inline}<b>{html.escape(point)}</b></div>{detail_html}</div>')
+        items.append(
+            f'<div{fragment}><div class="point-line">'
+            f"{icon_inline}<b>{html.escape(point)}</b></div>{detail_html}</div>"
+        )
     if not items:
         return ""
     return f'<div class="points{" narrow" if has_visual else ""}">{"".join(items)}</div>'
@@ -332,9 +648,14 @@ def _card_value(card: dict, evidence: dict | None, result: HtmlResult, page_id: 
     from .deck import _evidence_number, _fmt
 
     items = {item["id"]: item for item in (evidence or {}).get("items", [])}
-    number, unit = _evidence_number(items, str(card.get("value_from", "")), page_id, "metric card")
-    value = _fmt(number) + (f" {unit}" if unit else "")
-    return html.escape(value)
+    ref = str(card.get("value_from", ""))
+    number, unit = _evidence_number(items, ref, page_id, "metric card")
+    num_str = _fmt(number)
+    unit_str = f" {unit}" if unit else ""
+    full_str = html.escape(num_str + unit_str)
+    # Wrap in data-target and data-unit for client-side count-up ticker
+    unit_attr = f' data-unit="{html.escape(unit_str)}"' if unit_str else ""
+    return f'<span class="card-num" data-target="{num_str}"{unit_attr}>{full_str}</span>'
 
 
 def _css_chart(spec: dict, evidence: dict | None, result: HtmlResult, page_id: str, theme) -> str:
@@ -362,12 +683,14 @@ def _css_chart(spec: dict, evidence: dict | None, result: HtmlResult, page_id: s
         return f'<div class="chart">{title}<div class="bars {direction}s">{bars}</div></div>'
     # other chart types fall back to a table in v1 (offline, deterministic)
     rows = "".join(
-        f'<tr><td>{html.escape(label)}</td><td>{_fmt(value)}</td></tr>'
-        for label, value in entries
+        f"<tr><td>{html.escape(label)}</td><td>{_fmt(value)}</td></tr>" for label, value in entries
     )
     result.findings.append(
         Finding(
-            "deck_plan", "chart", "info", "pass",
+            "deck_plan",
+            "chart",
+            "info",
+            "pass",
             f"page {page_id}: '{chart_type}' chart renders as a table in the HTML v1 surface",
             "deck_plan",
         )
@@ -387,7 +710,7 @@ def _image_block(run_root: Path, address: str, entry: dict, theme, orders: dict)
         f'<div class="caption muted">{html.escape(str(caption))}</div>' if caption else ""
     )
     return (
-        f'<figure{_fragment_attrs(address, orders)}>'
+        f"<figure{_fragment_attrs(address, orders)}>"
         f'<img src="data:image/png;base64,{data}" alt="figure"/>{caption_html}</figure>'
     )
 
@@ -406,9 +729,6 @@ def _diagram_png_path(entry: dict, run_root: Path) -> Path:
 
 def _css(theme: RenderTheme) -> str:
     t = theme.theme
-    # RGBColor str() is bare hex ("F1F5F9"); CSS custom properties substitute
-    # verbatim, so the "#" prefix must be added here or every var() color
-    # becomes invalid and the whole deck renders unstyled.
     variables = (
         f"--bg:#{t.background}; --text:#{t.text}; --muted:#{t.muted};"
         f" --accent:#{t.accent}; --accent-soft:#{t.accent_soft};"
@@ -419,11 +739,11 @@ def _css(theme: RenderTheme) -> str:
         f"--footer-size:{t.footer_size}px; --index-size:{t.index_number_size}px;"
         f"--cover-size:{t.cover_title_size}px;"
     )
-    return f":root{{{variables}}}" + """
+    return (
+        f":root{{{variables}}}"
+        + """
 html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
   font-family:'Microsoft YaHei','Segoe UI',Calibri,sans-serif; }
-/* reveal.css paints .reveal-viewport (which reveal.js puts on <body>) white with
-   class specificity; same-specificity override later in order keeps the theme bg */
 .reveal-viewport { background:var(--bg); color:var(--text); }
 .reveal { font-size:var(--body-size); }
 .reveal h1 { font-size:var(--banner-size, 40px); color:var(--text); }
@@ -445,30 +765,50 @@ html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
 .agenda-row { display:flex; align-items:baseline; gap:26px; padding:12px 0;
   border-bottom:1px solid var(--card-line); }
 .agenda-row:last-child { border-bottom:none; }
-.agenda-num { font-size:var(--index-size); font-weight:700; color:var(--accent);
-  min-width:56px; }
+.agenda-num { font-size:var(--index-size); font-weight:700; color:var(--accent); min-width:56px; }
 .agenda-item { font-size:calc(var(--body-size) + 2px); }
-.reveal .slides > section { text-align:left; padding: 8px 60px 54px 60px; }
-.role-content { position:relative; }  /* corner wash removed: it read as an
-  occluding disc over the top-right figure column; only the accent strip remains */
-.role-content::before { content:""; position:absolute; top:0; left:0; right:0;
-  height:4px; background:var(--accent); }
+.reveal .slides > section { text-align:left; padding: 8px 60px 54px 60px; box-sizing:border-box; }
+.role-content, .role-hero_split, .role-fullscreen_backdrop,
+.role-timeline, .role-versus { position:relative; }
+.role-content::before, .role-hero_split::before, .role-fullscreen_backdrop::before,
+.role-timeline::before, .role-versus::before {
+  content:""; position:absolute; top:0; left:0; right:0; height:4px; background:var(--accent);
+}
+
+/* Background image & scrim overlay */
+.has-bg {
+  background-image:var(--slide-bg-img); background-size:cover;
+  background-position:center; position:relative;
+}
+.has-bg::after {
+  content:""; position:absolute; inset:0;
+  background:var(--scrim-color, transparent); z-index:0; pointer-events:none;
+}
+.has-bg > * { position:relative; z-index:1; }
+
 .muted { color:var(--muted); }
 .plain { list-style:none; padding:0; }
-.points { margin-top:12px; display:flex; flex-direction:column;
-  justify-content:space-between; gap:14px; }
+.points {
+  margin-top:12px; display:flex; flex-direction:column;
+  justify-content:space-between; gap:14px;
+}
 .points.narrow { max-width:46%; }
-.point { background:var(--card-fill); border:1px solid var(--card-line);
-  border-radius:12px; padding:12px 16px; }
+.point {
+  background:var(--card-fill); border:1px solid var(--card-line);
+  border-radius:12px; padding:12px 16px;
+}
 .point-line { font-size:var(--body-size); }
 .detail { font-size:var(--detail-size); margin-top:4px; }
 .cards { display:flex; gap:14px; margin:20px 0; }
-.card { flex:1; background:var(--card-fill); border:1px solid var(--card-line);
-  border-radius:12px; padding:16px 12px; text-align:center; }
-.card-value { font-size:var(--card-value-size); font-weight:700;
-  color:var(--accent); margin-top:10px; }
-.card-topbar { width:50px; height:3.5px; background:var(--accent);
-  margin:12px auto 0 auto; }
+.card {
+  flex:1; background:var(--card-fill); border:1px solid var(--card-line);
+  border-radius:12px; padding:16px 12px; text-align:center;
+}
+.card-value {
+  font-size:var(--card-value-size); font-weight:700;
+  color:var(--accent); margin-top:10px;
+}
+.card-topbar { width:50px; height:3.5px; background:var(--accent); margin:12px auto 0 auto; }
 .card-icon { display:flex; justify-content:center; margin-top:12px; }
 .card-icon svg { stroke:var(--accent); }
 .point-icon { display:inline-block; vertical-align:-4px; margin-right:10px; }
@@ -479,20 +819,69 @@ html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
 figure { margin:0; text-align:center; }
 figure img { max-width:100%; max-height:58vh; }
 .caption { font-size:13px; margin-top:8px; }
-.callout { margin-top:26px; background:var(--card-fill); border:1px solid var(--card-line);
-  border-radius:12px; padding:14px 18px; font-size:var(--callout-size); position:relative; }
-.callout-bar { position:absolute; left:8px; top:12px; bottom:12px; width:5px;
-  background:var(--accent); border-radius:3px; margin-right:12px; }
+.callout {
+  margin-top:26px; background:var(--card-fill); border:1px solid var(--card-line);
+  border-radius:12px; padding:14px 18px; font-size:var(--callout-size); position:relative;
+}
+.callout-bar {
+  position:absolute; left:8px; top:12px; bottom:12px; width:5px;
+  background:var(--accent); border-radius:3px; margin-right:12px;
+}
 .chart-title { font-size:15px; margin-bottom:10px; text-align:center; }
 .bar-row { display:flex; align-items:center; gap:12px; margin:14px 0; }
 .bar-label { width:30%; text-align:right; font-size:16px; }
 .bar-track { flex:1; background:var(--card-line); border-radius:6px; height:30px; }
-.bar-fill { display:block; height:30px; border-radius:6px; background:var(--accent); }
+.bar-fill {
+  display:block; height:30px; border-radius:6px; background:var(--accent);
+  transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
 .bar-value { width:16%; font-size:17px; }
 .chart-table { border-collapse:collapse; margin:0 auto; }
 .chart-table td { border:1px solid var(--card-line); padding:6px 16px; }
 .reveal .fragment.highlight-current.visible { color:var(--accent); }
+
+/* Layout archetypes */
+.hero-split { display:flex; gap:32px; align-items:stretch; margin-top:10px; }
+.hero-col {
+  flex:1; display:flex; flex-direction:column; justify-content:center; text-align:center;
+}
+.hero-col img { max-width:100%; max-height:56vh; border-radius:12px; object-fit:cover; }
+.hero-text { flex:1.2; display:flex; flex-direction:column; justify-content:center; }
+
+.backdrop-card {
+  background:var(--card-fill); border:1px solid var(--card-line);
+  border-radius:16px; padding:28px 36px; max-width:82%; margin:30px auto;
+}
+
+.timeline {
+  display:flex; gap:16px; margin-top:24px; justify-content:space-between; align-items:stretch;
+}
+.milestone {
+  flex:1; background:var(--card-fill); border:1px solid var(--card-line);
+  border-radius:12px; padding:18px 16px; position:relative;
+}
+.milestone-badge {
+  width:32px; height:32px; border-radius:50%; background:var(--accent); color:var(--bg);
+  display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:14px; margin-bottom:12px;
+}
+
+.versus { display:flex; gap:24px; margin-top:20px; align-items:stretch; }
+.versus-col {
+  flex:1; background:var(--card-fill); border:1px solid var(--card-line);
+  border-radius:12px; padding:20px 22px;
+}
+.versus-header {
+  font-size:14px; font-weight:700; margin-bottom:12px;
+  border-bottom:1px solid var(--card-line); padding-bottom:8px;
+}
+.versus-item { margin-bottom:12px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bar-fill { transition: none !important; }
+}
 """
+    )
 
 
 def _document(title: str, theme: RenderTheme, transition: str | None, sections: str) -> str:
@@ -525,13 +914,42 @@ Reveal.initialize({{
 </script>
 <script>
 (function () {{
+  function runCountUp(container) {{
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var nums = (container || document).querySelectorAll('.card-num:not([data-counted])');
+    nums.forEach(function (el) {{
+      var target = parseFloat(el.getAttribute('data-target'));
+      if (isNaN(target)) return;
+      el.setAttribute('data-counted', 'true');
+      var start = 0;
+      var duration = 800;
+      var startTime = null;
+      var decMatch = (el.getAttribute('data-target') || '').match(/\\.(\\d+)/);
+      var decimals = decMatch ? decMatch[1].length : 0;
+      var unit = el.getAttribute('data-unit') || '';
+      function tick(now) {{
+        if (!startTime) startTime = now;
+        var progress = Math.min((now - startTime) / duration, 1.0);
+        var ease = 1.0 - Math.pow(2, -10 * progress);
+        var cur = start + (target - start) * ease;
+        if (progress < 1.0) el.textContent = cur.toFixed(decimals) + unit;
+        else el.textContent = target.toFixed(decimals) + unit;
+      }}
+      requestAnimationFrame(tick);
+    }});
+  }}
+
+  Reveal.on('slidechanged', function (e) {{ runCountUp(e.currentSlide); }});
+  Reveal.on('fragmentshown', function (e) {{ runCountUp(e.fragment); }});
+  Reveal.on('ready', function (e) {{ runCountUp(e.currentSlide); }});
+
   function check() {{
     var findings = [];
     var slides = document.querySelectorAll('.slides > section');
     slides.forEach(function (slide, idx) {{
       var sr = slide.getBoundingClientRect();
       var blocks = [];
-      slide.querySelectorAll('h1,h2,.kicker,.point,.card,.callout,figure,.chart,.agenda-row,.footer')
+      slide.querySelectorAll('h1,h2,.kicker,.point,.card,.callout,figure,.chart,.agenda-row,.footer,.hero-col,.hero-text,.timeline,.milestone,.versus,.versus-col,.backdrop-card')
         .forEach(function (el) {{
           var r = el.getBoundingClientRect();
           if (r.width < 2 || r.height < 2) return;

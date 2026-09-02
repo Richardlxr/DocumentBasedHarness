@@ -33,6 +33,8 @@ from pptx.util import Inches, Pt
 
 from ..artifacts import Finding
 from .metrics import fit_box, wrap_lines
+from .ooxml import set_shape_translucent_fill
+from .scrim import solve_scrim
 from .theme import RenderTheme, render_theme
 
 _CHART_TYPES = {
@@ -90,8 +92,12 @@ def render_deck(
     if theme.forced_light:
         result.findings.append(
             Finding(
-                "deck_plan", "theme", "warn", "fail",
-                "brief forbids a dark background; dark template forced to light", "deck_plan",
+                "deck_plan",
+                "theme",
+                "warn",
+                "fail",
+                "brief forbids a dark background; dark template forced to light",
+                "deck_plan",
             )
         )
 
@@ -105,6 +111,7 @@ def render_deck(
         page_id = page.get("id", f"P{slide_number + 1:02d}")
         slide = prs.slides.add_slide(prs.slide_layouts[6])
         _paint_background(slide, theme.theme.background)
+        _apply_slide_background(slide, page, run_root, theme, result)
         shapes: dict[str, list[int]] = {}
         if role == "cover":
             _render_cover(slide, page, theme, result, shapes)
@@ -112,6 +119,14 @@ def render_deck(
             _render_agenda(slide, page, theme, result, shapes)
         elif role in ("section_divider", "closing"):
             _render_banner(slide, page, theme, result, shapes)
+        elif role == "hero_split":
+            _render_hero_split(slide, page, run_root, theme, result, evidence, shapes)
+        elif role == "fullscreen_backdrop":
+            _render_fullscreen_backdrop(slide, page, run_root, theme, result, evidence, shapes)
+        elif role == "timeline":
+            _render_timeline(slide, page, theme, result, evidence, shapes)
+        elif role == "versus":
+            _render_versus(slide, page, theme, result, evidence, shapes)
         else:
             _render_content(slide, page, run_root, theme, result, evidence, shapes)
         result.shape_map[page_id] = shapes
@@ -129,6 +144,69 @@ def render_deck(
 
 
 # -- shared helpers ---------------------------------------------------------
+
+
+def _apply_slide_background(
+    slide, page: dict, run_root: Path, theme: RenderTheme, result: RenderResult
+) -> None:
+    bg_spec = (page.get("visual") or {}).get("background") or page.get("background")
+    if not bg_spec or not isinstance(bg_spec, dict) or not bg_spec.get("asset"):
+        return
+    asset_path = run_root / str(bg_spec["asset"])
+    if not asset_path.is_file():
+        result.findings.append(
+            Finding(
+                "deck_plan",
+                "asset",
+                "warn",
+                "fail",
+                f"page {page.get('id', '')} background image not found: {bg_spec['asset']}",
+                "deck_plan",
+            )
+        )
+        return
+
+    scrim_res = solve_scrim(
+        asset_path,
+        theme.theme.text,
+        theme.theme.background,
+        base_alpha=float(bg_spec.get("opacity") or 0.0),
+    )
+    if not scrim_res.passed:
+        result.findings.append(
+            Finding(
+                "deck_plan",
+                "background-contrast",
+                "error",
+                "fail",
+                f"page {page.get('id', '')}: background image contrast against theme "
+                "text is below 4.5:1 even at alpha=0.90",
+                "deck_plan",
+            )
+        )
+
+    overlay_type = str(bg_spec.get("overlay", "theme")).lower()
+    if overlay_type == "frosted-glass":
+        result.findings.append(
+            Finding(
+                "deck_plan",
+                "theme-overlay",
+                "info",
+                "pass",
+                f"page {page.get('id', '')}: 'frosted-glass' overlay rendered as solid "
+                "translucent scrim in PPTX",
+                "deck_plan",
+            )
+        )
+
+    pic = slide.shapes.add_picture(str(asset_path), Inches(0), Inches(0), _SLIDE_W, _SLIDE_H)
+    pic.name = "background_image"
+
+    if scrim_res.alpha > 0.001:
+        scrim_shape = slide.shapes.add_shape(1, Inches(0), Inches(0), _SLIDE_W, _SLIDE_H)
+        scrim_shape.name = "background_scrim"
+        set_shape_translucent_fill(scrim_shape, theme.theme.background, scrim_res.alpha)
+        scrim_shape.line.fill.background()
 
 
 def _paint_background(slide, color) -> None:
@@ -180,7 +258,10 @@ def _fit_or_report(
     if fit.overflows:
         findings.append(
             Finding(
-                "deck_plan", "layout", "warn", "fail",
+                "deck_plan",
+                "layout",
+                "warn",
+                "fail",
                 f"page {page_id} {element} does not fit at minimum size "
                 f"{fit.font_size}pt ({fit.lines} wrapped lines) — split or demote content",
                 "deck_plan",
@@ -236,15 +317,24 @@ def _render_cover(
     joined = "  ·  ".join(p[0] for p in (_point_parts(x) for x in points))
     subtitle_lines = len(wrap_lines(joined, t.body_size, 10.8 * _PT_PER_IN, theme.body_font))
     size = _fit_or_report(
-        page["title"], page_id=page["id"], element="title",
-        width_in=10.8, height_in=2.6 - 0.4 * subtitle_lines,
-        max_size=t.cover_title_size, min_size=30, family=theme.title_font,
+        page["title"],
+        page_id=page["id"],
+        element="title",
+        width_in=10.8,
+        height_in=2.6 - 0.4 * subtitle_lines,
+        max_size=t.cover_title_size,
+        min_size=30,
+        family=theme.title_font,
         findings=result.findings,
     )
     box = _textbox(slide, Inches(0.9), Inches(2.15), Inches(10.8), Inches(2.6))
     _set(
-        box.text_frame.paragraphs[0], page["title"],
-        size=size, font=theme.title_font, color=t.text, bold=True,
+        box.text_frame.paragraphs[0],
+        page["title"],
+        size=size,
+        font=theme.title_font,
+        color=t.text,
+        bold=True,
     )
     if joined:
         paragraph = box.text_frame.add_paragraph()
@@ -266,8 +356,12 @@ def _render_agenda(
     shapes["title"] = []
     title = _textbox(slide, Inches(_MARGIN_X), Inches(0.55), Inches(_BODY_W), Inches(1.0))
     _set(
-        title.text_frame.paragraphs[0], page["title"],
-        size=t.banner_title_size, font=theme.title_font, color=t.text, bold=True,
+        title.text_frame.paragraphs[0],
+        page["title"],
+        size=t.banner_title_size,
+        font=theme.title_font,
+        color=t.text,
+        bold=True,
     )
 
     entries = page.get("support_points", [])
@@ -277,7 +371,10 @@ def _render_agenda(
     if row_h < 0.55:
         result.findings.append(
             Finding(
-                "deck_plan", "layout", "warn", "fail",
+                "deck_plan",
+                "layout",
+                "warn",
+                "fail",
                 f"page {page.get('id', '?')}: {len(entries)} agenda rows leave only "
                 f"{row_h:.2f}in each (needs ~0.55in) — merge or split into two pages",
                 "deck_plan",
@@ -288,13 +385,20 @@ def _render_agenda(
         y = top + index * row_h
         number = _textbox(slide, Inches(_MARGIN_X), Inches(y + 0.1), Inches(0.95), Inches(0.55))
         _set(
-            number.text_frame.paragraphs[0], f"{index + 1:02d}",
-            size=t.index_number_size, font=theme.title_font, color=t.accent, bold=True,
+            number.text_frame.paragraphs[0],
+            f"{index + 1:02d}",
+            size=t.index_number_size,
+            font=theme.title_font,
+            color=t.accent,
+            bold=True,
         )
         item = _textbox(slide, Inches(1.95), Inches(y + 0.12), Inches(10.4), Inches(0.55))
         _set(
-            item.text_frame.paragraphs[0], point,
-            size=t.body_size + 2, font=theme.body_font, color=t.text,
+            item.text_frame.paragraphs[0],
+            point,
+            size=t.body_size + 2,
+            font=theme.body_font,
+            color=t.text,
         )
         shapes[f"support_points[{index}]"] = [item.shape_id]
         if index < n - 1:
@@ -321,20 +425,29 @@ def _render_banner(
     accent.line.fill.background()
     points = page.get("support_points", [])
     body_lines = sum(
-        len(wrap_lines(p, t.body_size, _BODY_W * _PT_PER_IN, theme.body_font)) for p, _ in
-        (_point_parts(x) for x in points)
+        len(wrap_lines(p, t.body_size, _BODY_W * _PT_PER_IN, theme.body_font))
+        for p, _ in (_point_parts(x) for x in points)
     )
     size = _fit_or_report(
-        page["title"], page_id=page["id"], element="title",
-        width_in=_BODY_W, height_in=2.2 - 0.32 * body_lines,
-        max_size=t.banner_title_size, min_size=24, family=theme.title_font,
+        page["title"],
+        page_id=page["id"],
+        element="title",
+        width_in=_BODY_W,
+        height_in=2.2 - 0.32 * body_lines,
+        max_size=t.banner_title_size,
+        min_size=24,
+        family=theme.title_font,
         findings=result.findings,
     )
     box = _textbox(slide, Inches(1.0), Inches(2.7), Inches(_BODY_W), Inches(2.4))
     shapes["title"] = [box.shape_id]
     _set(
-        box.text_frame.paragraphs[0], page["title"],
-        size=size, font=theme.title_font, color=t.text, bold=True,
+        box.text_frame.paragraphs[0],
+        page["title"],
+        size=size,
+        font=theme.title_font,
+        color=t.text,
+        bold=True,
     )
     for entry in points:
         point, _ = _point_parts(entry)
@@ -344,27 +457,39 @@ def _render_banner(
         _set(paragraph, point, size=t.body_size, font=theme.body_font, color=t.muted)
 
 
-def _add_footer(slide, page_id: str, index: int, total: int, plan: dict,
-                 theme: RenderTheme) -> None:
+def _add_footer(
+    slide, page_id: str, index: int, total: int, plan: dict, theme: RenderTheme
+) -> None:
     """Page furniture: deck title bottom-left, NN / NN bottom-right."""
     t = theme.theme
     brand = _textbox(slide, Inches(_MARGIN_X), Inches(7.06), Inches(8.0), Inches(0.32))
     _set(
-        brand.text_frame.paragraphs[0], plan.get("deck", {}).get("title", ""),
-        size=t.footer_size, font=theme.body_font, color=t.muted,
+        brand.text_frame.paragraphs[0],
+        plan.get("deck", {}).get("title", ""),
+        size=t.footer_size,
+        font=theme.body_font,
+        color=t.muted,
     )
     number = _textbox(slide, Inches(11.0), Inches(7.06), Inches(1.43), Inches(0.32))
     paragraph = number.text_frame.paragraphs[0]
     paragraph.alignment = PP_ALIGN.RIGHT
     _set(
-        paragraph, f"{index + 1:02d} / {total:02d}",
-        size=t.footer_size, font=theme.body_font, color=t.muted,
+        paragraph,
+        f"{index + 1:02d} / {total:02d}",
+        size=t.footer_size,
+        font=theme.body_font,
+        color=t.muted,
     )
 
 
 def _render_content(
-    slide, page: dict, run_root: Path, theme: RenderTheme,
-    result: RenderResult, evidence: dict | None, shapes: dict,
+    slide,
+    page: dict,
+    run_root: Path,
+    theme: RenderTheme,
+    result: RenderResult,
+    evidence: dict | None,
+    shapes: dict,
 ) -> None:
     t = theme.theme
     page_id = page["id"]
@@ -378,26 +503,38 @@ def _render_content(
     if kicker:
         kick = _textbox(slide, Inches(_MARGIN_X), Inches(0.42), Inches(_BODY_W), Inches(0.34))
         _set(
-            kick.text_frame.paragraphs[0], kicker,
-            size=t.kicker_size, font=theme.body_font, color=t.accent, bold=True,
+            kick.text_frame.paragraphs[0],
+            kicker,
+            size=t.kicker_size,
+            font=theme.body_font,
+            color=t.accent,
+            bold=True,
         )
         title_top = 0.78
     size = _fit_or_report(
-        page["title"], page_id=page_id, element="title",
-        width_in=_BODY_W, height_in=1.15, max_size=t.content_title_size, min_size=20,
-        family=theme.title_font, findings=result.findings,
+        page["title"],
+        page_id=page_id,
+        element="title",
+        width_in=_BODY_W,
+        height_in=1.15,
+        max_size=t.content_title_size,
+        min_size=20,
+        family=theme.title_font,
+        findings=result.findings,
     )
     title = _textbox(slide, Inches(_MARGIN_X), Inches(title_top), Inches(_BODY_W), Inches(1.1))
     shapes["title"] = [title.shape_id]
     _set(
-        title.text_frame.paragraphs[0], page["title"],
-        size=size, font=theme.title_font, color=t.text, bold=True,
+        title.text_frame.paragraphs[0],
+        page["title"],
+        size=size,
+        font=theme.title_font,
+        color=t.text,
+        bold=True,
     )
     # full-width hairline with a short accent segment — editorial separation
     hair_y = title_top + 1.06
-    hair = slide.shapes.add_shape(
-        1, Inches(_MARGIN_X), Inches(hair_y), Inches(_BODY_W), Pt(0.75)
-    )
+    hair = slide.shapes.add_shape(1, Inches(_MARGIN_X), Inches(hair_y), Inches(_BODY_W), Pt(0.75))
     hair.name = "decor"
     hair.fill.solid()
     hair.fill.fore_color.rgb = t.card_line
@@ -423,21 +560,43 @@ def _render_content(
     content_top = _BODY_TOP if title_top < 0.5 else _BODY_TOP + 0.2
     if cards:
         _render_metric_cards(
-            slide, cards, theme, result, evidence, page_id, shapes,
-            content_top, run_root,
+            slide,
+            cards,
+            theme,
+            result,
+            evidence,
+            page_id,
+            shapes,
+            content_top,
+            run_root,
         )
         content_top += 1.8
 
     body_width = _BODY_W
     if chart_spec is not None:
         _add_chart(
-            slide, page_id, chart_spec, t, result, evidence,
-            x=6.55, y=content_top, w=5.9, h=_BODY_BOTTOM - content_top, shapes=shapes,
+            slide,
+            page_id,
+            chart_spec,
+            t,
+            result,
+            evidence,
+            x=6.55,
+            y=content_top,
+            w=5.9,
+            h=_BODY_BOTTOM - content_top,
+            shapes=shapes,
         )
         body_width = 5.35
     elif diagram_spec is not None:
         _add_diagram(
-            slide, page_id, diagram_spec, theme, result, run_root, shapes,
+            slide,
+            page_id,
+            diagram_spec,
+            theme,
+            result,
+            run_root,
+            shapes,
             has_callout=bool(page.get("callout")),
         )
         body_width = 5.35
@@ -448,9 +607,17 @@ def _render_content(
     points = page.get("support_points", [])
     if points:
         _render_points(
-            slide, points, page_id=page_id, x=_MARGIN_X, y=content_top,
-            width_in=body_width, height_in=_BODY_BOTTOM - content_top,
-            theme=theme, findings=result.findings, shapes=shapes, run_root=run_root,
+            slide,
+            points,
+            page_id=page_id,
+            x=_MARGIN_X,
+            y=content_top,
+            width_in=body_width,
+            height_in=_BODY_BOTTOM - content_top,
+            theme=theme,
+            findings=result.findings,
+            shapes=shapes,
+            run_root=run_root,
         )
 
     callout = page.get("callout")
@@ -483,8 +650,15 @@ def _fit_image(slide, png: Path, *, x: float, y: float, max_w: float, max_h: flo
 
 
 def _add_diagram(
-    slide, page_id: str, spec: dict, theme: RenderTheme, result: RenderResult,
-    run_root: Path, shapes: dict, *, has_callout: bool = False,
+    slide,
+    page_id: str,
+    spec: dict,
+    theme: RenderTheme,
+    result: RenderResult,
+    run_root: Path,
+    shapes: dict,
+    *,
+    has_callout: bool = False,
 ) -> None:
     from docx_harness.errors import DocumentError
 
@@ -505,20 +679,31 @@ def _add_diagram(
         paragraph = box.text_frame.paragraphs[0]
         paragraph.alignment = PP_ALIGN.CENTER
         _set(
-            paragraph, caption, size=theme.theme.caption_size,
-            font=theme.body_font, color=theme.theme.muted,
+            paragraph,
+            caption,
+            size=theme.theme.caption_size,
+            font=theme.body_font,
+            color=theme.theme.muted,
         )
 
 
 def _add_figure(
-    slide, page: dict, run_root: Path, theme: RenderTheme, result: RenderResult, shapes: dict,
+    slide,
+    page: dict,
+    run_root: Path,
+    theme: RenderTheme,
+    result: RenderResult,
+    shapes: dict,
 ) -> None:
     for entry in _asset_entries(page):
         image = run_root / entry["ref"]
         if not image.is_file():
             result.findings.append(
                 Finding(
-                    "deck_plan", "asset", "warn", "fail",
+                    "deck_plan",
+                    "asset",
+                    "warn",
+                    "fail",
                     f"page {page['id']} figure '{entry['ref']}' not found under the run root",
                     "deck_plan",
                 )
@@ -534,8 +719,11 @@ def _add_figure(
             paragraph = box.text_frame.paragraphs[0]
             paragraph.alignment = PP_ALIGN.CENTER
             _set(
-                paragraph, caption, size=theme.theme.caption_size,
-                font=theme.body_font, color=theme.theme.muted,
+                paragraph,
+                caption,
+                size=theme.theme.caption_size,
+                font=theme.body_font,
+                color=theme.theme.muted,
             )
         return
 
@@ -545,19 +733,29 @@ def _visual_max_h(has_callout: bool) -> float:
     hugs the image bottom) stays clear of the callout band and the footer."""
     if has_callout:
         return 5.5 - _BODY_TOP  # image bottom ≤5.5, caption ends ≤5.96 < callout 6.1
-    return 6.5 - _BODY_TOP     # image bottom ≤6.5, caption ends ≤6.96 < footer 7.06
+    return 6.5 - _BODY_TOP  # image bottom ≤6.5, caption ends ≤6.96 < footer 7.06
 
 
 def _render_metric_cards(
-    slide, cards: list, theme: RenderTheme, result: RenderResult,
-    evidence: dict | None, page_id: str, shapes: dict, top: float, run_root: Path,
+    slide,
+    cards: list,
+    theme: RenderTheme,
+    result: RenderResult,
+    evidence: dict | None,
+    page_id: str,
+    shapes: dict,
+    top: float,
+    run_root: Path,
 ) -> None:
     t = theme.theme
     items = {item["id"]: item for item in (evidence or {}).get("items", [])}
     if len(cards) > 4:
         result.findings.append(
             Finding(
-                "deck_plan", "layout", "warn", "fail",
+                "deck_plan",
+                "layout",
+                "warn",
+                "fail",
                 f"page {page_id} has {len(cards)} metric cards (max 4); extras dropped",
                 "deck_plan",
             )
@@ -586,28 +784,40 @@ def _render_metric_cards(
             if icon_exists(card_icon):
                 try:
                     png = icon_png(
-                        card_icon, color=t.accent, background=t.card_fill,
-                        px=48, run_root=run_root,
+                        card_icon,
+                        color=t.accent,
+                        background=t.card_fill,
+                        px=48,
+                        run_root=run_root,
                     )
                     icon_shape = slide.shapes.add_picture(
-                        str(png), Inches(left + width / 2 - 0.17), Inches(top + 0.14),
+                        str(png),
+                        Inches(left + width / 2 - 0.17),
+                        Inches(top + 0.14),
                         height=Inches(0.34),
                     )
                     icon_shape.name = "decor"
                 except RuntimeError as error:
                     result.findings.append(
                         Finding(
-                            "deck_plan", "icon", "warn", "fail",
-                            f"page {page_id}: icon '{card_icon}' could not rasterize "
-                            f"({error})", "deck_plan",
+                            "deck_plan",
+                            "icon",
+                            "warn",
+                            "fail",
+                            f"page {page_id}: icon '{card_icon}' could not rasterize ({error})",
+                            "deck_plan",
                         )
                     )
             else:
                 result.findings.append(
                     Finding(
-                        "deck_plan", "icon", "warn", "fail",
+                        "deck_plan",
+                        "icon",
+                        "warn",
+                        "fail",
                         f"page {page_id}: unknown icon '{card_icon}' (search "
-                        f"assets/vendor/tabler-outline/icons-index.json)", "deck_plan",
+                        f"assets/vendor/tabler-outline/icons-index.json)",
+                        "deck_plan",
                     )
                 )
         else:
@@ -619,29 +829,41 @@ def _render_metric_cards(
             top_bar.fill.fore_color.rgb = t.accent
             top_bar.line.fill.background()
         value_text = _fmt(number) + (f" {unit}" if unit else "")
-        value_box = _textbox(
-            slide, Inches(left), Inches(top + 0.34), Inches(width), Inches(0.8)
-        )
+        value_box = _textbox(slide, Inches(left), Inches(top + 0.34), Inches(width), Inches(0.8))
         _set(
-            value_box.text_frame.paragraphs[0], value_text,
-            size=t.card_value_size, font=theme.title_font, color=t.accent, bold=True,
+            value_box.text_frame.paragraphs[0],
+            value_text,
+            size=t.card_value_size,
+            font=theme.title_font,
+            color=t.accent,
+            bold=True,
         )
         value_box.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
         label = str(card.get("label") or card.get("value_from", ""))
-        label_box = _textbox(
-            slide, Inches(left), Inches(top + 1.14), Inches(width), Inches(0.4)
-        )
+        label_box = _textbox(slide, Inches(left), Inches(top + 1.14), Inches(width), Inches(0.4))
         _set(
-            label_box.text_frame.paragraphs[0], label,
-            size=t.card_label_size, font=theme.body_font, color=t.muted,
+            label_box.text_frame.paragraphs[0],
+            label,
+            size=t.card_label_size,
+            font=theme.body_font,
+            color=t.muted,
         )
         label_box.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
 
 
 def _render_points(
-    slide, points: list, *, page_id: str, x: float, y: float,
-    width_in: float, height_in: float, theme: RenderTheme, findings: list[Finding],
-    shapes: dict, run_root: Path | None = None,
+    slide,
+    points: list,
+    *,
+    page_id: str,
+    x: float,
+    y: float,
+    width_in: float,
+    height_in: float,
+    theme: RenderTheme,
+    findings: list[Finding],
+    shapes: dict,
+    run_root: Path | None = None,
 ) -> None:
     """Each point renders as a rounded card (point bold + detail muted inside),
     and the stack spreads evenly across the body zone — no floating text
@@ -668,7 +890,10 @@ def _render_points(
     else:
         findings.append(
             Finding(
-                "deck_plan", "layout", "warn", "fail",
+                "deck_plan",
+                "layout",
+                "warn",
+                "fail",
                 f"page {page_id} body points do not fit at 14pt — demote content to "
                 f"notes/appendix (see stages/deck.md)",
                 "deck_plan",
@@ -694,11 +919,15 @@ def _render_points(
             if icon_exists(icon_name):
                 try:
                     png = icon_png(
-                        icon_name, color=t.accent, background=t.card_fill,
-                        px=44, run_root=run_root,
+                        icon_name,
+                        color=t.accent,
+                        background=t.card_fill,
+                        px=44,
+                        run_root=run_root,
                     )
                     picture = slide.shapes.add_picture(
-                        str(png), Inches(x + 0.22),
+                        str(png),
+                        Inches(x + 0.22),
                         Inches(cursor + heights[index] / 2 - 0.14),
                         height=Inches(0.28),
                     )
@@ -707,16 +936,23 @@ def _render_points(
                 except RuntimeError as error:
                     findings.append(
                         Finding(
-                            "deck_plan", "icon", "warn", "fail",
-                            f"page {page_id}: icon '{icon_name}' could not rasterize "
-                            f"({error})", "deck_plan",
+                            "deck_plan",
+                            "icon",
+                            "warn",
+                            "fail",
+                            f"page {page_id}: icon '{icon_name}' could not rasterize ({error})",
+                            "deck_plan",
                         )
                     )
             else:
                 findings.append(
                     Finding(
-                        "deck_plan", "icon", "warn", "fail",
-                        f"page {page_id}: unknown icon '{icon_name}'", "deck_plan",
+                        "deck_plan",
+                        "icon",
+                        "warn",
+                        "fail",
+                        f"page {page_id}: unknown icon '{icon_name}'",
+                        "deck_plan",
                     )
                 )
         card.fill.solid()
@@ -746,14 +982,20 @@ def _render_points(
 
 
 def _render_callout(
-    slide, callout: dict, theme: RenderTheme, result: RenderResult,
-    page_id: str, shapes: dict,
+    slide,
+    callout: dict,
+    theme: RenderTheme,
+    result: RenderResult,
+    page_id: str,
+    shapes: dict,
+    *,
+    x: float = _MARGIN_X,
+    y: float = 6.1,
+    w: float = _BODY_W,
 ) -> None:
     t = theme.theme
     text = str(callout.get("text", ""))
-    band = slide.shapes.add_shape(
-        _ROUNDED, Inches(_MARGIN_X), Inches(6.1), Inches(_BODY_W), Inches(0.85)
-    )
+    band = slide.shapes.add_shape(_ROUNDED, Inches(x), Inches(y), Inches(w), Inches(0.85))
     band.name = "callout"
     shapes["callout"] = [band.shape_id]
     band.fill.solid()
@@ -761,37 +1003,493 @@ def _render_callout(
     band.line.color.rgb = t.card_line
     band.line.width = Pt(1)
     band.shadow.inherit = False
-    bar = slide.shapes.add_shape(
-        1, Inches(_MARGIN_X + 0.08), Inches(6.22), Pt(5), Inches(0.61)
-    )
+    bar = slide.shapes.add_shape(1, Inches(x + 0.08), Inches(y + 0.12), Pt(5), Inches(0.61))
     bar.name = "decor"
     bar.fill.solid()
     bar.fill.fore_color.rgb = t.accent
     bar.line.fill.background()
     size = _fit_or_report(
-        text, page_id=page_id, element="callout",
-        width_in=_BODY_W - 0.7, height_in=0.62,
-        max_size=t.callout_size, min_size=14, family=theme.body_font,
+        text,
+        page_id=page_id,
+        element="callout",
+        width_in=w - 0.7,
+        height_in=0.62,
+        max_size=t.callout_size,
+        min_size=14,
+        family=theme.body_font,
         findings=result.findings,
     )
-    box = _textbox(
-        slide, Inches(_MARGIN_X + 0.35), Inches(6.14), Inches(_BODY_W - 0.7), Inches(0.78)
-    )
+    box = _textbox(slide, Inches(x + 0.35), Inches(y + 0.04), Inches(w - 0.7), Inches(0.78))
     _set(box.text_frame.paragraphs[0], text, size=size, font=theme.body_font, color=t.text)
+
+
+def _render_hero_split(
+    slide,
+    page: dict,
+    run_root: Path,
+    theme: RenderTheme,
+    result: RenderResult,
+    evidence: dict | None,
+    shapes: dict,
+) -> None:
+    """Hero Split: full-height hero visual on right, title/points on left."""
+    t = theme.theme
+    page_id = page["id"]
+    title_top = 0.42
+    kicker = str(page.get("kicker") or "")
+    if kicker:
+        kick = _textbox(slide, Inches(_MARGIN_X), Inches(0.42), Inches(5.8), Inches(0.34))
+        _set(
+            kick.text_frame.paragraphs[0],
+            kicker,
+            size=t.kicker_size,
+            font=theme.body_font,
+            color=t.accent,
+            bold=True,
+        )
+        title_top = 0.78
+    size = _fit_or_report(
+        page["title"],
+        page_id=page_id,
+        element="title",
+        width_in=5.8,
+        height_in=1.3,
+        max_size=t.content_title_size,
+        min_size=20,
+        family=theme.title_font,
+        findings=result.findings,
+    )
+    title = _textbox(slide, Inches(_MARGIN_X), Inches(title_top), Inches(5.8), Inches(1.3))
+    shapes["title"] = [title.shape_id]
+    _set(
+        title.text_frame.paragraphs[0],
+        page["title"],
+        size=size,
+        font=theme.title_font,
+        color=t.text,
+        bold=True,
+    )
+
+    hair_y = title_top + 1.35
+    hair = slide.shapes.add_shape(1, Inches(_MARGIN_X), Inches(hair_y), Inches(5.8), Pt(0.75))
+    hair.name = "decor"
+    hair.fill.solid()
+    hair.fill.fore_color.rgb = t.card_line
+    hair.line.fill.background()
+
+    # Points on left
+    points = page.get("support_points", [])
+    callout = page.get("callout")
+    bottom_bound = 5.95 if callout else 6.7
+    if points:
+        _render_points(
+            slide,
+            points,
+            page_id=page_id,
+            x=_MARGIN_X,
+            y=hair_y + 0.2,
+            width_in=5.8,
+            height_in=bottom_bound - (hair_y + 0.2),
+            theme=theme,
+            findings=result.findings,
+            shapes=shapes,
+            run_root=run_root,
+        )
+    if callout:
+        _render_callout(slide, callout, theme, result, page_id, shapes, x=_MARGIN_X, y=6.0, w=5.8)
+
+    # Hero visual on right
+    visual = page.get("visual") or {}
+    if visual.get("chart"):
+        _add_chart(
+            slide,
+            page_id,
+            visual["chart"],
+            t,
+            result,
+            evidence,
+            x=7.1,
+            y=_BODY_TOP,
+            w=5.3,
+            h=_BODY_BOTTOM - _BODY_TOP,
+            shapes=shapes,
+        )
+    elif visual.get("diagram"):
+        _add_diagram(slide, page_id, visual["diagram"], theme, result, run_root, shapes)
+    else:
+        _add_figure(slide, page, run_root, theme, result, shapes)
+
+
+def _render_fullscreen_backdrop(
+    slide,
+    page: dict,
+    run_root: Path,
+    theme: RenderTheme,
+    result: RenderResult,
+    evidence: dict | None,
+    shapes: dict,
+) -> None:
+    """Fullscreen Backdrop: centered focus card over full-bleed background."""
+    t = theme.theme
+    page_id = page["id"]
+    card_w, card_h = 10.2, 5.5
+    card_x, card_y = (_SLIDE_W.inches - card_w) / 2, 0.95
+    card = slide.shapes.add_shape(
+        _ROUNDED, Inches(card_x), Inches(card_y), Inches(card_w), Inches(card_h)
+    )
+    card.name = "backdrop_card"
+    card.fill.solid()
+    card.fill.fore_color.rgb = t.card_fill
+    card.line.color.rgb = t.card_line
+    card.line.width = Pt(1)
+
+    title_top = card_y + 0.3
+    kicker = str(page.get("kicker") or "")
+    if kicker:
+        kick = _textbox(
+            slide, Inches(card_x + 0.5), Inches(title_top), Inches(card_w - 1.0), Inches(0.34)
+        )
+        _set(
+            kick.text_frame.paragraphs[0],
+            kicker,
+            size=t.kicker_size,
+            font=theme.body_font,
+            color=t.accent,
+            bold=True,
+        )
+        title_top += 0.36
+    size = _fit_or_report(
+        page["title"],
+        page_id=page_id,
+        element="title",
+        width_in=card_w - 1.0,
+        height_in=1.1,
+        max_size=t.content_title_size,
+        min_size=20,
+        family=theme.title_font,
+        findings=result.findings,
+    )
+    title = _textbox(
+        slide, Inches(card_x + 0.5), Inches(title_top), Inches(card_w - 1.0), Inches(1.1)
+    )
+    shapes["title"] = [title.shape_id]
+    _set(
+        title.text_frame.paragraphs[0],
+        page["title"],
+        size=size,
+        font=theme.title_font,
+        color=t.text,
+        bold=True,
+    )
+
+    hair_y = title_top + 1.15
+    hair = slide.shapes.add_shape(
+        1, Inches(card_x + 0.5), Inches(hair_y), Inches(card_w - 1.0), Pt(0.75)
+    )
+    hair.name = "decor"
+    hair.fill.solid()
+    hair.fill.fore_color.rgb = t.card_line
+    hair.line.fill.background()
+
+    points = page.get("support_points", [])
+    callout = page.get("callout")
+    bottom_bound = (card_y + card_h - 1.0) if callout else (card_y + card_h - 0.3)
+    if points:
+        _render_points(
+            slide,
+            points,
+            page_id=page_id,
+            x=card_x + 0.5,
+            y=hair_y + 0.15,
+            width_in=card_w - 1.0,
+            height_in=bottom_bound - (hair_y + 0.15),
+            theme=theme,
+            findings=result.findings,
+            shapes=shapes,
+            run_root=run_root,
+        )
+    if callout:
+        _render_callout(
+            slide,
+            callout,
+            theme,
+            result,
+            page_id,
+            shapes,
+            x=card_x + 0.5,
+            y=card_y + card_h - 0.9,
+            w=card_w - 1.0,
+        )
+
+
+def _render_timeline(
+    slide,
+    page: dict,
+    theme: RenderTheme,
+    result: RenderResult,
+    evidence: dict | None,
+    shapes: dict,
+) -> None:
+    """Timeline: 3-4 horizontal milestone cards."""
+    t = theme.theme
+    page_id = page["id"]
+    entries = page.get("support_points") or []
+    if len(entries) > 4:
+        result.findings.append(
+            Finding(
+                "deck_plan",
+                "layout",
+                "warn",
+                "pass",
+                f"page {page_id}: timeline has {len(entries)} milestones "
+                "(recommended 3-4) — excess items may cause layout crowding",
+                "deck_plan",
+            )
+        )
+
+    title_top = 0.42
+    kicker = str(page.get("kicker") or "")
+    if kicker:
+        kick = _textbox(slide, Inches(_MARGIN_X), Inches(0.42), Inches(_BODY_W), Inches(0.34))
+        _set(
+            kick.text_frame.paragraphs[0],
+            kicker,
+            size=t.kicker_size,
+            font=theme.body_font,
+            color=t.accent,
+            bold=True,
+        )
+        title_top = 0.78
+    size = _fit_or_report(
+        page["title"],
+        page_id=page_id,
+        element="title",
+        width_in=_BODY_W,
+        height_in=1.1,
+        max_size=t.content_title_size,
+        min_size=20,
+        family=theme.title_font,
+        findings=result.findings,
+    )
+    title = _textbox(slide, Inches(_MARGIN_X), Inches(title_top), Inches(_BODY_W), Inches(1.1))
+    shapes["title"] = [title.shape_id]
+    _set(
+        title.text_frame.paragraphs[0],
+        page["title"],
+        size=size,
+        font=theme.title_font,
+        color=t.text,
+        bold=True,
+    )
+
+    hair_y = title_top + 1.12
+    hair = slide.shapes.add_shape(1, Inches(_MARGIN_X), Inches(hair_y), Inches(_BODY_W), Pt(0.75))
+    hair.name = "decor"
+    hair.fill.solid()
+    hair.fill.fore_color.rgb = t.card_line
+    hair.line.fill.background()
+
+    n = max(len(entries), 1)
+    gap = 0.25
+    card_w = (_BODY_W - gap * (n - 1)) / n
+    card_y = hair_y + 0.35
+    card_h = 4.2
+
+    for i, entry in enumerate(entries):
+        card_x = _MARGIN_X + i * (card_w + gap)
+        card = slide.shapes.add_shape(
+            _ROUNDED, Inches(card_x), Inches(card_y), Inches(card_w), Inches(card_h)
+        )
+        card.name = f"milestone_{i}"
+        card.fill.solid()
+        card.fill.fore_color.rgb = t.card_fill
+        card.line.color.rgb = t.card_line
+        card.line.width = Pt(1)
+
+        # Step Badge
+        badge = slide.shapes.add_shape(
+            9, Inches(card_x + 0.2), Inches(card_y + 0.25), Inches(0.45), Inches(0.45)
+        )
+        badge.fill.solid()
+        badge.fill.fore_color.rgb = t.accent
+        badge.line.fill.background()
+        badge_text = _textbox(
+            slide, Inches(card_x + 0.2), Inches(card_y + 0.25), Inches(0.45), Inches(0.45)
+        )
+        _set(
+            badge_text.text_frame.paragraphs[0],
+            f"{i + 1:02d}",
+            size=11,
+            font=theme.title_font,
+            color=t.background,
+            bold=True,
+        )
+        badge_text.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+
+        pt_text, pt_detail = _point_parts(entry)
+        pt_size = _fit_or_report(
+            pt_text,
+            page_id=page_id,
+            element=f"milestone[{i}]",
+            width_in=card_w - 0.4,
+            height_in=1.2,
+            max_size=t.body_size,
+            min_size=14,
+            family=theme.body_font,
+            findings=result.findings,
+        )
+        box = _textbox(
+            slide,
+            Inches(card_x + 0.2),
+            Inches(card_y + 0.85),
+            Inches(card_w - 0.4),
+            Inches(card_h - 1.0),
+        )
+        _set(
+            box.text_frame.paragraphs[0],
+            pt_text,
+            size=pt_size,
+            font=theme.body_font,
+            color=t.text,
+            bold=True,
+        )
+        if pt_detail:
+            p = box.text_frame.add_paragraph()
+            p.space_before = Pt(8)
+            _set(p, pt_detail, size=t.detail_size, font=theme.body_font, color=t.muted)
+        shapes[f"support_points[{i}]"] = [card.shape_id, box.shape_id]
+
+
+def _render_versus(
+    slide,
+    page: dict,
+    theme: RenderTheme,
+    result: RenderResult,
+    evidence: dict | None,
+    shapes: dict,
+) -> None:
+    """Versus: 2-column side-by-side comparison."""
+    t = theme.theme
+    page_id = page["id"]
+
+    title_top = 0.42
+    kicker = str(page.get("kicker") or "")
+    if kicker:
+        kick = _textbox(slide, Inches(_MARGIN_X), Inches(0.42), Inches(_BODY_W), Inches(0.34))
+        _set(
+            kick.text_frame.paragraphs[0],
+            kicker,
+            size=t.kicker_size,
+            font=theme.body_font,
+            color=t.accent,
+            bold=True,
+        )
+        title_top = 0.78
+    size = _fit_or_report(
+        page["title"],
+        page_id=page_id,
+        element="title",
+        width_in=_BODY_W,
+        height_in=1.1,
+        max_size=t.content_title_size,
+        min_size=20,
+        family=theme.title_font,
+        findings=result.findings,
+    )
+    title = _textbox(slide, Inches(_MARGIN_X), Inches(title_top), Inches(_BODY_W), Inches(1.1))
+    shapes["title"] = [title.shape_id]
+    _set(
+        title.text_frame.paragraphs[0],
+        page["title"],
+        size=size,
+        font=theme.title_font,
+        color=t.text,
+        bold=True,
+    )
+
+    hair_y = title_top + 1.12
+    hair = slide.shapes.add_shape(1, Inches(_MARGIN_X), Inches(hair_y), Inches(_BODY_W), Pt(0.75))
+    hair.name = "decor"
+    hair.fill.solid()
+    hair.fill.fore_color.rgb = t.card_line
+    hair.line.fill.background()
+
+    entries = page.get("support_points") or []
+    half = (len(entries) + 1) // 2
+    left_entries = entries[:half]
+    right_entries = entries[half:]
+
+    card_w = (_BODY_W - 0.4) / 2
+    card_y = hair_y + 0.25
+    card_h = 4.4
+
+    for col_idx, (col_items, col_label, _col_start) in enumerate(
+        [
+            (left_entries, "方案 A / BASELINE", 0),
+            (right_entries, "方案 B / PROPOSED", half),
+        ]
+    ):
+        cx = _MARGIN_X + col_idx * (card_w + 0.4)
+        card = slide.shapes.add_shape(
+            _ROUNDED, Inches(cx), Inches(card_y), Inches(card_w), Inches(card_h)
+        )
+        card.name = f"versus_col_{col_idx}"
+        card.fill.solid()
+        card.fill.fore_color.rgb = t.card_fill
+        card.line.color.rgb = t.card_line
+        card.line.width = Pt(1)
+
+        hdr = _textbox(
+            slide, Inches(cx + 0.3), Inches(card_y + 0.2), Inches(card_w - 0.6), Inches(0.4)
+        )
+        _set(
+            hdr.text_frame.paragraphs[0],
+            col_label,
+            size=13,
+            font=theme.body_font,
+            color=t.accent,
+            bold=True,
+        )
+
+        _render_points(
+            slide,
+            col_items,
+            page_id=page_id,
+            x=cx + 0.3,
+            y=card_y + 0.7,
+            width_in=card_w - 0.6,
+            height_in=card_h - 0.9,
+            theme=theme,
+            findings=result.findings,
+            shapes=shapes,
+        )
 
 
 # -- charts -----------------------------------------------------------------
 
 
 def _add_chart(
-    slide, page_id: str, spec: dict, t, result: RenderResult,
-    evidence: dict | None, *, x: float, y: float, w: float, h: float, shapes: dict,
+    slide,
+    page_id: str,
+    spec: dict,
+    t,
+    result: RenderResult,
+    evidence: dict | None,
+    *,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    shapes: dict,
 ) -> None:
     chart_type = str(spec.get("type", "column")).lower()
     if chart_type not in _CHART_TYPES:
         result.findings.append(
             Finding(
-                "deck_plan", "chart", "warn", "fail",
+                "deck_plan",
+                "chart",
+                "warn",
+                "fail",
                 f"page {page_id} chart type '{chart_type}' unknown "
                 f"(known: {', '.join(_CHART_TYPES)}); skipping chart",
                 "deck_plan",
@@ -816,7 +1514,11 @@ def _add_chart(
     data.add_series(series_name, tuple(values))
     frame = slide.shapes.add_chart(
         _CHART_TYPES[chart_type],
-        Inches(x), Inches(y), Inches(w), Inches(h), data,
+        Inches(x),
+        Inches(y),
+        Inches(w),
+        Inches(h),
+        data,
     )
     shapes["visual"] = [frame.shape_id]
     chart = frame.chart
@@ -844,7 +1546,10 @@ def _apply_transition(prs: Presentation, plan: dict, result: RenderResult) -> No
     if tag not in _TRANSITIONS:
         result.findings.append(
             Finding(
-                "deck_plan", "transition", "warn", "fail",
+                "deck_plan",
+                "transition",
+                "warn",
+                "fail",
                 f"transition '{requested}' unknown (known: {', '.join(_TRANSITIONS)}); skipped",
                 "deck_plan",
             )
@@ -891,9 +1596,15 @@ def _effect_group(parent, shape_ids: list[int], fade: bool, counter: iter) -> No
         # first effect in a click group is clickEffect; the rest animate with it
         node_type = "clickEffect" if position == 0 else "withEffect"
         effect = _el(
-            effects, "cTn", id=next(counter), fill="hold", grpId="0",
-            nodeType=node_type, presetID="10" if fade else "1",
-            presetClass="entr", presetSubtype="0",
+            effects,
+            "cTn",
+            id=next(counter),
+            fill="hold",
+            grpId="0",
+            nodeType=node_type,
+            presetID="10" if fade else "1",
+            presetClass="entr",
+            presetSubtype="0",
         )
         _el(_el(effect, "stCondLst"), "cond", delay="0")
         behaviors = _el(effect, "childTnLst")
@@ -931,9 +1642,13 @@ def _apply_animations(prs: Presentation, plan: dict, result: RenderResult) -> No
             if verb not in _PPTX_VERBS:
                 result.findings.append(
                     Finding(
-                        "deck_plan", "animation", "info", "pass",
+                        "deck_plan",
+                        "animation",
+                        "info",
+                        "pass",
                         f"page {page_id}: verb '{verb}' executes on the HTML surface only "
-                        f"(pptx v1: appear/fade_in)", "deck_plan",
+                        f"(pptx v1: appear/fade_in)",
+                        "deck_plan",
                     )
                 )
             targets: list[int] = []
@@ -942,9 +1657,13 @@ def _apply_animations(prs: Presentation, plan: dict, result: RenderResult) -> No
                 if address.startswith("support_points["):
                     result.findings.append(
                         Finding(
-                            "deck_plan", "animation", "info", "pass",
+                            "deck_plan",
+                            "animation",
+                            "info",
+                            "pass",
                             f"page {page_id}: '{address}' animates as the whole points block "
-                            f"in pptx v1 (paragraph-level is HTML-only)", "deck_plan",
+                            f"in pptx v1 (paragraph-level is HTML-only)",
+                            "deck_plan",
                         )
                     )
                 ids = shapes.get(address) or shapes.get(address.split("[")[0]) or []
@@ -1034,7 +1753,10 @@ def _check_geometry(prs: Presentation, result: RenderResult) -> None:
             ):
                 result.findings.append(
                     Finding(
-                        "deck_plan", "geometry", "warn", "fail",
+                        "deck_plan",
+                        "geometry",
+                        "warn",
+                        "fail",
                         f"slide {slide_number}: '{name}' falls outside the canvas "
                         f"({bbox[0]:.2f},{bbox[1]:.2f})-({bbox[2]:.2f},{bbox[3]:.2f})",
                         "deck_plan",
@@ -1056,7 +1778,10 @@ def _check_geometry(prs: Presentation, result: RenderResult) -> None:
                 if smaller > 0 and area / smaller > 0.04:
                     result.findings.append(
                         Finding(
-                            "deck_plan", "geometry", "warn", "fail",
+                            "deck_plan",
+                            "geometry",
+                            "warn",
+                            "fail",
                             f"slide {slide_number}: '{name_a}' overlaps '{name_b}' "
                             f"({area / smaller:.0%} of the smaller block)",
                             "deck_plan",

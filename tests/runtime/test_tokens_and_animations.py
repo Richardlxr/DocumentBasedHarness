@@ -15,8 +15,13 @@ from comh.validate import validate_hard_constraints
 
 EVIDENCE = {
     "items": [
-        {"id": "E001", "kind": "datum", "content": "220ms",
-         "value": {"number": 220, "unit": "ms"}, "source": {"source": "S", "locator": "x"}},
+        {
+            "id": "E001",
+            "kind": "datum",
+            "content": "220ms",
+            "value": {"number": 220, "unit": "ms"},
+            "source": {"source": "S", "locator": "x"},
+        },
     ]
 }
 
@@ -67,8 +72,7 @@ def test_validator_flags_dark_override_under_no_dark_constraint() -> None:
     }
     findings = validate_hard_constraints(artifacts, None)
     assert any(
-        f.severity == "error" and "effective deck background is dark" in f.detail
-        for f in findings
+        f.severity == "error" and "effective deck background is dark" in f.detail for f in findings
     )
 
 
@@ -87,8 +91,11 @@ ANIM_PLAN = {
                 "callout": {"text": "c"},
                 "reveal": [
                     {"elements": ["title"], "verb": "fade_in", "trigger": "click"},
-                    {"elements": ["metric_cards[0]", "callout"], "verb": "appear",
-                     "trigger": "click"},
+                    {
+                        "elements": ["metric_cards[0]", "callout"],
+                        "verb": "appear",
+                        "trigger": "click",
+                    },
                 ],
             }
         ],

@@ -33,8 +33,18 @@ from .artifacts import Finding
 
 # Open vocabulary — extend freely; these are heuristics, not grammar laws.
 METAPHOR_MARKERS = (
-    "伤害", "打架", "立尺子", "组合拳", "护城河", "赛道", "赋能", "抓手",
-    "药方", "生病", "讲故事", "靶点",
+    "伤害",
+    "打架",
+    "立尺子",
+    "组合拳",
+    "护城河",
+    "赛道",
+    "赋能",
+    "抓手",
+    "药方",
+    "生病",
+    "讲故事",
+    "靶点",
 )
 
 _EM_DASH = "——"
@@ -109,42 +119,61 @@ def lint_text(
     if em_dashes and element in ("title", "callout") and voice.enforces("em-dash"):
         findings.append(
             Finding(
-                "deck_plan", "style:em-dash", "warn", "fail",
+                "deck_plan",
+                "style:em-dash",
+                "warn",
+                "fail",
                 f"page {page_id} {element}: em-dash punchline in a title/callout — "
                 f"write the plain statement instead "
-                f'("{text[:36]}…")', "deck_plan",
+                f'("{text[:36]}…")',
+                "deck_plan",
             )
         )
     elif em_dashes > 1 and voice.enforces("em-dash"):
         findings.append(
             Finding(
-                "deck_plan", "style:em-dash", "warn", "fail",
+                "deck_plan",
+                "style:em-dash",
+                "warn",
+                "fail",
                 f"page {page_id} {element}: {em_dashes} em-dash punchlines in one "
-                f"block — keep at most one, prefer plain sentences", "deck_plan",
+                f"block — keep at most one, prefer plain sentences",
+                "deck_plan",
             )
         )
     for marker in voice.markers:
         if marker in text:
             findings.append(
                 Finding(
-                    "deck_plan", "style:metaphor", "warn", "fail",
+                    "deck_plan",
+                    "style:metaphor",
+                    "warn",
+                    "fail",
                     f"page {page_id} {element}: metaphor marker '{marker}' — say the "
                     f"technical fact directly; gloss jargon in half a sentence "
-                    f"instead of building an analogy", "deck_plan",
+                    f"instead of building an analogy",
+                    "deck_plan",
                 )
             )
     if len(_NOT_X_BUT_Y.findall(text)) >= 2 and voice.enforces("contrast-frame"):
         findings.append(
             Finding(
-                "deck_plan", "style:contrast-frame", "warn", "fail",
+                "deck_plan",
+                "style:contrast-frame",
+                "warn",
+                "fail",
                 f"page {page_id} {element}: repeated '不是X，而是Y' frames — the "
-                f"contrast construction is an AI tell at this density", "deck_plan",
+                f"contrast construction is an AI tell at this density",
+                "deck_plan",
             )
         )
     if _EN_TELL_WORDS.search(text) and voice.enforces("en-tell"):
         findings.append(
             Finding(
-                "deck_plan", "style:en-tell", "warn", "fail",
+                "deck_plan",
+                "style:en-tell",
+                "warn",
+                "fail",
                 f"page {page_id} {element}: AI-favored English wording "
                 f"({_EN_TELL_WORDS.search(text).group(0)}) — pick the concrete word",
                 "deck_plan",
@@ -153,9 +182,13 @@ def lint_text(
     if (_EN_EM_DASH_CLAUSE.search(text) or _EN_NOT_JUST.search(text)) and voice.enforces("en-tell"):
         findings.append(
             Finding(
-                "deck_plan", "style:en-tell", "warn", "fail",
+                "deck_plan",
+                "style:en-tell",
+                "warn",
+                "fail",
                 f"page {page_id} {element}: em-dash clause or 'not just X but Y' — "
-                f"use a plain sentence", "deck_plan",
+                f"use a plain sentence",
+                "deck_plan",
             )
         )
     return findings
@@ -172,34 +205,44 @@ def lint_report(text: str, voice: VoiceConfig | None = None) -> list[Finding]:
         if em_dashes > 1 and voice.enforces("em-dash"):
             findings.append(
                 Finding(
-                    "report_md", "style:em-dash", "warn", "fail",
+                    "report_md",
+                    "style:em-dash",
+                    "warn",
+                    "fail",
                     f"report paragraph {number}: {em_dashes} em-dash punchlines — "
-                    f"prefer plain sentences", "report_md",
+                    f"prefer plain sentences",
+                    "report_md",
                 )
             )
         hits = [m for m in voice.markers if m in paragraph]
         if hits:
             findings.append(
                 Finding(
-                    "report_md", "style:metaphor", "warn", "fail",
+                    "report_md",
+                    "style:metaphor",
+                    "warn",
+                    "fail",
                     f"report paragraph {number}: metaphor markers {hits} — state the "
-                    f"technical fact directly", "report_md",
+                    f"technical fact directly",
+                    "report_md",
                 )
             )
         if _EN_TELL_WORDS.search(paragraph) and voice.enforces("en-tell"):
             findings.append(
                 Finding(
-                    "report_md", "style:en-tell", "warn", "fail",
+                    "report_md",
+                    "style:en-tell",
+                    "warn",
+                    "fail",
                     f"report paragraph {number}: AI-favored English wording — "
-                    f"pick the concrete word", "report_md",
+                    f"pick the concrete word",
+                    "report_md",
                 )
             )
     return findings
 
 
-def validate_style(
-    artifacts: dict[str, dict | None], report_md_text: str | None
-) -> list[Finding]:
+def validate_style(artifacts: dict[str, dict | None], report_md_text: str | None) -> list[Finding]:
     voice = (artifacts.get("brief") or {}).get("voice") or {}
     deck_voice = VoiceConfig(voice, voice.get("deck"))
     report_voice = VoiceConfig(voice, voice.get("report"))
@@ -224,9 +267,11 @@ def validate_style(
                     findings.append(
                         Finding(
                             "deck_plan" if medium == "deck" else "report_md",
-                            "style:forbidden-word", "warn", "fail",
-                            f"{page_id} {element}: '{word}' is forbidden by "
-                            f"brief.voice.rules", "deck_plan" if medium == "deck" else "report_md",
+                            "style:forbidden-word",
+                            "warn",
+                            "fail",
+                            f"{page_id} {element}: '{word}' is forbidden by brief.voice.rules",
+                            "deck_plan" if medium == "deck" else "report_md",
                         )
                     )
 

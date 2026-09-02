@@ -173,9 +173,7 @@ class Manifest:
             raise RunError(f"cannot save '{key}': {record['path']} does not exist")
         record["hash"] = hash_file(file)
         record["saved_at"] = now_iso()
-        record["upstream"] = {
-            up: self._current_hash(up) for up in DERIVATION[key]
-        }
+        record["upstream"] = {up: self._current_hash(up) for up in DERIVATION[key]}
         # Re-saving identical content must not invalidate a user gate: the gate
         # pins what the user confirmed, and the bytes did not change. Changed
         # content always invalidates.

@@ -321,18 +321,14 @@ def theme_from_pptx(pptx_path: Path, name: str, run_root: Path) -> Path:
         xml = archive.read("ppt/theme/theme1.xml").decode("utf-8")
 
     def color(tag: str) -> str | None:
-        block = re_module.search(
-            rf"<a:{tag}>.*?</a:{tag}>", xml, re_module.DOTALL
-        )
+        block = re_module.search(rf"<a:{tag}>.*?</a:{tag}>", xml, re_module.DOTALL)
         if not block:
             return None
         srgb = re_module.search(r'val="([0-9A-Fa-f]{6})"', block.group(0))
         return srgb.group(1).upper() if srgb else None
 
     def font(tag: str, script: str) -> str | None:
-        block = re_module.search(
-            rf"<a:{tag}Font>\s*<a:latin[^/]*typeface=\"([^\"]+)\"", xml
-        )
+        block = re_module.search(rf"<a:{tag}Font>\s*<a:latin[^/]*typeface=\"([^\"]+)\"", xml)
         if block and script == "latin":
             return block.group(1)
         ea = re_module.search(
@@ -359,9 +355,13 @@ def theme_from_pptx(pptx_path: Path, name: str, run_root: Path) -> Path:
         "name": name,
         "is_light": is_light,
         "colors": {
-            "background": lt1, "text": dk1, "muted": dk1,
-            "accent": accent, "accent_soft": accent2,
-            "card_fill": card_fill, "card_line": card_line,
+            "background": lt1,
+            "text": dk1,
+            "muted": dk1,
+            "accent": accent,
+            "accent_soft": accent2,
+            "card_fill": card_fill,
+            "card_line": card_line,
         },
         "fonts": {
             "latin": [major_latin, minor_latin],

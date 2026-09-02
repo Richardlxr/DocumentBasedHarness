@@ -21,7 +21,18 @@ SCHEMA_DIR = Path(__file__).parent / "schemas"
 ARTIFACT_KEYS = ("evidence", "brief", "narrative", "deck_plan", "report_plan")
 
 KNOWN_CLAIM_STATUSES = {"supported", "partial", "background", "assumption", "needs_research"}
-KNOWN_PAGE_ROLES = {"cover", "agenda", "section_divider", "content", "closing", "appendix"}
+KNOWN_PAGE_ROLES = {
+    "cover",
+    "agenda",
+    "section_divider",
+    "content",
+    "closing",
+    "appendix",
+    "hero_split",
+    "fullscreen_backdrop",
+    "timeline",
+    "versus",
+}
 
 
 @dataclass
@@ -69,17 +80,21 @@ def load_artifact(run_root: Path, key: str) -> tuple[Any, list[Finding]]:
     manifest = Manifest.load(run_root)
     path = run_root / manifest.data["artifacts"][key]["path"]
     if not path.is_file():
-        return None, [
-            Finding(key, "schema", "error", "fail", f"file missing: {path}", key)
-        ]
+        return None, [Finding(key, "schema", "error", "fail", f"file missing: {path}", key)]
     try:
         data = load_yaml(path)
     except yaml.YAMLError as error:
         location = getattr(getattr(error, "problem_mark", None), "line", None)
         where = f" (line {location + 1})" if location is not None else ""
         return None, [
-            Finding(key, "schema", "error", "fail",
-                    f"{path.name} is not valid YAML{where}: fix the syntax and retry", key)
+            Finding(
+                key,
+                "schema",
+                "error",
+                "fail",
+                f"{path.name} is not valid YAML{where}: fix the syntax and retry",
+                key,
+            )
         ]
     findings = [
         Finding(key, "schema", "error", "fail", message, key)

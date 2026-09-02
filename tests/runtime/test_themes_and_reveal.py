@@ -31,8 +31,9 @@ def test_creative_themes_reach_the_surfaces(tmp_path: Path) -> None:
         "deck": {
             "title": "t",
             "style": {"template": "poster-pop"},
-            "pages": [{"id": "P01", "page_role": "cover", "title": "发布",
-                       "support_points": ["副标"]}],
+            "pages": [
+                {"id": "P01", "page_role": "cover", "title": "发布", "support_points": ["副标"]}
+            ],
         },
     }
     render_html_deck(plan, tmp_path, tmp_path / "pop.html", language="zh-CN")
@@ -118,11 +119,11 @@ def test_valid_reveal_steps_pass() -> None:
 def test_reveal_address_errors(tmp_path: Path) -> None:
     page = _page(
         reveal=[
-            {"elements": ["support_points[5]"], "verb": "fade_in"},   # out of range
-            {"elements": ["bogus[0]"], "verb": "fade_in"},            # unknown base
-            {"elements": ["title[0]"], "verb": "fade_in"},            # indexed scalar
+            {"elements": ["support_points[5]"], "verb": "fade_in"},  # out of range
+            {"elements": ["bogus[0]"], "verb": "fade_in"},  # unknown base
+            {"elements": ["title[0]"], "verb": "fade_in"},  # indexed scalar
         ],
-        emphasis=[{"elements": ["callout"]}],                          # ok
+        emphasis=[{"elements": ["callout"]}],  # ok
     )
     page.pop("callout")
     findings = validate_reveal(_artifacts(page))
@@ -167,14 +168,24 @@ def test_icon_validation_and_search() -> None:
 
     artifacts = {
         "evidence": {"items": []},
-        "deck_plan": {"deck": {"title": "t", "pages": [{
-            "id": "P01", "page_role": "content", "title": "x",
-            "metric_cards": [{"value_from": "E001", "icon": "no-such-icon"}],
-        }]}},
+        "deck_plan": {
+            "deck": {
+                "title": "t",
+                "pages": [
+                    {
+                        "id": "P01",
+                        "page_role": "content",
+                        "title": "x",
+                        "metric_cards": [{"value_from": "E001", "icon": "no-such-icon"}],
+                    }
+                ],
+            }
+        },
     }
     findings = validate_visuals(artifacts)
-    assert any("unknown icon 'no-such-icon'" in f.detail and f.severity == "error"
-               for f in findings)
+    assert any(
+        "unknown icon 'no-such-icon'" in f.detail and f.severity == "error" for f in findings
+    )
 
 
 def test_pptx_card_icons_render(tmp_path: Path):
@@ -184,14 +195,29 @@ def test_pptx_card_icons_render(tmp_path: Path):
 
     plan = {
         "version": 1,
-        "deck": {"title": "t", "pages": [{
-            "id": "P01", "page_role": "content", "title": "x",
-            "metric_cards": [{"value_from": "E001", "icon": "gauge"}],
-        }]},
+        "deck": {
+            "title": "t",
+            "pages": [
+                {
+                    "id": "P01",
+                    "page_role": "content",
+                    "title": "x",
+                    "metric_cards": [{"value_from": "E001", "icon": "gauge"}],
+                }
+            ],
+        },
     }
-    evidence = {"items": [{"id": "E001", "kind": "datum", "content": "5",
-                           "value": {"number": 5, "unit": "ms"},
-                           "source": {"source": "S", "locator": "x"}}]}
+    evidence = {
+        "items": [
+            {
+                "id": "E001",
+                "kind": "datum",
+                "content": "5",
+                "value": {"number": 5, "unit": "ms"},
+                "source": {"source": "S", "locator": "x"},
+            }
+        ]
+    }
     result = render_deck(plan, tmp_path, tmp_path / "i.pptx", evidence=evidence)
     assert not [f for f in result.findings if f.check == "icon"]
     prs = Presentation(str(tmp_path / "i.pptx"))
@@ -214,10 +240,17 @@ def test_agenda_overflow_gets_layout_finding(tmp_path: Path):
 
     plan = {
         "version": 1,
-        "deck": {"title": "t", "pages": [{
-            "id": "P02", "page_role": "agenda", "title": "目录",
-            "support_points": [f"事项{i}" for i in range(10)],
-        }]},
+        "deck": {
+            "title": "t",
+            "pages": [
+                {
+                    "id": "P02",
+                    "page_role": "agenda",
+                    "title": "目录",
+                    "support_points": [f"事项{i}" for i in range(10)],
+                }
+            ],
+        },
     }
     result = render_deck(plan, tmp_path, tmp_path / "agenda.pptx")
     overflow = [f for f in result.findings if f.check == "layout" and "agenda rows" in f.detail]

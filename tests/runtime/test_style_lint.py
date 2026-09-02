@@ -41,11 +41,20 @@ def test_plain_text_passes() -> None:
 
 def test_validate_style_walks_deck_and_report() -> None:
     artifacts = {
-        "deck_plan": {"deck": {"title": "t", "pages": [
-            {"id": "P01", "page_role": "content",
-             "title": "机制可信——硬件待验", "support_points": ["普通要点"],
-             "callout": {"text": "正常结论条"}},
-        ]}},
+        "deck_plan": {
+            "deck": {
+                "title": "t",
+                "pages": [
+                    {
+                        "id": "P01",
+                        "page_role": "content",
+                        "title": "机制可信——硬件待验",
+                        "support_points": ["普通要点"],
+                        "callout": {"text": "正常结论条"},
+                    },
+                ],
+            }
+        },
     }
     findings = validate_style(artifacts, "正文一段。没有问题的段落。")
     assert any(f.check == "style:em-dash" and "P01" in f.detail for f in findings)
@@ -59,15 +68,15 @@ def test_voice_config_relaxes_and_tightens() -> None:
     assert not punchy.enforces("em-dash")  # relaxed away
     plain = VoiceConfig(None)
     assert plain.enforces("em-dash")
-    assert not any(
-        f.check == "style:em-dash" for f in lint_text("P1", "title", text, punchy)
-    )
+    assert not any(f.check == "style:em-dash" for f in lint_text("P1", "title", text, punchy))
     assert any(f.check == "style:em-dash" for f in lint_text("P1", "title", text, plain))
 
-    custom = VoiceConfig({
-        "style": "custom-voice",
-        "rules": {"relax": ["em-dash"], "extra_metaphor_markers": ["内卷"]},
-    })
+    custom = VoiceConfig(
+        {
+            "style": "custom-voice",
+            "rules": {"relax": ["em-dash"], "extra_metaphor_markers": ["内卷"]},
+        }
+    )
     assert not custom.enforces("em-dash")
     hits = lint_text("P2", "support_points[0]", "这个方案很内卷", custom)
     assert any(f.check == "style:metaphor" and "内卷" in f.detail for f in hits)
@@ -75,10 +84,19 @@ def test_voice_config_relaxes_and_tightens() -> None:
     # validate_style reads brief.voice end to end
     artifacts = {
         "brief": {"voice": {"style": "punchy"}},
-        "deck_plan": {"deck": {"title": "t", "pages": [
-            {"id": "P01", "page_role": "content", "title": "机制成立——数据稳定",
-             "support_points": ["要点"]},
-        ]}},
+        "deck_plan": {
+            "deck": {
+                "title": "t",
+                "pages": [
+                    {
+                        "id": "P01",
+                        "page_role": "content",
+                        "title": "机制成立——数据稳定",
+                        "support_points": ["要点"],
+                    },
+                ],
+            }
+        },
     }
     assert validate_style(artifacts, None) == []
 
@@ -94,19 +112,28 @@ def test_voice_is_per_medium() -> None:
     # deck relaxed to punchy, report stays plain: same sentence, one surface flagged
     artifacts = {
         "brief": {"voice": {"deck": {"style": "punchy"}}},
-        "deck_plan": {"deck": {"title": "t", "pages": [
-            {"id": "P01", "page_role": "content",
-             "title": "机制成立——数据稳定", "support_points": ["要点"]},
-        ]}},
+        "deck_plan": {
+            "deck": {
+                "title": "t",
+                "pages": [
+                    {
+                        "id": "P01",
+                        "page_role": "content",
+                        "title": "机制成立——数据稳定",
+                        "support_points": ["要点"],
+                    },
+                ],
+            }
+        },
     }
     report = "机制成立——数据稳定；结论可用——先行灰度。"
     findings = validate_style(artifacts, report)
-    assert not any(
-        f.check == "style:em-dash" and f.artifact == "deck_plan" for f in findings
-    ), "deck surface uses the punchy profile"
-    assert any(
-        f.check == "style:em-dash" and f.artifact == "report_md" for f in findings
-    ), "report surface keeps the plain profile"
+    assert not any(f.check == "style:em-dash" and f.artifact == "deck_plan" for f in findings), (
+        "deck surface uses the punchy profile"
+    )
+    assert any(f.check == "style:em-dash" and f.artifact == "report_md" for f in findings), (
+        "report surface keeps the plain profile"
+    )
 
     # medium rules merge additively over the global rules
     artifacts["brief"] = {
@@ -119,10 +146,10 @@ def test_voice_is_per_medium() -> None:
     report = "综上所述，方案可行。"
     findings = validate_style(artifacts, report)
     assert any(
-        f.check == "style:forbidden-word" and "赋能" in f.detail
-        and f.artifact == "deck_plan" for f in findings
+        f.check == "style:forbidden-word" and "赋能" in f.detail and f.artifact == "deck_plan"
+        for f in findings
     ), "global rules apply to deck"
     assert any(
-        f.check == "style:forbidden-word" and "综上所述" in f.detail
-        and f.artifact == "report_md" for f in findings
+        f.check == "style:forbidden-word" and "综上所述" in f.detail and f.artifact == "report_md"
+        for f in findings
     ), "medium-specific rules apply to report"

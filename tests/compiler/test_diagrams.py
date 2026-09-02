@@ -443,14 +443,7 @@ def test_drawio_cli_uses_product_cache(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
     monkeypatch.delenv("DRAWIO_CLI", raising=False)
     monkeypatch.setattr("docx_harness.diagrams.drawio_cli.shutil.which", lambda command: None)
-    executable = (
-        tmp_path
-        / "docx-harness"
-        / "drawio"
-        / DRAWIO_VERSION
-        / "squashfs-root"
-        / "AppRun"
-    )
+    executable = tmp_path / "docx-harness" / "drawio" / DRAWIO_VERSION / "squashfs-root" / "AppRun"
     executable.parent.mkdir(parents=True)
     executable.touch()
 

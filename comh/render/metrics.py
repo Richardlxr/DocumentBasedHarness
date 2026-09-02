@@ -18,9 +18,7 @@ from functools import cache
 from PIL import ImageFont
 
 _MARGIN = 1.08  # measured widths are estimates of the final render; stay safe
-_CJK_RANGES = (
-    (0x2E80, 0x9FFF), (0xF900, 0xFAFF), (0xFF00, 0xFFEF), (0x20000, 0x2FA1F)
-)
+_CJK_RANGES = ((0x2E80, 0x9FFF), (0xF900, 0xFAFF), (0xFF00, 0xFFEF), (0x20000, 0x2FA1F))
 _FALLBACK_LATIN = 0.52  # width in em for the fallback model
 _FALLBACK_CJK = 1.0
 
@@ -38,7 +36,10 @@ def _font_path(family: str) -> str | None:
     try:
         completed = subprocess.run(
             [configured, "-f", "%{file}\n", f"{family}:style=Regular"],
-            capture_output=True, text=True, check=False, timeout=10,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
         )
     except (subprocess.TimeoutExpired, OSError):
         return None

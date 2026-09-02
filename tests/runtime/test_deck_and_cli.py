@@ -39,10 +39,20 @@ PLAN = {
 
 EVIDENCE = {
     "items": [
-        {"id": "E001", "kind": "datum", "content": "基线 220ms",
-         "value": {"number": 220, "unit": "ms"}, "source": {"source": "SRC01", "locator": "r1"}},
-        {"id": "E002", "kind": "datum", "content": "优化 180ms",
-         "value": {"number": 180, "unit": "ms"}, "source": {"source": "SRC01", "locator": "r2"}},
+        {
+            "id": "E001",
+            "kind": "datum",
+            "content": "基线 220ms",
+            "value": {"number": 220, "unit": "ms"},
+            "source": {"source": "SRC01", "locator": "r1"},
+        },
+        {
+            "id": "E002",
+            "kind": "datum",
+            "content": "优化 180ms",
+            "value": {"number": 180, "unit": "ms"},
+            "source": {"source": "SRC01", "locator": "r2"},
+        },
     ]
 }
 
@@ -226,8 +236,15 @@ def test_elaborated_points_cards_and_callout(tmp_path: Path):
     }
     evidence = {
         "items": EVIDENCE["items"]
-        + [{"id": "E003", "kind": "datum", "content": "降幅 18.2%",
-            "value": {"number": 18.2, "unit": "%"}, "source": {"source": "S", "locator": "x"}}]
+        + [
+            {
+                "id": "E003",
+                "kind": "datum",
+                "content": "降幅 18.2%",
+                "value": {"number": 18.2, "unit": "%"},
+                "source": {"source": "S", "locator": "x"},
+            }
+        ]
     }
     result = render_deck(
         plan, tmp_path, tmp_path / "rich.pptx", language="zh-CN", evidence=evidence
@@ -290,8 +307,10 @@ def test_visual_validation_covers_cards_and_callout(tmp_path: Path):
                         "id": "P01",
                         "page_role": "content",
                         "title": "x",
-                        "metric_cards": [{"label": "l", "value_from": "E001"},
-                                          {"label": "bad", "value_from": "E999"}],
+                        "metric_cards": [
+                            {"label": "l", "value_from": "E001"},
+                            {"label": "bad", "value_from": "E999"},
+                        ],
                         "callout": {"text": "c", "evidence": "E888"},
                     }
                 ],

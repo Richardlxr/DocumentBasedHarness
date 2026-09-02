@@ -57,9 +57,7 @@ def _require_validated(manifest: Manifest, keys: set[str], action: str) -> None:
     not stop the deck, and a stale downstream artifact does not block an
     upstream save (it will be re-derived anyway).
     """
-    blocking = [
-        f for f in run_all(manifest.root) if f.severity == "error" and f.artifact in keys
-    ]
+    blocking = [f for f in run_all(manifest.root) if f.severity == "error" and f.artifact in keys]
     if blocking:
         for finding in blocking:
             print(f"  ✗ {finding.artifact}/{finding.check}: {finding.detail}", file=sys.stderr)
@@ -187,9 +185,7 @@ def cmd_render(args: argparse.Namespace) -> int:
     if args.target == "deck":
         manifest.require_gate("narrative")
         manifest.require_fresh("deck_plan")
-        _require_validated(
-            manifest, {"evidence", "brief", "narrative", "deck_plan"}, "render deck"
-        )
+        _require_validated(manifest, {"evidence", "brief", "narrative", "deck_plan"}, "render deck")
         plan, findings = load_artifact(run_root, "deck_plan")
         if findings:
             raise RunError("deck_plan fails schema validation; run `comh validate all`")
@@ -197,12 +193,13 @@ def cmd_render(args: argparse.Namespace) -> int:
         brief = brief or {}
         evidence, _ = load_artifact(run_root, "evidence")
         allow_dark = not any(
-            _BACKGROUND_FORBIDS_DARK.search(c)
-            for c in brief.get("constraints", {}).get("hard", [])
+            _BACKGROUND_FORBIDS_DARK.search(c) for c in brief.get("constraints", {}).get("hard", [])
         )
         output = run_root / manifest.data["build"]["deck"]
         result = render_deck(
-            plan, run_root, output,
+            plan,
+            run_root,
+            output,
             language=brief.get("language", "en"),
             evidence=evidence,
             allow_dark=allow_dark,
@@ -264,8 +261,7 @@ def cmd_render(args: argparse.Namespace) -> int:
         brief = brief or {}
         evidence, _ = load_artifact(run_root, "evidence")
         allow_dark = not any(
-            _BACKGROUND_FORBIDS_DARK.search(c)
-            for c in brief.get("constraints", {}).get("hard", [])
+            _BACKGROUND_FORBIDS_DARK.search(c) for c in brief.get("constraints", {}).get("hard", [])
         )
         rel = manifest.data["build"].get("deck_html", "build/deck.html")
         if "deck_html" not in manifest.data["build"]:
@@ -273,7 +269,9 @@ def cmd_render(args: argparse.Namespace) -> int:
             manifest.save()
         output = run_root / rel
         result = render_html_deck(
-            plan, run_root, output,
+            plan,
+            run_root,
+            output,
             language=brief.get("language", "en"),
             evidence=evidence,
             allow_dark=allow_dark,
@@ -323,23 +321,41 @@ def _headless_layout_check(html_path: Path, result) -> None:
     if chrome is None:
         result.findings.append(
             Finding(
-                "deck_plan", "layout", "warn", "fail",
+                "deck_plan",
+                "layout",
+                "warn",
+                "fail",
                 "[html] layout check skipped: headless Chrome not found (set COMH_CHROME); "
-                "geometry findings are not guaranteed for this output", "deck_plan",
+                "geometry findings are not guaranteed for this output",
+                "deck_plan",
             )
         )
         return
     completed = subprocess_module.run(
-        [chrome, "--headless=new", "--disable-gpu", "--virtual-time-budget=4000",
-         "--window-size=1600,900", "--dump-dom", html_path.as_uri()],
-        capture_output=True, text=True, timeout=120, check=False,
+        [
+            chrome,
+            "--headless=new",
+            "--disable-gpu",
+            "--virtual-time-budget=4000",
+            "--window-size=1600,900",
+            "--dump-dom",
+            html_path.as_uri(),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
     )
     match = re_module.search(r'data-layout-findings="(.*?)"', completed.stdout or "")
     if not match:
         result.findings.append(
             Finding(
-                "deck_plan", "layout", "warn", "fail",
-                "[html] layout check produced no read-back (guard script did not run)", "deck_plan",
+                "deck_plan",
+                "layout",
+                "warn",
+                "fail",
+                "[html] layout check produced no read-back (guard script did not run)",
+                "deck_plan",
             )
         )
         return
@@ -352,8 +368,12 @@ def _headless_layout_check(html_path: Path, result) -> None:
     except (ValueError, UnicodeDecodeError):
         result.findings.append(
             Finding(
-                "deck_plan", "layout", "warn", "fail",
-                "[html] layout check read-back could not be parsed", "deck_plan",
+                "deck_plan",
+                "layout",
+                "warn",
+                "fail",
+                "[html] layout check read-back could not be parsed",
+                "deck_plan",
             )
         )
         return
@@ -407,9 +427,7 @@ def cmd_deliver(args: argparse.Namespace) -> int:
         if (manifest.root / manifest.data["artifacts"][key]["path"]).is_file()
     }
     _require_validated(manifest, existing, "deliver")
-    if not any(
-        (manifest.root / str(rel)).is_file() for rel in manifest.data["build"].values()
-    ):
+    if not any((manifest.root / str(rel)).is_file() for rel in manifest.data["build"].values()):
         raise RunError("no build outputs found; render at least one medium first (`comh render …`)")
     record = manifest.record_delivery(note=args.note)
     print(f"delivery recorded at {record['accepted_at']}: {', '.join(record['outputs'])}")

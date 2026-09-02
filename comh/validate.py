@@ -87,9 +87,12 @@ def validate_sources(artifacts: dict[str, dict | None], run_root: Path) -> list[
         if cites_source:
             findings.append(
                 Finding(
-                    "evidence", "source-registry", "warn", "fail",
-                    "items cite SRCxx but no sources registry exists; provenance "
-                    "is unverifiable", "evidence",
+                    "evidence",
+                    "source-registry",
+                    "warn",
+                    "fail",
+                    "items cite SRCxx but no sources registry exists; provenance is unverifiable",
+                    "evidence",
                 )
             )
         return findings
@@ -103,9 +106,13 @@ def validate_sources(artifacts: dict[str, dict | None], run_root: Path) -> list[
             if entry is None:
                 findings.append(
                     Finding(
-                        "evidence", "ref-integrity", "error", "fail",
+                        "evidence",
+                        "ref-integrity",
+                        "error",
+                        "fail",
                         f"evidence {item_id} cites source '{source_ref}' which is not in "
-                        f"the sources registry", "evidence",
+                        f"the sources registry",
+                        "evidence",
                     )
                 )
             else:
@@ -113,9 +120,13 @@ def validate_sources(artifacts: dict[str, dict | None], run_root: Path) -> list[
                 if path and not (run_root / path).is_file():
                     findings.append(
                         Finding(
-                            "evidence", "ref-integrity", "error", "fail",
+                            "evidence",
+                            "ref-integrity",
+                            "error",
+                            "fail",
                             f"evidence {item_id}: source '{source_ref}' path '{path}' does "
-                            f"not exist under the run workspace", "evidence",
+                            f"not exist under the run workspace",
+                            "evidence",
                         )
                     )
         locator = str((item.get("source") or {}).get("locator", ""))
@@ -125,18 +136,26 @@ def validate_sources(artifacts: dict[str, dict | None], run_root: Path) -> list[
             if not any(operands):
                 findings.append(
                     Finding(
-                        "evidence", "ref-integrity", "error", "fail",
+                        "evidence",
+                        "ref-integrity",
+                        "error",
+                        "fail",
                         f"evidence {item_id} has a derived locator with no operands "
-                        f"(expected 'derived:(E001,E002)')", "evidence",
+                        f"(expected 'derived:(E001,E002)')",
+                        "evidence",
                     )
                 )
             for operand in operands:
                 if operand and operand not in item_ids:
                     findings.append(
                         Finding(
-                            "evidence", "ref-integrity", "error", "fail",
+                            "evidence",
+                            "ref-integrity",
+                            "error",
+                            "fail",
                             f"evidence {item_id} derived locator references missing "
-                            f"evidence '{operand}'", "evidence",
+                            f"evidence '{operand}'",
+                            "evidence",
                         )
                     )
     return findings
@@ -155,8 +174,12 @@ def validate_refs(artifacts: dict[str, dict | None]) -> list[Finding]:
             if ref not in evidence_ids:
                 findings.append(
                     Finding(
-                        "narrative", "ref-integrity", "error", "fail",
-                        f"claim {claim['id']} references missing evidence '{ref}'", "evidence",
+                        "narrative",
+                        "ref-integrity",
+                        "error",
+                        "fail",
+                        f"claim {claim['id']} references missing evidence '{ref}'",
+                        "evidence",
                     )
                 )
     for beat in narrative.get("story", []):
@@ -164,8 +187,12 @@ def validate_refs(artifacts: dict[str, dict | None]) -> list[Finding]:
             if ref not in claim_ids:
                 findings.append(
                     Finding(
-                        "narrative", "ref-integrity", "error", "fail",
-                        f"beat {beat['id']} references missing claim '{ref}'", "narrative",
+                        "narrative",
+                        "ref-integrity",
+                        "error",
+                        "fail",
+                        f"beat {beat['id']} references missing claim '{ref}'",
+                        "narrative",
                     )
                 )
 
@@ -175,25 +202,37 @@ def validate_refs(artifacts: dict[str, dict | None]) -> list[Finding]:
         if beat and beat not in beat_ids:
             findings.append(
                 Finding(
-                    "deck_plan", "ref-integrity", "error", "fail",
-                    f"page {page['id']} references missing beat '{beat}'", "narrative",
+                    "deck_plan",
+                    "ref-integrity",
+                    "error",
+                    "fail",
+                    f"page {page['id']} references missing beat '{beat}'",
+                    "narrative",
                 )
             )
         if page.get("page_role") not in KNOWN_PAGE_ROLES:
             findings.append(
                 Finding(
-                    "deck_plan", "page-role", "warn", "pass",
+                    "deck_plan",
+                    "page-role",
+                    "warn",
+                    "pass",
                     f"page {page['id']} uses unknown page_role '{page.get('page_role')}' "
-                    f"(treated as content)", "deck_plan",
+                    f"(treated as content)",
+                    "deck_plan",
                 )
             )
         for item in (page.get("visual") or {}).get("asset_refs", []):
             if isinstance(item, dict) and item.get("evidence", "") not in evidence_ids:
                 findings.append(
                     Finding(
-                        "deck_plan", "ref-integrity", "error", "fail",
+                        "deck_plan",
+                        "ref-integrity",
+                        "error",
+                        "fail",
                         f"page {page['id']} figure '{item.get('ref')}' references missing "
-                        f"evidence '{item.get('evidence')}'", "evidence",
+                        f"evidence '{item.get('evidence')}'",
+                        "evidence",
                     )
                 )
 
@@ -203,24 +242,36 @@ def validate_refs(artifacts: dict[str, dict | None]) -> list[Finding]:
             if ref not in beat_ids:
                 findings.append(
                     Finding(
-                        "report_plan", "ref-integrity", "error", "fail",
-                        f"section {section['id']} references missing beat '{ref}'", "narrative",
+                        "report_plan",
+                        "ref-integrity",
+                        "error",
+                        "fail",
+                        f"section {section['id']} references missing beat '{ref}'",
+                        "narrative",
                     )
                 )
         for ref in section.get("claims", []):
             if ref not in claim_ids:
                 findings.append(
                     Finding(
-                        "report_plan", "ref-integrity", "error", "fail",
-                        f"section {section['id']} references missing claim '{ref}'", "narrative",
+                        "report_plan",
+                        "ref-integrity",
+                        "error",
+                        "fail",
+                        f"section {section['id']} references missing claim '{ref}'",
+                        "narrative",
                     )
                 )
         for ref in section.get("evidence", []):
             if ref not in evidence_ids:
                 findings.append(
                     Finding(
-                        "report_plan", "ref-integrity", "error", "fail",
-                        f"section {section['id']} references missing evidence '{ref}'", "evidence",
+                        "report_plan",
+                        "ref-integrity",
+                        "error",
+                        "fail",
+                        f"section {section['id']} references missing evidence '{ref}'",
+                        "evidence",
                     )
                 )
     return findings
@@ -238,7 +289,10 @@ def validate_claims(artifacts: dict[str, dict | None]) -> list[Finding]:
         if status not in KNOWN_CLAIM_STATUSES:
             findings.append(
                 Finding(
-                    "narrative", "claim-status", "warn", "pass",
+                    "narrative",
+                    "claim-status",
+                    "warn",
+                    "pass",
                     f"claim {claim['id']} has unknown status '{status}' (treated as needs review)",
                     "narrative",
                 )
@@ -246,9 +300,13 @@ def validate_claims(artifacts: dict[str, dict | None]) -> list[Finding]:
         if status == "supported" and not claim.get("evidence"):
             findings.append(
                 Finding(
-                    "narrative", "claims-grounded", "error", "fail",
+                    "narrative",
+                    "claims-grounded",
+                    "error",
+                    "fail",
                     f"claim {claim['id']} is 'supported' but cites no evidence; "
-                    f"demote to background/assumption or add evidence", "narrative",
+                    f"demote to background/assumption or add evidence",
+                    "narrative",
                 )
             )
         refs = claim.get("evidence", [])
@@ -257,17 +315,20 @@ def validate_claims(artifacts: dict[str, dict | None]) -> list[Finding]:
             status == "supported"
             and cited
             and all(
-                (item.get("extraction") or {}).get("confidence") == "estimated"
-                for item in cited
+                (item.get("extraction") or {}).get("confidence") == "estimated" for item in cited
             )
         )
         if estimated_only:
             findings.append(
                 Finding(
-                    "narrative", "visual-estimate-only", "warn", "fail",
+                    "narrative",
+                    "visual-estimate-only",
+                    "warn",
+                    "fail",
                     f"claim {claim['id']} rests only on visually estimated evidence "
                     f"({', '.join(refs)}); verify against an underlying data file "
-                    f"or soften the claim", "evidence",
+                    f"or soften the claim",
+                    "evidence",
                 )
             )
     return findings
@@ -290,9 +351,13 @@ def validate_numbers(
             if number not in pool:
                 findings.append(
                     Finding(
-                        "narrative", "number-consistency", "error", "fail",
+                        "narrative",
+                        "number-consistency",
+                        "error",
+                        "fail",
                         f"claim {claim['id']} uses number {number:g} that appears in no evidence "
-                        f"item; materialize it as a datum first", "evidence",
+                        f"item; materialize it as a datum first",
+                        "evidence",
                     )
                 )
     deck = artifacts.get("deck_plan") or {}
@@ -311,9 +376,13 @@ def validate_numbers(
             if number not in pool:
                 findings.append(
                     Finding(
-                        "deck_plan", "number-consistency", "warn", "fail",
+                        "deck_plan",
+                        "number-consistency",
+                        "warn",
+                        "fail",
                         f"page {page['id']} uses number {number:g} not found in evidence "
-                        f"(check rounding or add a derived datum)", "deck_plan",
+                        f"(check rounding or add a derived datum)",
+                        "deck_plan",
                     )
                 )
     if report_md_text:
@@ -322,8 +391,12 @@ def validate_numbers(
             if number not in pool:
                 findings.append(
                     Finding(
-                        "report_md", "number-consistency", "warn", "fail",
-                        f"report uses number {number:g} not found in evidence", "report_md",
+                        "report_md",
+                        "number-consistency",
+                        "warn",
+                        "fail",
+                        f"report uses number {number:g} not found in evidence",
+                        "report_md",
                     )
                 )
     return findings
@@ -359,18 +432,25 @@ def validate_coverage(artifacts: dict[str, dict | None]) -> list[Finding]:
         )
         findings.append(
             Finding(
-                "narrative", "beat-coverage", "info", "pass",
-                f"beat {beat['id']} projection.status={status}: intentionally not "
-                f"projected{note}", "narrative",
+                "narrative",
+                "beat-coverage",
+                "info",
+                "pass",
+                f"beat {beat['id']} projection.status={status}: intentionally not projected{note}",
+                "narrative",
             )
         )
     for beat_id in sorted(beat_ids - covered - dropped):
         findings.append(
             Finding(
-                "narrative", "beat-coverage", "warn", "fail",
+                "narrative",
+                "beat-coverage",
+                "warn",
+                "fail",
                 f"beat {beat_id} is not covered by any deck page or report section; "
                 f"add coverage or mark it projection.status: dropped/appendix in the "
-                f"narrative", "narrative",
+                f"narrative",
+                "narrative",
             )
         )
     return findings
@@ -390,16 +470,24 @@ def validate_visuals(artifacts: dict[str, dict | None]) -> list[Finding]:
         if item is None:
             findings.append(
                 Finding(
-                    "deck_plan", "ref-integrity", "error", "fail",
-                    f"page {page_id} {what} references missing evidence '{ref}'", "evidence",
+                    "deck_plan",
+                    "ref-integrity",
+                    "error",
+                    "fail",
+                    f"page {page_id} {what} references missing evidence '{ref}'",
+                    "evidence",
                 )
             )
         elif (item.get("value") or {}).get("number") is None:
             findings.append(
                 Finding(
-                    "deck_plan", "visual", "error", "fail",
+                    "deck_plan",
+                    "visual",
+                    "error",
+                    "fail",
                     f"page {page_id} {what}: evidence '{ref}' has no value.number; "
-                    f"cards and charts plot structured data only", "evidence",
+                    f"cards and charts plot structured data only",
+                    "evidence",
                 )
             )
 
@@ -411,9 +499,13 @@ def validate_visuals(artifacts: dict[str, dict | None]) -> list[Finding]:
             if stray in page:
                 findings.append(
                     Finding(
-                        "deck_plan", "schema", "warn", "fail",
+                        "deck_plan",
+                        "schema",
+                        "warn",
+                        "fail",
                         f"page {page_id} has '{stray}' at page level; it belongs under "
-                        f"'visual' and the renderer ignores misplaced keys", "deck_plan",
+                        f"'visual' and the renderer ignores misplaced keys",
+                        "deck_plan",
                     )
                 )
         chart = (page.get("visual") or {}).get("chart")
@@ -430,7 +522,10 @@ def validate_visuals(artifacts: dict[str, dict | None]) -> list[Finding]:
                 if icon_name and not icon_exists(icon_name):
                     findings.append(
                         Finding(
-                            "deck_plan", "icon", "error", "fail",
+                            "deck_plan",
+                            "icon",
+                            "error",
+                            "fail",
                             f"page {page_id} references unknown icon '{icon_name}' "
                             f"(search comh.render.icons.search_icons)",
                             "deck_plan",
@@ -441,9 +536,13 @@ def validate_visuals(artifacts: dict[str, dict | None]) -> list[Finding]:
             if diagram.get("evidence") and diagram["evidence"] not in evidence_items:
                 findings.append(
                     Finding(
-                        "deck_plan", "ref-integrity", "error", "fail",
+                        "deck_plan",
+                        "ref-integrity",
+                        "error",
+                        "fail",
                         f"page {page_id} diagram references missing evidence "
-                        f"'{diagram['evidence']}'", "evidence",
+                        f"'{diagram['evidence']}'",
+                        "evidence",
                     )
                 )
             # Dry-run mermaid → DrawioDocument (pure Python, no draw.io CLI) so
@@ -454,17 +553,36 @@ def validate_visuals(artifacts: dict[str, dict | None]) -> list[Finding]:
             if error:
                 findings.append(
                     Finding(
-                        "deck_plan", "diagram", "error", "fail",
-                        f"page {page_id} diagram does not compile: {error}", "deck_plan",
+                        "deck_plan",
+                        "diagram",
+                        "error",
+                        "fail",
+                        f"page {page_id} diagram does not compile: {error}",
+                        "deck_plan",
                     )
                 )
         callout = page.get("callout")
         if callout and callout.get("evidence") and callout["evidence"] not in evidence_items:
             findings.append(
                 Finding(
-                    "deck_plan", "ref-integrity", "error", "fail",
-                    f"page {page_id} callout references missing evidence "
-                    f"'{callout['evidence']}'", "evidence",
+                    "deck_plan",
+                    "ref-integrity",
+                    "error",
+                    "fail",
+                    f"page {page_id} callout references missing evidence '{callout['evidence']}'",
+                    "evidence",
+                )
+            )
+        if page.get("page_role") == "timeline" and len(page.get("support_points") or []) > 4:
+            findings.append(
+                Finding(
+                    "deck_plan",
+                    "layout",
+                    "warn",
+                    "pass",
+                    f"page {page_id}: timeline has {len(page.get('support_points'))} milestones "
+                    "(recommended 3-4) — excess items may cause layout crowding",
+                    "deck_plan",
                 )
             )
     return findings
@@ -520,24 +638,35 @@ def validate_reveal(artifacts: dict[str, dict | None]) -> list[Finding]:
                     if error:
                         findings.append(
                             Finding(
-                                "deck_plan", "reveal-address", "error", "fail",
-                                f"page {page_id} {field}: {error}", "deck_plan",
+                                "deck_plan",
+                                "reveal-address",
+                                "error",
+                                "fail",
+                                f"page {page_id} {field}: {error}",
+                                "deck_plan",
                             )
                         )
                 verb = entry.get("verb")
                 if verb and verb not in _KNOWN_VERBS:
                     findings.append(
                         Finding(
-                            "deck_plan", "reveal-verb", "warn", "pass",
+                            "deck_plan",
+                            "reveal-verb",
+                            "warn",
+                            "pass",
                             f"page {page_id} {field}: unknown verb '{verb}' "
-                            f"(renderers ignore unknown verbs)", "deck_plan",
+                            f"(renderers ignore unknown verbs)",
+                            "deck_plan",
                         )
                     )
                 trigger = entry.get("trigger")
                 if trigger and trigger not in _KNOWN_TRIGGERS:
                     findings.append(
                         Finding(
-                            "deck_plan", "reveal-trigger", "warn", "pass",
+                            "deck_plan",
+                            "reveal-trigger",
+                            "warn",
+                            "pass",
                             f"page {page_id} {field}: unknown trigger '{trigger}'",
                             "deck_plan",
                         )
@@ -558,13 +687,21 @@ def validate_assets(artifacts: dict[str, dict | None], run_root: Path) -> list[F
             ref = str(entry.get("ref", "")).strip()
             if ref:
                 refs.append((page["id"], ref))
+        bg_spec = (page.get("visual") or {}).get("background") or page.get("background")
+        if isinstance(bg_spec, dict):
+            bg_asset = str(bg_spec.get("asset", "")).strip()
+            if bg_asset:
+                refs.append((page["id"], bg_asset))
     if not refs:
         return []
     manifest_path = run_root / "assets" / "manifest.yaml"
     if not manifest_path.is_file():
         return [
             Finding(
-                "deck_plan", "asset-provenance", "info", "pass",
+                "deck_plan",
+                "asset-provenance",
+                "info",
+                "pass",
                 f"{len({ref for _, ref in refs})} asset(s) in use without a manifest; "
                 "materials fetched from outside should be registered in "
                 "assets/manifest.yaml {file, origin_url, license, fetched_at}",
@@ -582,15 +719,22 @@ def validate_assets(artifacts: dict[str, dict | None], run_root: Path) -> list[F
         if not (run_root / name).is_file():
             findings.append(
                 Finding(
-                    "deck_plan", "asset-provenance", "error", "fail",
-                    f"manifest registers '{name}' but the file is missing", "deck_plan",
+                    "deck_plan",
+                    "asset-provenance",
+                    "error",
+                    "fail",
+                    f"manifest registers '{name}' but the file is missing",
+                    "deck_plan",
                 )
             )
     for page_id, ref in refs:
         if ref not in entries:
             findings.append(
                 Finding(
-                    "deck_plan", "asset-provenance", "warn", "pass",
+                    "deck_plan",
+                    "asset-provenance",
+                    "warn",
+                    "pass",
                     f"page {page_id} uses '{ref}' which assets/manifest.yaml does not "
                     "register (fetched materials must record origin and license)",
                     "deck_plan",
@@ -608,6 +752,7 @@ def validate_theme(artifacts: dict[str, dict | None], run_root: Path) -> list[Fi
     style = deck.get("deck", {}).get("style") or {}
     if not (style.get("template") or style.get("tokens_override")):
         return []  # default theme; the built-ins are guarded by their own test
+    from .render.scrim import solve_scrim
     from .render.theme import background_is_light, contrast_ratio, resolve_style
 
     theme = resolve_style(style, allow_dark=True, run_root=run_root).theme
@@ -616,10 +761,14 @@ def validate_theme(artifacts: dict[str, dict | None], run_root: Path) -> list[Fi
     if text_ratio < 4.5:
         findings.append(
             Finding(
-                "deck_plan", "theme-contrast", "error", "fail",
+                "deck_plan",
+                "theme-contrast",
+                "error",
+                "fail",
                 f"theme '{theme.name}': text/background contrast {text_ratio:.1f}:1 "
                 f"is below 4.5:1 — body text would be unreadable; darken the text "
-                f"or lighten the background", "deck_plan",
+                f"or lighten the background",
+                "deck_plan",
             )
         )
     for role, color in (("muted", theme.muted), ("accent", theme.accent)):
@@ -627,7 +776,10 @@ def validate_theme(artifacts: dict[str, dict | None], run_root: Path) -> list[Fi
         if ratio < 3.0:
             findings.append(
                 Finding(
-                    "deck_plan", "theme-contrast", "warn", "pass",
+                    "deck_plan",
+                    "theme-contrast",
+                    "warn",
+                    "pass",
                     f"theme '{theme.name}': {role} color contrast {ratio:.1f}:1 is "
                     f"below 3:1 — captions/kicker/accents may be hard to see",
                     "deck_plan",
@@ -637,24 +789,58 @@ def validate_theme(artifacts: dict[str, dict | None], run_root: Path) -> list[Fi
         actual = "light" if background_is_light(theme.background) else "dark"
         findings.append(
             Finding(
-                "deck_plan", "theme-declaration", "warn", "pass",
+                "deck_plan",
+                "theme-declaration",
+                "warn",
+                "pass",
                 f"theme '{theme.name}' declares is_light={theme.is_light} but its "
                 f"background '{theme.background}' reads {actual}; dark-forbidding "
-                f"briefs pin on the actual color, fix the flag", "deck_plan",
+                f"briefs pin on the actual color, fix the flag",
+                "deck_plan",
             )
         )
     for role, size, floor in (
-        ("body", theme.body_size, 14), ("detail", theme.detail_size, 11),
+        ("body", theme.body_size, 14),
+        ("detail", theme.detail_size, 11),
         ("caption", theme.caption_size, 9),
     ):
         if size < floor:
             findings.append(
                 Finding(
-                    "deck_plan", "theme-legibility", "warn", "pass",
+                    "deck_plan",
+                    "theme-legibility",
+                    "warn",
+                    "pass",
                     f"theme '{theme.name}': {role} size {size}pt is below the "
-                    f"{floor}pt legibility floor", "deck_plan",
+                    f"{floor}pt legibility floor",
+                    "deck_plan",
                 )
             )
+
+    # Check empirical background contrast across all pages
+    for page in deck.get("deck", {}).get("pages", []):
+        bg_spec = (page.get("visual") or {}).get("background") or page.get("background")
+        if isinstance(bg_spec, dict) and bg_spec.get("asset"):
+            asset_path = run_root / str(bg_spec["asset"])
+            if asset_path.is_file():
+                scrim_res = solve_scrim(
+                    asset_path,
+                    theme.text,
+                    theme.background,
+                    base_alpha=float(bg_spec.get("opacity") or 0.0),
+                )
+                if not scrim_res.passed:
+                    findings.append(
+                        Finding(
+                            "deck_plan",
+                            "background-contrast",
+                            "error",
+                            "fail",
+                            f"page {page['id']}: background image contrast against theme text "
+                            f"({scrim_res.contrast:.1f}:1) is below 4.5:1 even at alpha=0.90",
+                            "deck_plan",
+                        )
+                    )
     return findings
 
 
@@ -678,18 +864,26 @@ def validate_hard_constraints(
             if choice.forced_light:
                 findings.append(
                     Finding(
-                        "brief", "hard-constraint", "error", "fail",
+                        "brief",
+                        "hard-constraint",
+                        "error",
+                        "fail",
                         f"constraint '{constraint}' but the effective deck background is dark "
                         f"(template '{choice.requested}' or its tokens_override); pick a light "
-                        f"palette — the renderer would force light anyway", "deck_plan",
+                        f"palette — the renderer would force light anyway",
+                        "deck_plan",
                     )
                 )
             else:
                 findings.append(
                     Finding(
-                        "brief", "hard-constraint", "info", "pass",
+                        "brief",
+                        "hard-constraint",
+                        "info",
+                        "pass",
                         f"constraint '{constraint}' enforced: light background "
-                        f"'{choice.theme.background}' effective", "deck_plan",
+                        f"'{choice.theme.background}' effective",
+                        "deck_plan",
                     )
                 )
         match = _MUST_INCLUDE.search(constraint)
@@ -704,9 +898,13 @@ def validate_hard_constraints(
             if not any(phrase in h for h in haystacks):
                 findings.append(
                     Finding(
-                        "brief", "hard-constraint", "error", "fail",
+                        "brief",
+                        "hard-constraint",
+                        "error",
+                        "fail",
                         f"constraint requires '{phrase}' but it appears in no report section "
-                        f"heading/must_include and no deck text", "report_plan",
+                        f"heading/must_include and no deck text",
+                        "report_plan",
                     )
                 )
         forbidden = _FORBIDDEN_PHRASE.search(constraint)
@@ -719,7 +917,10 @@ def validate_hard_constraints(
             if phrase in (report_md_text or ""):
                 findings.append(
                     Finding(
-                        "brief", "hard-constraint", "error", "fail",
+                        "brief",
+                        "hard-constraint",
+                        "error",
+                        "fail",
                         f"constraint forbids '{phrase}' but it appears in the report text",
                         "report_md",
                     )
@@ -728,9 +929,13 @@ def validate_hard_constraints(
             if deck_hits:
                 findings.append(
                     Finding(
-                        "brief", "hard-constraint", "error", "fail",
+                        "brief",
+                        "hard-constraint",
+                        "error",
+                        "fail",
                         f"constraint forbids '{phrase}' but it appears in deck text "
-                        f"({deck_hits[0][:40]!r}…)", "deck_plan",
+                        f"({deck_hits[0][:40]!r}…)",
+                        "deck_plan",
                     )
                 )
     # A hard constraint that matches no pattern is neither enforced nor
@@ -739,10 +944,14 @@ def validate_hard_constraints(
         if index not in matched and str(constraint).strip():
             findings.append(
                 Finding(
-                    "brief", "hard-constraint", "warn", "pass",
+                    "brief",
+                    "hard-constraint",
+                    "warn",
+                    "pass",
                     f"constraint '{constraint}' has no machine check; confirm at Gate 1 "
                     f"that it was demoted to a soft preference (or add a validator "
-                    f"pattern)", "brief",
+                    f"pattern)",
+                    "brief",
                 )
             )
     return findings
@@ -782,7 +991,10 @@ def run_all(run_root: Path) -> list[Finding]:
         if record.get("confirmed") and not manifest.gate_valid(gate):
             findings.append(
                 Finding(
-                    gate, "gate", "warn", "fail",
+                    gate,
+                    "gate",
+                    "warn",
+                    "fail",
                     f"gate '{gate}' confirmed at {record.get('at')} but the file changed since",
                     gate,
                 )
@@ -800,9 +1012,7 @@ def write_findings(run_root: Path, findings: list[Finding]) -> Path:
     }
     for f in findings:
         payload["count"][f.severity] += 1
-    path.write_text(
-        yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8"
-    )
+    path.write_text(yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8")
     return path
 
 

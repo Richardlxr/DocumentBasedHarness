@@ -89,6 +89,21 @@
   同一份语义。
 - 所有数字必须来自 evidence（派生数字先落库，见 stages/evidence.md）。
 
+- **版式原型（`page_role` 扩展）**：
+  - `content`（默认）：标准上下/双栏图文排版。
+  - `hero_split`：左图右文或左文右图 Hero 分栏，图文顶格等高。
+  - `fullscreen_backdrop`：全幅背景图 + 居中悬浮半透明卡片（`backdrop_card`），沉浸式叙事。
+  - `timeline`：横向里程碑时间轴（推荐 3-4 节点，超出出 warning），带步骤徽标与展开要点。
+  - `versus`：双栏并列对比（方案 A vs 方案 B / 基线 vs 优化），结构化对称展示。
+
+- **背景图与蒙层（`visual.background`）**：
+  - 语法：`visual.background: {asset: "assets/hero.jpg", opacity: 0.15, overlay: theme|frosted-glass}`
+  - **实测保底与素材铁律**：背景图必须在 `assets/manifest.yaml` 登记溯源；系统使用 PIL 实测 worst-case 对比度，不足 4.5:1 时动态步进 α 蒙层（封顶 0.90），保证文字绝对清晰。HTML 支持毛玻璃，PPTX 自动优雅降级为实色半透明矩形。
+
+- **样板先行与局部精细微调工作流（对话协议）**：
+  1. **样板对齐（Specimen Preview）**：在生成整套 Deck 前，Agent 必须先根据风格诉求生成 1-2 页样板（Cover + 带卡片/图表的 Content/Hero 页）并渲染，供用户在浏览器预览确认。
+  2. **精准单页微调（Surgical Page Tuning）**：成品生成后，当用户指出某页（如 P03）某部分需要调整时，直接针对该页 `Pxx` 的字段（如版式 role、要点措辞、背景透明度、卡片数据）进行手术式修改并重新校验渲染，绝不破坏其他页面的既有结构。
+
 ## 样式方向：选型或生成（对话式，不只是学术汇报）
 
 风格是数据（`themes/<name>/theme.yaml`，色板/字体/字号），没有代码。内置方向

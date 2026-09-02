@@ -9,10 +9,20 @@ from comh.render.html_deck import render_html_deck
 
 EVIDENCE = {
     "items": [
-        {"id": "E001", "kind": "datum", "content": "220ms",
-         "value": {"number": 220, "unit": "ms"}, "source": {"source": "S", "locator": "x"}},
-        {"id": "E002", "kind": "datum", "content": "180ms",
-         "value": {"number": 180, "unit": "ms"}, "source": {"source": "S", "locator": "x"}},
+        {
+            "id": "E001",
+            "kind": "datum",
+            "content": "220ms",
+            "value": {"number": 220, "unit": "ms"},
+            "source": {"source": "S", "locator": "x"},
+        },
+        {
+            "id": "E002",
+            "kind": "datum",
+            "content": "180ms",
+            "value": {"number": 180, "unit": "ms"},
+            "source": {"source": "S", "locator": "x"},
+        },
     ]
 }
 
@@ -31,10 +41,16 @@ PLAN = {
                     {"point": "加粗导语", "detail": "展开一行"},
                 ],
                 "metric_cards": [{"label": "P99", "value_from": "E001"}],
-                "visual": {"chart": {"type": "column", "title": "P99", "series": [
-                    {"label": "a", "value_from": "E001"},
-                    {"label": "b", "value_from": "E002"},
-                ]}},
+                "visual": {
+                    "chart": {
+                        "type": "column",
+                        "title": "P99",
+                        "series": [
+                            {"label": "a", "value_from": "E001"},
+                            {"label": "b", "value_from": "E002"},
+                        ],
+                    }
+                },
                 "callout": {"text": "结论条"},
                 "notes": "讲稿",
                 "reveal": [
@@ -70,7 +86,7 @@ def test_html_deck_single_file_with_fragments(tmp_path: Path):
     # evidence-backed cards and CSS bars
     assert "220 ms" in doc and re.search(r'class="card-value"', doc)
     assert len(re.findall(r'class="bar-fill"', doc)) == 2
-    assert "结论条" in doc and "<aside class=\"notes\">讲稿</aside>" in doc
+    assert "结论条" in doc and '<aside class="notes">讲稿</aside>' in doc
     assert "--accent" in doc  # theme tokens as CSS variables
     # reveal.js paints .reveal-viewport (applied to <body>) white; our override
     # must re-pin it to the theme background or every deck renders on white
@@ -82,12 +98,21 @@ def test_html_deck_line_chart_falls_back_to_table(tmp_path: Path):
         "version": 1,
         "deck": {
             "title": "t",
-            "pages": [{
-                "id": "P01", "page_role": "content", "title": "x",
-                "visual": {"chart": {"type": "line", "series": [
-                    {"label": "a", "value_from": "E001"},
-                ]}},
-            }],
+            "pages": [
+                {
+                    "id": "P01",
+                    "page_role": "content",
+                    "title": "x",
+                    "visual": {
+                        "chart": {
+                            "type": "line",
+                            "series": [
+                                {"label": "a", "value_from": "E001"},
+                            ],
+                        }
+                    },
+                }
+            ],
         },
     }
     result = render_html_deck(plan, tmp_path, tmp_path / "line.html", evidence=EVIDENCE)

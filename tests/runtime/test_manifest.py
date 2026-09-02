@@ -29,9 +29,7 @@ MIN_BRIEF = (
     "media: [{medium: pptx, surface: presentation}]\n"
     "takeaways: [z]\n"
 )
-MIN_NARRATIVE = (
-    "version: 1\nclaims: []\nstory:\n  - {id: S01, purpose: p, message: m}\n"
-)
+MIN_NARRATIVE = "version: 1\nclaims: []\nstory:\n  - {id: S01, purpose: p, message: m}\n"
 
 
 def test_guard_blocks_narrative_before_gate(run_root):

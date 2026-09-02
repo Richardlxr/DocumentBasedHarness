@@ -64,9 +64,7 @@ def _artifacts():
                     "beat": "S01",
                     "title": "with figure",
                     "visual": {
-                        "asset_refs": [
-                            {"ref": "assets/x.png", "caption": "c", "evidence": "E999"}
-                        ]
+                        "asset_refs": [{"ref": "assets/x.png", "caption": "c", "evidence": "E999"}]
                     },
                 },
             ],
@@ -195,9 +193,7 @@ def test_hard_constraint_forbidden_phrase():
     assert any(f.severity == "error" and "KP920 硬件实测" in f.detail for f in findings)
     findings = validate_hard_constraints(artifacts, "干净的正文")
     assert not any(f.severity == "error" for f in findings)
-    artifacts["deck_plan"]["deck"]["pages"].append(
-        {"id": "P09", "title": "KP920 硬件实测结果"}
-    )
+    artifacts["deck_plan"]["deck"]["pages"].append({"id": "P09", "title": "KP920 硬件实测结果"})
     findings = validate_hard_constraints(artifacts, "干净的正文")
     deck_hits = [f for f in findings if f.severity == "error" and f.owning_artifact == "deck_plan"]
     assert deck_hits and "KP920 硬件实测" in deck_hits[0].detail
@@ -214,9 +210,21 @@ def test_asset_provenance_manifest_checks(tmp_path: Path) -> None:
     from comh.validate import validate_assets
 
     def deck_with_asset(ref: str) -> dict:
-        return {"deck_plan": {"deck": {"title": "t", "pages": [
-            {"id": "P01", "page_role": "content", "title": "x",
-             "visual": {"asset_refs": [{"ref": ref, "caption": "c"}]}}]}}}
+        return {
+            "deck_plan": {
+                "deck": {
+                    "title": "t",
+                    "pages": [
+                        {
+                            "id": "P01",
+                            "page_role": "content",
+                            "title": "x",
+                            "visual": {"asset_refs": [{"ref": ref, "caption": "c"}]},
+                        }
+                    ],
+                }
+            }
+        }
 
     # assets in use but no manifest at all -> info nudge, never a blocker
     findings = validate_assets(deck_with_asset("assets/a.jpg"), tmp_path)
@@ -241,8 +249,11 @@ def test_asset_provenance_manifest_checks(tmp_path: Path) -> None:
     assert validate_assets(deck_with_asset("assets/a.jpg"), tmp_path) == []
 
     # no asset_refs anywhere -> the check stays silent
-    plain = {"deck_plan": {"deck": {"title": "t", "pages": [
-        {"id": "P01", "page_role": "content", "title": "x"}]}}}
+    plain = {
+        "deck_plan": {
+            "deck": {"title": "t", "pages": [{"id": "P01", "page_role": "content", "title": "x"}]}
+        }
+    }
     assert validate_assets(plain, tmp_path) == []
 
 
@@ -250,8 +261,15 @@ def test_theme_quality_floor(tmp_path: Path) -> None:
     from comh.validate import validate_theme
 
     def deck_with_style(style: dict) -> dict:
-        return {"deck_plan": {"deck": {"title": "t", "style": style,
-            "pages": [{"id": "P01", "page_role": "content", "title": "x"}]}}}
+        return {
+            "deck_plan": {
+                "deck": {
+                    "title": "t",
+                    "style": style,
+                    "pages": [{"id": "P01", "page_role": "content", "title": "x"}],
+                }
+            }
+        }
 
     def write_theme(name: str, colors: dict, is_light: bool, sizes: dict | None = None):
         # its own run root per theme: the registry is lru_cached by run path
@@ -266,9 +284,15 @@ def test_theme_quality_floor(tmp_path: Path) -> None:
         (d / "theme.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
         return root
 
-    full = {"background": "FFFFFF", "text": "111111", "muted": "6B7280",
-            "accent": "B91C1C", "accent_soft": "FCA5A5",
-            "card_fill": "F8FAFC", "card_line": "E2E8F0"}
+    full = {
+        "background": "FFFFFF",
+        "text": "111111",
+        "muted": "6B7280",
+        "accent": "B91C1C",
+        "accent_soft": "FCA5A5",
+        "card_fill": "F8FAFC",
+        "card_line": "E2E8F0",
+    }
     # AI-authored theme with unreadable text on a mid-gray bg -> error blocks render
     noisy = dict(full, background="9CA3AF", text="6B7280", muted="4B5563")
     root = write_theme("noisy", noisy, is_light=True)
@@ -286,8 +310,7 @@ def test_theme_quality_floor(tmp_path: Path) -> None:
     root = write_theme("clean", full, is_light=True)
     assert validate_theme(deck_with_style({"template": "clean"}), root) == []
     # tokens_override can break an otherwise fine template and gets caught too
-    bad_override = {"template": "slate-tech",
-                    "tokens_override": {"colors": {"text": "E2E8F0"}}}
+    bad_override = {"template": "slate-tech", "tokens_override": {"colors": {"text": "E2E8F0"}}}
     findings = validate_theme(deck_with_style(bad_override), tmp_path)
     assert any(f.severity == "error" for f in findings)
 
@@ -297,8 +320,14 @@ def test_builtin_themes_pass_the_quality_floor(tmp_path: Path) -> None:
     from comh.validate import validate_theme
 
     for name in available_themes():
-        deck = {"deck_plan": {"deck": {"title": "t",
-            "style": {"template": name},
-            "pages": [{"id": "P01", "page_role": "content", "title": "x"}]}}}
+        deck = {
+            "deck_plan": {
+                "deck": {
+                    "title": "t",
+                    "style": {"template": name},
+                    "pages": [{"id": "P01", "page_role": "content", "title": "x"}],
+                }
+            }
+        }
         findings = validate_theme(deck, tmp_path)
         assert findings == [], f"{name}: {[f.detail for f in findings]}"
