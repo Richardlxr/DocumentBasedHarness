@@ -10,8 +10,10 @@ dist/
 runs/*/build/
 runs/*/.workspace/
 
-# private runs: real client/project data must not be committed
-runs/my-report/
+# run workspaces are private: ignore everything under runs/ except the sample
+# (real client/project data must never be committed by accident)
+runs/*
+!runs/sample-cache-latency/
 
 # macOS noise
 .DS_Store
