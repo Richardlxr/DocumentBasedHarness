@@ -364,6 +364,10 @@
           }
         }
       }
+    },
+    "draft": {
+      "type": "boolean",
+      "description": "A saved outline draft. Finish authoring before formal rendering or report prose save."
     }
   }
 }

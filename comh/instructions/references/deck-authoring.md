@@ -28,7 +28,7 @@
   主谓宾+数字就是最好的直白。术语首次出现给半句白话即可。
   **brief.voice 优先于本段默认纪律**：Gate 1 选定的风格档和 `voice.rules`
   （如 punchy 场景 relax em-dash）才是本 run 的标准。`comh validate` 的
-  style:* findings 按 brief.voice 执行，驱动改写循环：改完重跑，直到清零。
+  style:* findings 按 brief.voice 执行，驱动改写循环：改写或有理由地保留 warn；显式禁词 error 必须修复。
 - 可选 `kicker`（页眉小标，如"结果 · RESULTS"）：小号强调色，提供编辑级层次；
   不要重复标题内容，每个 section 用一次即可。
 - 但不要机械执行：`page_role` 为 `cover` / `agenda` / `section_divider` /
@@ -101,7 +101,7 @@
   - **实测保底与素材铁律**：背景图必须在 `assets/manifest.yaml` 登记溯源；系统使用 PIL 实测 worst-case 对比度，不足 4.5:1 时动态步进 α 蒙层（封顶 0.90），保证文字绝对清晰。HTML 支持毛玻璃，PPTX 自动优雅降级为实色半透明矩形。
 
 - **样板先行与局部精细微调工作流（对话协议）**：
-  1. **样板对齐（Specimen Preview）**：在生成整套 Deck 前，新风格尚未对齐时，Agent 先根据风格诉求生成 1-2 页样板（Cover + 带卡片/图表的 Content/Hero 页）并渲染，供用户在浏览器预览确认。用户已选定成熟主题或明确要求直接出稿时可直接生成。
+  1. **样板对齐（Specimen Preview）**：先对齐整套粗大纲，再细化典型的 Cover 与 Content/Hero 页，用 `comh render deck-html --preview` 渲染当前草案。保留其他页的结构和 beat 覆盖，可展示典型页供用户看风格。预览不产生交付凭据；用户已选定成熟主题或明确要求直接出稿时可直接细化全套。
   2. **精准单页微调（Surgical Page Tuning）**：成品生成后，当用户指出某页（如 P03）某部分需要调整时，直接针对该页 `Pxx` 的字段（如版式 role、要点措辞、背景透明度、卡片数据）进行手术式修改并重新校验渲染，绝不破坏其他页面的既有结构。
 
 ## 样式方向：选型或生成（对话式，不只是学术汇报）

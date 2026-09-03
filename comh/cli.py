@@ -19,13 +19,28 @@ refuse to run when an upstream gate is missing or invalidated.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 import yaml
 
-from .artifacts import ARTIFACT_KEYS, Finding, load_artifact, validate_schema
+from .artifacts import ARTIFACT_KEYS, Finding, load_artifact, load_yaml, validate_schema
+from .context import STAGE_FILES, context_pack, instructions, next_action
 from .contracts import forbids_dark, required_artifacts
+from .dialogue import (
+    ARTIFACT,
+    MODES,
+    TARGETS,
+    intake,
+    present,
+    readiness,
+    require_outline,
+    respond,
+    set_mode,
+    state,
+    valid,
+)
 from .evidence_pack import build_pack, format_pack
 from .manifest import (
     DERIVATION,
@@ -72,7 +87,7 @@ def _require_validated(manifest: Manifest, keys: set[str], action: str) -> None:
 def cmd_init_run(args: argparse.Namespace) -> int:
     target = init_run(Path(args.path), args.name, preset=args.preset)
     print(f"initialized run workspace: {target}")
-    print("next: drop source material into sources/, then follow stages/evidence.md")
+    print("next: `comh context --stage intake` — frame the goal before extracting material")
     return 0
 
 
@@ -98,7 +113,10 @@ def cmd_status(args: argparse.Namespace) -> int:
         if manifest.gate_valid(gate):
             print(f"  [✓] {gate:<10} confirmed at {record['at']}")
         elif record.get("confirmed"):
-            print(f"  [!] {gate:<10} invalidated: file changed after confirmation")
+            detail = (
+                "legacy: no decision receipt" if not record.get("request_id") else "basis changed"
+            )
+            print(f"  [!] {gate:<10} invalidated: {detail}")
         else:
             print(f"  [·] {gate:<10} not confirmed")
     state, record = manifest.delivery_state()
@@ -111,12 +129,15 @@ def cmd_status(args: argparse.Namespace) -> int:
             f"delivery:  [!] invalidated: build outputs changed since "
             f"{record['accepted_at']}; re-render and re-accept (`comh deliver`)"
         )
+    print("next:", json.dumps(next_action(manifest), ensure_ascii=False))
     return 0
 
 
 def cmd_save(args: argparse.Namespace) -> int:
     manifest = Manifest.load(_resolve_run(args))
     key = args.artifact
+    if key == "report_md":
+        require_outline(manifest, "report_plan", details=True)
     if key not in manifest.data["artifacts"]:
         raise RunError(f"unknown artifact '{key}' (known: {', '.join(manifest.data['artifacts'])})")
     # Guards: an artifact may only be saved from a valid upstream state.
@@ -142,7 +163,7 @@ def cmd_save(args: argparse.Namespace) -> int:
     print(f"saved '{key}' (upstream snapshot: {', '.join(DERIVATION[key])})")
     gate = GATE_OF_ARTIFACT.get(key)
     if gate and not manifest.gate_valid(gate):
-        print(f"note: gate '{key}' needs user confirmation → `comh confirm {key}`")
+        print(f"note: gate '{key}' needs a user decision → `comh present {key}`")
     return 0
 
 
@@ -157,9 +178,90 @@ def cmd_confirm(args: argparse.Namespace) -> int:
     # A gate may only be confirmed when its upstream gate (if any) is valid.
     if gate == "narrative":
         manifest.require_gate("brief")
-    manifest.confirm_gate(gate)
+    if not args.request or not args.reply or not args.source:
+        raise RunError(
+            "confirm needs --request, --reply and --source from a presented user decision"
+        )
+    request = next((r for r in state(manifest)["requests"] if r["id"] == args.request), None)
+    if request is None or request["target"] != gate:
+        raise RunError("confirmation request does not match this gate")
+    respond(manifest, args.request, "accepted", args.reply, args.source)
     record = manifest.data["gates"][gate]
     print(f"gate '{gate}' confirmed at {record['at']}")
+    return 0
+
+
+def _print_data(data: dict, as_json: bool = False) -> None:
+    print(
+        json.dumps(data, ensure_ascii=False, indent=2)
+        if as_json
+        else yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
+        end="\n",
+    )
+
+
+def cmd_intake(args: argparse.Namespace) -> int:
+    intake(Manifest.load(_resolve_run(args)), load_yaml(Path(args.file)))
+    print("intake recorded; run `comh next` to continue")
+    return 0
+
+
+def cmd_collaborate(args: argparse.Namespace) -> int:
+    set_mode(Manifest.load(_resolve_run(args)), args.mode, args.reply, args.source)
+    print(f"collaboration mode: {args.mode}; prior decisions retain their own scope")
+    return 0
+
+
+def cmd_present(args: argparse.Namespace) -> int:
+    manifest = Manifest.load(_resolve_run(args))
+    if args.target == "delivery":
+        _delivery_ready(manifest)
+    else:
+        _require_validated(manifest, _upstream_chain(ARTIFACT[args.target]), "present")
+    summary = Path(args.summary).read_text(encoding="utf-8") if args.summary else ""
+    request = present(manifest, args.target, args.node, summary)
+    _print_data(request, args.json)
+    print(
+        "Show the view and blockers. Await the user reply; presentation is not acceptance.",
+        file=sys.stderr,
+    )
+    return 0
+
+
+def cmd_respond(args: argparse.Namespace) -> int:
+    manifest = Manifest.load(_resolve_run(args))
+    request = next((r for r in state(manifest)["requests"] if r["id"] == args.request), None)
+    if request and args.decision != "changes_requested":
+        if request["target"] == "delivery":
+            _delivery_ready(manifest)
+        else:
+            _require_validated(manifest, _upstream_chain(ARTIFACT[request["target"]]), "respond")
+    result = respond(manifest, args.request, args.decision, args.reply, args.source)
+    _print_data(
+        {"id": result["id"], "state": result["state"], "next": next_action(manifest)}, args.json
+    )
+    return 0
+
+
+def cmd_next(args: argparse.Namespace) -> int:
+    _print_data(next_action(Manifest.load(_resolve_run(args))), args.json)
+    return 0
+
+
+def cmd_context(args: argparse.Namespace) -> int:
+    data = context_pack(Manifest.load(_resolve_run(args)), args.stage, args.node)
+    encoded = json.dumps(data, ensure_ascii=False, indent=2)
+    if len(encoded) > args.max_chars:
+        raise RunError(
+            f"context needs {len(encoded)} characters; increase --max-chars or select --node. "
+            "No constraints were silently dropped."
+        )
+    print(encoded)
+    return 0
+
+
+def cmd_instructions(args: argparse.Namespace) -> int:
+    _print_data(instructions(args.stage), args.json)
     return 0
 
 
@@ -192,14 +294,28 @@ def cmd_render(args: argparse.Namespace) -> int:
     run_root = manifest.root
     key = {"deck": "deck", "deck-html": "deck_html", "report": "report_docx"}[args.target]
     artifact = "report_md" if key == "report_docx" else "deck_plan"
+    if args.preview and key == "report_docx":
+        raise RunError("--preview supports deck/deck-html; review report prose before DOCX export")
     manifest.require_gate("brief")
     manifest.require_gate("narrative")
     manifest.require_fresh(artifact)
+    require_outline(
+        manifest, "report_plan" if artifact == "report_md" else artifact, details=not args.preview
+    )
+    errors = readiness(manifest, "report_detail" if artifact == "report_md" else "deck_detail")
+    if errors:
+        raise RunError("; ".join(errors))
     _require_validated(manifest, _upstream_chain(artifact), f"render {args.target}")
-    inputs = manifest.begin_build(key)
-    output = manifest.output_path(key)
-    report_path = run_root / "qa" / f"render-{args.target}.yaml"
-    metadata = {"output": str(output), "inputs": inputs}
+    if args.preview:
+        inputs = manifest.input_snapshot(_upstream_chain(artifact))
+        suffix = ".html" if key == "deck_html" else ".pptx"
+        output = run_root / ".workspace" / f"preview-deck{suffix}"
+        report_path = run_root / ".workspace" / f"preview-{args.target}.yaml"
+    else:
+        inputs = manifest.begin_build(key)
+        output = manifest.output_path(key)
+        report_path = run_root / "qa" / f"render-{args.target}.yaml"
+    metadata = {"output": str(output), "inputs": inputs, "preview": args.preview}
     findings = []
     if key == "report_docx":
         render_report(manifest.artifact_path("report_md"), run_root / "templates/base.docx", output)
@@ -229,7 +345,8 @@ def cmd_render(args: argparse.Namespace) -> int:
         yaml.safe_dump(metadata, allow_unicode=True, sort_keys=False), encoding="utf-8"
     )
     success = not any(f.severity == "error" for f in findings)
-    manifest.record_build(key, inputs, report_path, success)
+    if not args.preview:
+        manifest.record_build(key, inputs, report_path, success)
     for finding in findings:
         print(f"  [{'✗' if finding.severity == 'error' else '△'}] render: {finding.detail}")
     print(f"rendered {args.target} → {output}; render report → {report_path}")
@@ -348,6 +465,11 @@ def _require_deliverables(manifest: Manifest) -> set[str]:
     manifest.require_gate("narrative")
     for key in keys:
         manifest.require_fresh(key)
+        if key in {"deck_plan", "report_plan"}:
+            require_outline(manifest, key, details=True)
+    decisions = readiness(manifest, "delivery")
+    if decisions:
+        raise RunError("; ".join(decisions))
     outputs = manifest.output_selection()
     if not outputs:
         raise RunError("no supported outputs selected in brief.media")
@@ -368,8 +490,7 @@ def cmd_review(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_deliver(args: argparse.Namespace) -> int:
-    manifest = Manifest.load(_resolve_run(args))
+def _delivery_ready(manifest: Manifest) -> None:
     _require_deliverables(manifest)
     preserve_legacy_review(manifest.root)
     findings = review_findings(manifest, required=True) + render_findings(manifest)
@@ -378,6 +499,13 @@ def cmd_deliver(args: argparse.Namespace) -> int:
         for finding in errors:
             print(f"  ✗ {finding.check}: {finding.detail}", file=sys.stderr)
         raise RunError("cannot deliver: unresolved or stale QA; review current outputs")
+
+
+def cmd_deliver(args: argparse.Namespace) -> int:
+    manifest = Manifest.load(_resolve_run(args))
+    _delivery_ready(manifest)
+    if not valid(manifest, "delivery"):
+        raise RunError("present delivery and record the user's acceptance before delivering")
     record = manifest.record_delivery(note=args.note)
     print(f"delivery recorded at {record['accepted_at']}: {', '.join(record['outputs'])}")
     print("acceptance pins current inputs, builds, canonical Markdown and review")
@@ -411,7 +539,52 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("confirm", "user confirms a gate (brief | narrative)")
     p.add_argument("gate", choices=["brief", "narrative"])
+    p.add_argument("--request")
+    p.add_argument("--reply")
+    p.add_argument("--source")
     p.set_defaults(func=cmd_confirm)
+
+    p = add("intake", "record a lightweight goal and source scope")
+    p.add_argument("file")
+    p.set_defaults(func=cmd_intake)
+
+    p = add("collaborate", "record the user's refinement preference")
+    p.add_argument("mode", choices=MODES)
+    p.add_argument("--reply", required=True)
+    p.add_argument("--source", required=True)
+    p.set_defaults(func=cmd_collaborate)
+
+    p = add("present", "create a version-bound view to show to the user")
+    p.add_argument("target", choices=TARGETS)
+    p.add_argument("--node")
+    p.add_argument("--summary", help="optional human-readable Markdown summary file")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_present)
+
+    p = add("respond", "record the actual user response to a specific presentation")
+    p.add_argument("request")
+    p.add_argument(
+        "--decision", required=True, choices=["accepted", "changes_requested", "delegated"]
+    )
+    p.add_argument("--reply", required=True)
+    p.add_argument("--source", required=True)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_respond)
+
+    p = add("next", "derive the next action or pending user decision")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_next)
+
+    p = add("context", "load current-stage instructions and recovery context")
+    p.add_argument("--stage", choices=list(STAGE_FILES))
+    p.add_argument("--node")
+    p.add_argument("--max-chars", type=int, default=24000)
+    p.set_defaults(func=cmd_context)
+
+    p = add("instructions", "read packaged instructions without a run")
+    p.add_argument("stage", choices=[*STAGE_FILES, "skill"])
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_instructions)
 
     p = add("validate", "schema + cross-artifact checks")
     p.add_argument("target", nargs="?", default="all")
@@ -419,6 +592,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("render", "render a final artifact")
     p.add_argument("target", choices=["deck", "report", "deck-html"])
+    p.add_argument("--preview", action="store_true", help="deck specimen; no deliverable receipt")
     p.set_defaults(func=cmd_render)
 
     p = add("evidence-pack", "ID-chain slice for a deck page / report section / beat")

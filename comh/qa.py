@@ -8,9 +8,29 @@ import yaml
 
 from .artifacts import Finding
 from .contracts import hard_constraints
+from .decision_checks import has_text
+from .lineage import hash_file
 from .manifest import Manifest, RunError, now_iso
 
 REVIEW_CHECKS = {"narrative", "audience", "reader", "style"}
+
+
+def reader_receipt(manifest: Manifest, data: dict) -> dict:
+    if not isinstance(data, dict):
+        raise RunError("reader test record must be an object")
+    reader = data.get("reader_test")
+    if not isinstance(reader, dict) or any(
+        not has_text(reader.get(k)) for k in ("output", "executor", "input_scope")
+    ):
+        raise RunError(
+            "reader_test needs output, executor and input_scope; a checkbox is not output"
+        )
+    output = (manifest.root / reader["output"]).resolve()
+    if not output.is_relative_to(manifest.root.resolve()) or not output.is_file():
+        raise RunError("reader_test.output must be an existing file inside this run")
+    if not output.read_bytes().strip():
+        raise RunError("reader_test.output must contain the actual reader response")
+    return {**reader, "hash": hash_file(output), "recording": "agent_attested"}
 
 
 def read_report(path: Path) -> dict:
@@ -98,6 +118,7 @@ def record_review(manifest: Manifest, source: Path) -> None:
         raise RunError("manual_constraints needs {id, verdict: pass|fail, detail} entries")
     if len({c["id"] for c in checks}) != len(checks):
         raise RunError("duplicate manual constraint review IDs")
+    data["reader_test"] = reader_receipt(manifest, data)
     data.update(version=1, reviewed_at=now_iso(), inputs=manifest.review_snapshot())
     output = manifest.root / "qa/model-findings.yaml"
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -149,6 +170,11 @@ def review_findings(manifest: Manifest, *, required: bool = False) -> list[Findi
             )
         )
     if required:
+        try:
+            if data.get("reader_test") != reader_receipt(manifest, data):
+                raise RunError("reader output changed after review; rerun the reader check")
+        except RunError as error:
+            findings.append(Finding("qa", "qa:reader", "error", "fail", str(error)))
         completed = data.get("completed_checks") or []
         if not set(completed) >= REVIEW_CHECKS:
             findings.append(

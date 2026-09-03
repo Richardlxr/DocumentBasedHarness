@@ -69,6 +69,10 @@ style lint 提供可复查的提示。**语言风格的最终验收永远
 
 ```yaml
 completed_checks: [narrative, audience, reader, style]
+reader_test:
+  output: qa/reader-output.md
+  executor: 实际独立执行任务的 ID 或读者标识
+  input_scope: 实际提供给读者的成品及讲解范围
 findings: []
 manual_constraints:
   - id: tone
@@ -76,14 +80,16 @@ manual_constraints:
     detail: 用户已通读当前版本并确认语气符合约定
 ```
 
-只有实际完成的检查才能记入 completed_checks。没有人工硬约束时 manual_constraints
+只有实际完成的检查才能记入 completed_checks。reader_test 必须引用 run 内已有的实际读者输出；
+CLI 保存其哈希，文件变化后需要重审。路径和执行信息不能证明独立性，不得伪造输出。
+没有可用的独立执行能力就报告未完成，不得自填通过。没有人工硬约束时 manual_constraints
 可以为空。发现的问题用 `{artifact, check: model:logic, severity: error|warn|info,
 verdict: fail, detail, owning_artifact}` 记录。已解决项可保留 `state: resolved, reason: ...`；
 warn 可 `state: waived` 并写 reason，error 不得豁免。
 
 顺序：修机械 error → 渲染全部所选成品（Markdown 可独立交付）→ 检查模型清单、
 完成读者测试和人工硬约束验收 → `comh review .workspace/review-input.yaml` →
-`comh validate all` → 用户验收后 `comh deliver`。
+`comh validate all` → `comh present delivery` 展示当前成品，实际验收回复经 respond 记录后 `comh deliver`。
 
 交付必须有当前版本的审稿记录，所有未解决 error 都会阻断。改动输入、输出或重新渲染后，
 原审稿/验收失效，需检查变更影响并重新记录；不能机械复制旧的通过结论。

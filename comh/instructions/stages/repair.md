@@ -17,7 +17,9 @@
 不要重读所有材料。用：
 
 ```
-comh evidence-pack deck P07      # 或 report R02 / narrative S04
+comh next --json
+comh context --stage deck --node P07   # 全局约束 + 当前页/反证；报告用 report
+comh evidence-pack deck P07            # 需要单独的溯源切片时
 ```
 
 抽出该节点的完整切片：页面/章节 + beat + claims + evidence + sources。
@@ -47,6 +49,8 @@ comh evidence-pack deck P07      # 或 report R02 / narrative S04
 
 在归属层改 artifact → `comh save <artifact>`（下游自动标脏）→ 重跑受影响 stage →
 `comh validate all` → 重新渲染 → 更新当前版本 `comh review` → 给用户看**前后对比**（改了哪页/哪节、diff 是什么）。
+每次保存后先 next；内容或依据变化需要重新 present 当前方案并记录真实回复。
+纯样式保留粗大纲确认；已过期的待回复请求会在新 presentation 时保留为 superseded。
 
 ## 6. 保险丝与台账
 

@@ -84,7 +84,7 @@ def build_pack(run_root: Path, artifact: str, node_id: str) -> dict:
             claims.append({"id": claim_id, "error": "claim not found"})
             continue
         claims.append(claim)
-        for evidence_id in claim.get("evidence", []):
+        for evidence_id in claim.get("evidence", []) + claim.get("counterevidence", []):
             if evidence_id not in seen_evidence:
                 seen_evidence.add(evidence_id)
                 used_evidence.append(

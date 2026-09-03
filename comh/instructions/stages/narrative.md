@@ -59,12 +59,18 @@ narrative 里**禁止**出现任何媒介信息：布局、字数、页数、颜
 03 ……
 ```
 
-附：primary claims 及其证据状态、无据/存疑项清单。用户确认后：
+附：primary claims、证据状态、反证及无据/存疑项的处置。partial/assumption/needs_research
+写 resolution（qualify 与 boundary，或 omit 并移除引用）；尚需 research 时不得接受。
+先保存并展示请求，等待用户确认：
 
 ```
 comh save narrative
-comh confirm narrative      # 必须由用户明确同意后才能执行
+comh present narrative
+# 展示逻辑链并收到当前版本的实际回复后：
+comh respond D0002 --decision accepted --reply "实际原话" --source "消息引用"
 ```
 
 需要回头改 brief 的（对齐错了），回到 brief stage 改文件、重新过 Gate 1，
 narrative 会自动标脏——不要绕。
+
+本阶段只设计故事线。接受之后进入 projection 阶段，先对齐粗大纲，再按用户选择逐步精修。

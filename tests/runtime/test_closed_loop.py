@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
 from pptx import Presentation
+from workflow_helpers import aligned, approve, prepare, simulated_reader
 
 from comh.cli import build_parser, cmd_theme_from_pptx, main
 from comh.scaffold import init_run
@@ -61,6 +63,9 @@ deck:
 def _write(root: Path, rel: str, text: str) -> None:
     path = root / rel
     path.parent.mkdir(parents=True, exist_ok=True)
+    if rel == "brief/brief.yaml":
+        text = yaml.safe_dump(aligned(yaml.safe_load(text)), allow_unicode=True)
+        prepare(root)
     path.write_text(text, encoding="utf-8")
 
 
@@ -71,9 +76,9 @@ def _pipeline_through_narrative(root: Path) -> None:
     _write(root, "narrative/narrative.yaml", GOOD_NARRATIVE)
     assert main(["save", "evidence", "--run", str(root)]) == 0
     assert main(["save", "brief", "--run", str(root)]) == 0
-    assert main(["confirm", "brief", "--run", str(root)]) == 0
+    assert approve(root, "brief") == 0
     assert main(["save", "narrative", "--run", str(root)]) == 0
-    assert main(["confirm", "narrative", "--run", str(root)]) == 0
+    assert approve(root, "narrative") == 0
 
 
 def test_theme_from_pptx_is_registered_and_runs(tmp_path: Path, capsys):
@@ -96,7 +101,7 @@ def test_save_blocks_on_dangling_evidence_ref(tmp_path: Path):
     _write(run, "brief/brief.yaml", MIN_BRIEF)
     assert main(["save", "evidence", "--run", str(run)]) == 0
     assert main(["save", "brief", "--run", str(run)]) == 0
-    assert main(["confirm", "brief", "--run", str(run)]) == 0
+    assert approve(run, "brief") == 0
     _write(run, "narrative/narrative.yaml", DANGLING_NARRATIVE)
     blocked = main(["save", "narrative", "--run", str(run)])
     assert blocked == 2, "ref-integrity error must block save"
@@ -115,7 +120,7 @@ def test_confirm_requires_saved_fresh_state(tmp_path: Path):
     _write(run, "brief/brief.yaml", MIN_BRIEF + "voice: {style: plain}\n")
     assert main(["confirm", "brief", "--run", str(run)]) == 2
     assert main(["save", "brief", "--run", str(run)]) == 0
-    assert main(["confirm", "brief", "--run", str(run)]) == 0
+    assert approve(run, "brief") == 0
 
 
 def test_render_blocked_by_validation_errors_and_deliver_flow(tmp_path: Path, capsys):
@@ -123,16 +128,24 @@ def test_render_blocked_by_validation_errors_and_deliver_flow(tmp_path: Path, ca
     _pipeline_through_narrative(run)
     _write(run, "projection/deck_plan.yaml", MIN_DECK_PLAN)
     assert main(["save", "deck_plan", "--run", str(run)]) == 0
+    assert approve(run, "deck_outline") == 0
     assert main(["render", "deck", "--run", str(run)]) == 0
 
     _write(
         run,
         ".workspace/review.yaml",
-        "completed_checks: [narrative, audience, reader, style]\nfindings: []\n",
+        yaml.safe_dump(
+            {
+                "completed_checks": ["narrative", "audience", "reader", "style"],
+                "reader_test": simulated_reader(run),
+                "findings": [],
+            }
+        ),
     )
     assert main(["review", str(run / ".workspace/review.yaml"), "--run", str(run)]) == 0
 
     # deliver before acceptance: records and pins output hashes
+    assert approve(run, "delivery") == 0
     assert main(["deliver", "--run", str(run), "--note", "user read-through ok"]) == 0
     status = capsys.readouterr().out
     assert main(["status", "--run", str(run)]) == 0
@@ -145,8 +158,10 @@ def test_render_blocked_by_validation_errors_and_deliver_flow(tmp_path: Path, ca
     assert main(["status", "--run", str(run)]) == 0
     assert "invalidated" in capsys.readouterr().out
     assert main(["deliver", "--run", str(run)]) == 2
+    assert approve(run, "deck_outline") == 0
     assert main(["render", "deck", "--run", str(run)]) == 0
     assert main(["review", str(run / ".workspace/review.yaml"), "--run", str(run)]) == 0
+    assert approve(run, "delivery") == 0
     assert main(["deliver", "--run", str(run)]) == 0
 
     # a deck_plan with a dangling beat ref cannot be saved, let alone rendered

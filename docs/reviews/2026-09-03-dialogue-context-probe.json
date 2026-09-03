@@ -1,0 +1,43 @@
+{
+  "baseline": "f395bbf67cec7f65426b814f3014ac7d564b3ae7",
+  "fixture": "synthetic local run; no real user acceptance supplied",
+  "brief_missing_voice_visual_materials_delivery_context": [
+    "voice",
+    "visual_materials",
+    "delivery_context"
+  ],
+  "unanswered_question_schema_errors": [],
+  "gate_fields": {
+    "brief": [
+      "at",
+      "confirmed",
+      "hash"
+    ],
+    "narrative": [
+      "at",
+      "confirmed",
+      "hash"
+    ]
+  },
+  "brief_gate_valid": true,
+  "narrative_gate_valid": true,
+  "coverage_file_exists": false,
+  "deck_save_without_outline_approval_exit": 0,
+  "deck_render_without_outline_approval_exit": 0,
+  "unresolved_primary_claim_save_exit": 0,
+  "unresolved_primary_claim_confirm_exit": 0,
+  "command_transcript": [
+    "saved 'evidence' (upstream snapshot: sources)",
+    "saved 'brief' (upstream snapshot: evidence)",
+    "note: gate 'brief' needs user confirmation → `comh confirm brief`",
+    "gate 'brief' confirmed at 2026-09-03T06:47:45+00:00",
+    "saved 'narrative' (upstream snapshot: brief, evidence)",
+    "note: gate 'narrative' needs user confirmation → `comh confirm narrative`",
+    "gate 'narrative' confirmed at 2026-09-03T06:47:45+00:00",
+    "saved 'deck_plan' (upstream snapshot: narrative, brief)",
+    "rendered deck → /private/tmp/codex-dev-cache/DocumentBasedHarness/context-audit/probe/run/build/deck.pptx; render report → /private/tmp/codex-dev-cache/DocumentBasedHarness/context-audit/probe/run/qa/render-deck.yaml",
+    "saved 'narrative' (upstream snapshot: brief, evidence)",
+    "note: gate 'narrative' needs user confirmation → `comh confirm narrative`",
+    "gate 'narrative' confirmed at 2026-09-03T06:47:45+00:00"
+  ]
+}

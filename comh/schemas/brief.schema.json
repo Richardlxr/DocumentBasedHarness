@@ -166,7 +166,7 @@
               }
             ]
           },
-          "description": "User hard constraints. Must be deterministically checkable or enforceable; otherwise demote to soft at Gate 1."
+          "description": "User hard constraints; retain manual acceptance requirements when no machine check exists. Only the user may demote them."
         },
         "soft": {
           "type": "array",
@@ -282,6 +282,46 @@
             "type": "string"
           },
           "answer": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "alignment": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "source",
+          "status",
+          "basis"
+        ],
+        "properties": {
+          "source": {
+            "enum": [
+              "user",
+              "material",
+              "inference",
+              "default"
+            ]
+          },
+          "status": {
+            "enum": [
+              "provided",
+              "confirmed",
+              "proposed",
+              "delegated",
+              "deferred",
+              "not_applicable",
+              "unresolved"
+            ]
+          },
+          "basis": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {},
+          "due": {
             "type": "string"
           }
         }

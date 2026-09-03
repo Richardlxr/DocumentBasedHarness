@@ -45,6 +45,37 @@
           "importance": {
             "type": "string",
             "description": "e.g. primary, supporting, minor (open vocabulary)."
+          },
+          "counterevidence": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^E[0-9]{3,}$"
+            }
+          },
+          "resolution": {
+            "type": "object",
+            "required": [
+              "action",
+              "reason"
+            ],
+            "properties": {
+              "action": {
+                "enum": [
+                  "research",
+                  "qualify",
+                  "omit"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "boundary": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           }
         }
       }

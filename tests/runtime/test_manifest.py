@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import pytest
+import yaml
+from workflow_helpers import aligned, approve, prepare
 
 from comh.manifest import Manifest, RunError
 from comh.scaffold import init_run
@@ -16,6 +18,11 @@ def run_root(tmp_path):
 def _write(root, rel: str, text: str) -> None:
     path = root / rel
     path.parent.mkdir(parents=True, exist_ok=True)
+    if rel == "brief/brief.yaml":
+        text = yaml.safe_dump(aligned(yaml.safe_load(text)), allow_unicode=True) + (
+            "# touched\n" if "#" in text else ""
+        )
+        prepare(root)
     path.write_text(text, encoding="utf-8")
 
 
@@ -23,7 +30,6 @@ MIN_EVIDENCE = "version: 1\nitems: []\n"
 MIN_BRIEF = (
     "version: 1\n"
     "language: zh-CN\n"
-    "version: 1\n"
     "audience: {description: x}\n"
     "objective: y\n"
     "media: [{medium: pptx, surface: presentation}]\n"
@@ -36,6 +42,7 @@ def test_guard_blocks_narrative_before_gate(run_root):
     manifest = Manifest.load(run_root)
     _write(run_root, "evidence/evidence.yaml", MIN_EVIDENCE)
     _write(run_root, "brief/brief.yaml", MIN_BRIEF)
+    manifest = Manifest.load(run_root)
     manifest.mark_saved("evidence")
     manifest.mark_saved("brief")
     _write(run_root, "narrative/narrative.yaml", MIN_NARRATIVE)
@@ -48,11 +55,14 @@ def _confirmed_through_narrative(run_root) -> Manifest:
     _write(run_root, "evidence/evidence.yaml", MIN_EVIDENCE)
     _write(run_root, "brief/brief.yaml", MIN_BRIEF)
     _write(run_root, "narrative/narrative.yaml", MIN_NARRATIVE)
+    manifest = Manifest.load(run_root)
     manifest.mark_saved("evidence")
     manifest.mark_saved("brief")
-    manifest.confirm_gate("brief")
+    assert approve(run_root, "brief") == 0
+    manifest = Manifest.load(run_root)
     manifest.mark_saved("narrative")
-    manifest.confirm_gate("narrative")
+    assert approve(run_root, "narrative") == 0
+    manifest = Manifest.load(run_root)
     return manifest
 
 
@@ -68,14 +78,24 @@ def test_transitive_staleness_from_source_change(run_root):
         manifest.require_fresh("narrative")
 
 
-def test_identical_resave_keeps_gate_changed_content_resets(run_root):
+def test_identical_resave_preserves_gate_only_with_unchanged_basis(run_root):
     manifest = _confirmed_through_narrative(run_root)
-    (run_root / "sources" / "data.csv").write_text("a,b\n1,2\n", encoding="utf-8")
-    manifest.mark_saved("evidence")
-    manifest.mark_saved("brief")  # identical bytes -> gate must survive
+    manifest.mark_saved("brief")
+    manifest.mark_saved("narrative")
     assert manifest.gate_valid("brief")
-    manifest.mark_saved("narrative")  # identical bytes -> gate survives
     assert manifest.gate_valid("narrative")
+    (run_root / "sources" / "data.csv").write_text("a,b\n1,2\n", encoding="utf-8")
+    manifest = Manifest.load(run_root)
+    manifest.mark_saved("evidence")
+    manifest.mark_saved("brief")  # same bytes, but a new source basis
+    assert not manifest.gate_valid("brief")  # changed evidence basis requires new acceptance
+    prepare(run_root)
+    assert approve(run_root, "brief") == 0
+    manifest = Manifest.load(run_root)
+    manifest.mark_saved("narrative")
+    assert not manifest.gate_valid("narrative")
+    assert approve(run_root, "narrative") == 0
+    manifest = Manifest.load(run_root)
     # now actually edit the narrative -> gate resets
     _write(run_root, "narrative/narrative.yaml", MIN_NARRATIVE + "# edited\n")
     manifest.mark_saved("narrative")

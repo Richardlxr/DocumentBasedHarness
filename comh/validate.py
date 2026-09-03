@@ -176,7 +176,7 @@ def validate_refs(artifacts: dict[str, dict | None]) -> list[Finding]:
     beat_ids = {b["id"] for b in narrative.get("story", [])}
 
     for claim in narrative.get("claims", []):
-        for ref in claim.get("evidence", []):
+        for ref in claim.get("evidence", []) + claim.get("counterevidence", []):
             if ref not in evidence_ids:
                 findings.append(
                     Finding(

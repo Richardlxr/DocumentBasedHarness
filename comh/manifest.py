@@ -89,6 +89,7 @@ def default_manifest(name: str) -> dict:
         "build": dict(BUILD_OUTPUTS),
         "build_records": {},
         "deliveries": [],
+        "interaction": {"version": 1, "mode": "checkpoints", "requests": []},
     }
 
 
@@ -199,12 +200,22 @@ class Manifest:
         )
 
     def _gate_content_valid(self, gate: str) -> bool:
+        from .dialogue import latest, valid
+
         record = self.data["gates"][gate]
         if not record.get("confirmed"):
             return False
         artifact = self.data["artifacts"][gate]
         file = self.root / artifact["path"]
-        return file.is_file() and hash_file(file) == record["hash"]
+        request = latest(self, gate)
+        return (
+            file.is_file()
+            and hash_file(file) == record["hash"]
+            and bool(request)
+            and record.get("request_id") == request["id"]
+            and request["state"] == "accepted"
+            and valid(self, gate)
+        )
 
     # -- mutations -----------------------------------------------------------
 
@@ -227,18 +238,9 @@ class Manifest:
         self.save()
 
     def confirm_gate(self, gate: str) -> None:
-        if gate not in self.data["gates"]:
-            raise RunError(f"unknown gate '{gate}' (known: brief, narrative)")
-        artifact = self.data["artifacts"][gate]
-        file = self.root / artifact["path"]
-        if not file.is_file():
-            raise RunError(f"cannot confirm gate '{gate}': {artifact['path']} does not exist")
-        self.data["gates"][gate] = {
-            "confirmed": True,
-            "at": now_iso(),
-            "hash": hash_file(file),
-        }
-        self.save()
+        raise RunError(
+            "direct confirmation is unsupported; present a version and record its user response"
+        )
 
     # -- delivery acceptance ---------------------------------------------------
 
@@ -303,6 +305,8 @@ class Manifest:
         return self.root / self.data.get("build", {}).get(key, BUILD_OUTPUTS[key])
 
     def review_snapshot(self) -> dict:
+        from .dialogue import accepted_receipts
+
         snapshot = self.input_snapshot(required_artifacts(self.brief()))
         outputs = self.output_selection()
         snapshot["outputs"] = {
@@ -318,6 +322,7 @@ class Manifest:
             qa = self.root / record["qa_path"] if record else None
             snapshot["render_qa"][key] = hash_file(qa) if qa and qa.is_file() else None
         snapshot["gates"] = self.data["gates"]
+        snapshot["decisions"] = accepted_receipts(self)
         return deepcopy(snapshot)
 
     def begin_build(self, key: str) -> dict:
@@ -355,12 +360,21 @@ class Manifest:
 
     def delivery_state(self) -> tuple[str, dict | None]:
         """(state, record) for the latest delivery: none | accepted | invalidated."""
+        from .dialogue import latest, valid
+
         records = self.data.get("deliveries") or []
         if not records:
             return "none", None
         record = records[-1]
         if not record.get("inputs"):
             return "invalidated", record  # legacy acceptance did not pin inputs
+        decision = latest(self, "delivery")
+        if (
+            not decision
+            or record.get("request_id") != decision["id"]
+            or not valid(self, "delivery")
+        ):
+            return "invalidated", record
         try:
             if record["inputs"] != self.review_snapshot():
                 return "invalidated", record
@@ -377,12 +391,20 @@ class Manifest:
 
     def record_delivery(self, note: str | None = None) -> dict:
         """Pin the current build outputs as user-accepted (the final gate)."""
+        from .dialogue import latest, valid
+
+        if not valid(self, "delivery"):
+            raise RunError("delivery needs an accepted current presentation")
+        status, existing = self.delivery_state()
+        if status == "accepted" and existing.get("note") == note:
+            return existing
         outputs = {}
         for key in self.output_selection():
             path = self.output_path(key)
             outputs[path.relative_to(self.root).as_posix()] = hash_file(path)
         record = {
             "accepted_at": now_iso(),
+            "request_id": latest(self, "delivery")["id"],
             "outputs": outputs,
             "inputs": self.review_snapshot(),
             "review_hash": hash_file(self.root / "qa" / "model-findings.yaml"),
@@ -404,7 +426,7 @@ class Manifest:
 
     def require_gate(self, gate: str) -> None:
         if not self.data["gates"][gate]["confirmed"]:
-            raise RunError(f"gate '{gate}' is not confirmed; `comh confirm {gate}` with the user")
+            raise RunError(f"gate '{gate}' is not confirmed; `comh present {gate}` to the user")
         if not self.gate_valid(gate):
             raise RunError(
                 f"gate '{gate}' was invalidated by later edits; re-confirm with the user"

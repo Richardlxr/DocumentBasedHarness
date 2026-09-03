@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 import yaml
+from workflow_helpers import aligned, approve, prepare, simulated_reader
 
 from comh.artifacts import load_artifact, validate_schema
 from comh.cli import main
@@ -108,15 +109,16 @@ def cli(root, *args):
 def pipeline(tmp_path, brief=None):
     root = init_run(tmp_path / "run")
     write(root, "sources/data.csv", "latency_ms\n220\n180\n")
+    prepare(root)
     for key, rel, data in (
         ("evidence", "evidence/evidence.yaml", EVIDENCE),
-        ("brief", "brief/brief.yaml", brief or BRIEF),
+        ("brief", "brief/brief.yaml", aligned(brief or BRIEF)),
         ("narrative", "narrative/narrative.yaml", NARRATIVE),
     ):
         write(root, rel, data)
         assert cli(root, "save", key) == 0
         if key in {"brief", "narrative"}:
-            assert cli(root, "confirm", key) == 0
+            assert approve(root, key) == 0
     return root
 
 
@@ -124,6 +126,7 @@ def deck_run(tmp_path, brief=None):
     root = pipeline(tmp_path, brief)
     write(root, "projection/deck_plan.yaml", DECK)
     assert cli(root, "save", "deck_plan") == 0
+    assert approve(root, "deck_outline") == 0
     assert cli(root, "render", "deck") == 0
     return root
 
@@ -134,6 +137,7 @@ def review(root, findings=None, manual=None):
         ".workspace/review-input.yaml",
         {
             "completed_checks": ["narrative", "audience", "reader", "style"],
+            "reader_test": simulated_reader(root),
             "findings": findings or [],
             "manual_constraints": manual or [],
         },
@@ -144,6 +148,7 @@ def review(root, findings=None, manual=None):
 def test_changed_plan_cannot_reaccept_old_output(tmp_path):
     root = deck_run(tmp_path)
     review(root)
+    assert approve(root, "delivery") == 0
     assert cli(root, "deliver") == 0
     changed = deepcopy(DECK)
     changed["deck"]["pages"][0]["title"] = "修改后的结论"
@@ -151,9 +156,11 @@ def test_changed_plan_cannot_reaccept_old_output(tmp_path):
     assert cli(root, "save", "deck_plan") == 0
     assert Manifest.load(root).delivery_state()[0] == "invalidated"
     assert cli(root, "deliver") == 2
+    assert approve(root, "deck_outline") == 0
     assert cli(root, "render", "deck") == 0
     assert cli(root, "deliver") == 2  # rendering cannot refresh a model review
     review(root)
+    assert approve(root, "delivery") == 0
     assert cli(root, "deliver") == 0
 
 
@@ -171,6 +178,7 @@ def test_changed_plan_cannot_reaccept_old_output(tmp_path):
 def test_changed_dependencies_and_output_invalidate_delivery(tmp_path, rel):
     root = deck_run(tmp_path)
     review(root)
+    assert approve(root, "delivery") == 0
     assert cli(root, "deliver") == 0
     write(root, rel, "changed")
     assert Manifest.load(root).delivery_state()[0] == "invalidated"
@@ -204,6 +212,7 @@ def test_qa_errors_survive_validation_and_block_delivery(tmp_path):
     assert cli(root, "deliver") == 2
     assert cli(root, "save", "evidence") == 0  # a finding cannot deadlock its repair
     review(root)
+    assert approve(root, "delivery") == 0
     assert cli(root, "deliver") == 0
 
 
@@ -227,6 +236,7 @@ def test_failed_render_cannot_deliver_previous_success(tmp_path, monkeypatch):
 
     root = deck_run(tmp_path)
     review(root)
+    assert approve(root, "delivery") == 0
     assert cli(root, "deliver") == 0
 
     def fail(plan, run_root, output, **kwargs):
@@ -246,11 +256,13 @@ def test_failed_render_cannot_deliver_previous_success(tmp_path, monkeypatch):
 def test_byte_identical_rerender_invalidates_review(tmp_path, monkeypatch):
     root = deck_run(tmp_path)
     review(root)
+    assert approve(root, "delivery") == 0
     assert cli(root, "deliver") == 0
     monkeypatch.setattr(
         "comh.cli.render_deck",
         lambda *a, **k: SimpleNamespace(theme="test", transition=None, findings=[]),
     )
+    assert approve(root, "deck_outline") == 0
     assert cli(root, "render", "deck") == 0
     assert Manifest.load(root).delivery_state()[0] == "invalidated"
     assert cli(root, "deliver") == 2
@@ -282,10 +294,12 @@ def test_markdown_only_delivery_pins_canonical_source(tmp_path):
     root = pipeline(tmp_path, brief)
     write(root, "projection/report_plan.yaml", REPORT_PLAN)
     assert cli(root, "save", "report_plan") == 0
+    assert approve(root, "report_outline") == 0
     write(root, "documents/report.md", REPORT)
     assert cli(root, "save", "report_md") == 0
     assert cli(root, "validate", "all") == 0
     review(root)
+    assert approve(root, "delivery") == 0
     assert cli(root, "deliver") == 0
     record = Manifest.load(root).delivery_state()[1]
     assert list(record["outputs"]) == ["documents/report.md"]
@@ -313,6 +327,7 @@ def test_report_contract_blocks_missing_content_or_bad_citations(tmp_path, text)
     root = pipeline(tmp_path)
     write(root, "projection/report_plan.yaml", REPORT_PLAN)
     assert cli(root, "save", "report_plan") == 0
+    assert approve(root, "report_outline") == 0
     write(root, "documents/report.md", text)
     assert cli(root, "save", "report_md") == 2
 
@@ -435,6 +450,7 @@ def test_manual_hard_constraint_requires_recorded_acceptance(tmp_path):
     review(root)
     assert cli(root, "deliver") == 2
     review(root, manual=[{"id": "tone", "verdict": "pass", "detail": "用户确认当前语气"}])
+    assert approve(root, "delivery") == 0
     assert cli(root, "deliver") == 0
 
 

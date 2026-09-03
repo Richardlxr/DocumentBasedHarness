@@ -16,6 +16,9 @@
   deck 上放不下、被 demote 到 `report_only` 的内容，必须在这里有着落——plan 阶段就
   对账，不要等写完发现丢了。
 
+粗大纲用 `comh present report_outline` 展示，记录当前接受或委托后才写正文。
+共同打磨模式先逐节细化，并用 `comh present report_detail --node R01` 记录对齐。
+
 ## Step 2 — report.md（正文，Markdown 为主、DOCX 为辅）
 
 用 docx-harness 的 Markdown/MyST 方言写 `documents/report.md`：
