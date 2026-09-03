@@ -38,15 +38,15 @@ comh evidence-pack deck P07      # 或 report R02 / narrative S04
 
 ## 4. 修复提案（先亮影响面再动手）
 
-- **内容层修改（brief/narrative/projection/report_md）：必须先提案**——病根在哪层、
-  病因是什么、打算怎么改、会波及哪些下游 artifact（CLI 的 stale 机制会列出）。
-  用户放行后才执行。
+- **明确授权范围内的局部修改直接执行**：先说明归属层与影响，再修改、复检、展示差异。
+- **改变目标、核心结论或超出授权范围时先提案**：说明病因、改法、下游影响，用户放行后执行。
+  brief/narrative 内容发生变化仍需重新过对应 Gate。
 - **渲染层修复（renderer/模板/编译）：直接执行**，无破坏性。
 
 ## 5. 修复与复检
 
 在归属层改 artifact → `comh save <artifact>`（下游自动标脏）→ 重跑受影响 stage →
-`comh validate all` → 重新渲染 → 给用户看**前后对比**（改了哪页/哪节、diff 是什么）。
+`comh validate all` → 重新渲染 → 更新当前版本 `comh review` → 给用户看**前后对比**（改了哪页/哪节、diff 是什么）。
 
 ## 6. 保险丝与台账
 

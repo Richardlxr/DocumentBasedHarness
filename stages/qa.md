@@ -1,9 +1,10 @@
 # Stage: QA（质检）
 
-机械检查由 `comh validate all` 完成（schema、引用链、数字一致性、beat 覆盖、硬约束、
-素材出处、主题体检、Gate 有效性），结果在 `qa/findings.yaml`。**你负责判断型检查**，同样以 finding 记录
-（`check` 用 `model:` 前缀），追加进 `qa/findings.yaml` 的 `findings` 列表并同步
-`count`。每条 finding 必须写 `owning_artifact`——修复循环靠它定位归属层。
+机械检查由 `comh validate all` 完成，按 brief.media 检查所选媒介。
+`qa/findings.yaml` 是汇总视图，不直接往里面写新的模型审稿结果。
+模型审稿写独立输入文件，再执行 `comh review <文件>`；CLI 将结果与当前输入、成品和
+构建记录一起写入 `qa/model-findings.yaml`。机械检查重跑不会覆盖它。
+所有 finding 都写 `owning_artifact`，修复在归属层进行。
 
 ## 判断型检查清单
 
@@ -32,8 +33,8 @@
 
 ### Reader Test（读者模拟，owning: 按 finding 归属）
 
-用一个**不带任何上下文**的子 agent，只给它成品（pptx 逐页文本 + notes，或
-report.md），让它回答：
+用一个**不带任何上下文**的子 agent，只给它受众实际能接触的成品（异步阅读只给页面可见文本/图片或
+报告；模拟现场讲解时再提供实际会讲的 notes），让它回答：
 
 1. 你认为作者最想让你记住什么？（逐条列出）
 2. 哪里没看懂 / 需要更多背景？
@@ -47,7 +48,9 @@ narrative——故事没承载，而不是页面没写出来）。回答 2/3 的
 ## 去 AI 味审稿（二次审稿，必做）
 
 `comh validate` 的 `style:*` findings（破折号金句、比喻标记、对仗句式、英文 tell）
-是机器可检测的 AI 腔。流程：**检测 → 改写 → 重跑检测，直到清零**。改写原则：
+是默认文风的启发式告警。流程：**检测 → 改写或记录有理由的豁免 → 重检**。
+显式禁词是 error；默认文风建议是 warn，不得为了清零而扭曲正常术语或用户选定风格。
+需要放行比喻检测时通过 brief.voice.rules.relax: [metaphor] 表达。改写原则：
 
 - 破折号金句：拆成两个陈述句，或只留主句；
 - 比喻/拟人：直接说技术事实（"伤害来自缓存共用"改写为"共用缓存时尾延迟升高"）；
@@ -56,13 +59,33 @@ narrative——故事没承载，而不是页面没写出来）。回答 2/3 的
 
 ## 风格验收（必经的人工步骤）
 
-style lint 只保证下限（机器可检测的 AI 腔清零）。**语言风格的最终验收永远
+style lint 提供可复查的提示。**语言风格的最终验收永远
 是用户通读**：交付前把成品逐页/逐节给用户过一遍语言，用户说"就是这个味"
-才算过。lint 清零 ≠ 风格合格；用户通读 ≠ 可跳过 lint——两者都要。
+才算过。机器检查与用户通读都需要完成；默认风格 warn 可以保留并说明理由。
 
-## 收尾
+## 记录审查与交付
 
-机械 + 模型 findings 合并后，有 error 必须修（在归属层修，见 stages/repair.md）；
-warn 逐条判断：修、记录不修原因、或降级。全部 error 清零是硬性的：save / confirm /
-render 会直接拒绝带 error 的工作区。最后由用户验收：`comh deliver` 把验收落进
-run.yaml（钉住成品指纹；此后任何重渲染都会把验收标记为作废，需重新验收）。
+在 `.workspace/review-input.yaml` 写入（示例格式，不代表已完成审查）：
+
+```yaml
+completed_checks: [narrative, audience, reader, style]
+findings: []
+manual_constraints:
+  - id: tone
+    verdict: pass
+    detail: 用户已通读当前版本并确认语气符合约定
+```
+
+只有实际完成的检查才能记入 completed_checks。没有人工硬约束时 manual_constraints
+可以为空。发现的问题用 `{artifact, check: model:logic, severity: error|warn|info,
+verdict: fail, detail, owning_artifact}` 记录。已解决项可保留 `state: resolved, reason: ...`；
+warn 可 `state: waived` 并写 reason，error 不得豁免。
+
+顺序：修机械 error → 渲染全部所选成品（Markdown 可独立交付）→ 检查模型清单、
+完成读者测试和人工硬约束验收 → `comh review .workspace/review-input.yaml` →
+`comh validate all` → 用户验收后 `comh deliver`。
+
+交付必须有当前版本的审稿记录，所有未解决 error 都会阻断。改动输入、输出或重新渲染后，
+原审稿/验收失效，需检查变更影响并重新记录；不能机械复制旧的通过结论。
+历史手写 model findings 会保留，但因没有版本依据，必须重新审查绑定。
+修复期间的 save/render 只执行相关机械检查，旧审稿不会阻塞其自身的修复。

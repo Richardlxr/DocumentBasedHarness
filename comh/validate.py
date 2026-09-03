@@ -8,6 +8,7 @@ live in ``stages/qa.md``; only mechanically checkable invariants live here.
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 from pathlib import Path
 
 import yaml
@@ -18,11 +19,20 @@ from .artifacts import (
     Finding,
     load_artifact,
 )
+from .contracts import (
+    MEDIA_OUTPUTS,
+    derived_operands,
+    direct_evidence,
+    hard_constraints,
+    page_beats,
+    required_artifacts,
+)
 from .manifest import Manifest
+from .report_checks import prose, validate_report
 
 # Numbers immediately followed by 年/月/日 are dates, not data. IDs (E001, P99,
 # v2) are excluded by the lookbehind.
-_NUMBER = re.compile(r"(?<![A-Za-z\d])-?\d+(?:\.\d+)?(?!\s*[年月日])")
+_NUMBER = re.compile(r"(?<![A-Za-z\d])-?\d+(?:\.\d+)?(?![\d.]|\s*[年月日])")
 # Code fences and MyST directive blocks are metadata/structure, not report prose.
 _NON_PROSE = re.compile(r"```.*?```|^:::.*?:::", re.DOTALL | re.MULTILINE)
 # Ordered-list markers ("1. ", "2、") are structure, not data.
@@ -34,9 +44,6 @@ _ADDRESS = re.compile(r"^([a-z_]+)(?:\[(\d+)\])?$")
 _ELEMENT_BASES = {"title", "callout", "visual", "support_points", "metric_cards"}
 _KNOWN_VERBS = {"appear", "fade_in", "emphasize", "highlight"}
 _KNOWN_TRIGGERS = {"click", "with_previous", "after"}
-_MUST_INCLUDE = re.compile(r"必须包含[:：]?\s*(.+)")
-_FORBIDDEN_PHRASE = re.compile(r"(?:不得出现|不得写|禁止出现|禁止写)[:：]?\s*(.+)")
-_BACKGROUND_FORBIDS_DARK = re.compile(r"黑底|暗色背景|深色背景|dark background", re.IGNORECASE)
 
 
 def _iter_strings(node) -> list[str]:
@@ -50,114 +57,113 @@ def _iter_strings(node) -> list[str]:
     return []
 
 
-def _numbers_in(text: str) -> set[float]:
-    return {round(float(token), 2) for token in _NUMBER.findall(text or "")}
+def _numbers_in(text: str) -> set[Decimal]:
+    return {Decimal(token) for token in _NUMBER.findall(text or "")}
 
 
-def _evidence_number_pool(evidence: dict | None) -> set[float]:
-    pool: set[float] = set()
+def _evidence_number_pool(evidence: dict | None) -> set[Decimal]:
+    pool: set[Decimal] = set()
     for item in (evidence or {}).get("items", []):
         value = item.get("value")
         if isinstance(value, dict) and isinstance(value.get("number"), (int, float)):
-            pool.add(round(float(value["number"]), 2))
+            pool.add(Decimal(str(value["number"])))
         pool |= _numbers_in(str(item.get("content", "")))
     return pool
 
 
 def validate_sources(artifacts: dict[str, dict | None], run_root: Path) -> list[Finding]:
-    """The last link of the ID chain: evidence must cite real, existing sources.
+    """Source resolution, workspace containment and an acyclic derivation graph."""
+    from .derivations import calculate
 
-    Checks that SRCxx references resolve into the sources registry, registry
-    paths exist on disk, and derived locators name real operand items. Without
-    this, the chain page→beat→claim→evidence stops at evidence.
-    """
-    findings: list[Finding] = []
+    findings = []
     evidence = artifacts.get("evidence") or {}
-    items = evidence.get("items", [])
-    registry: dict[str, dict] = {}
-    for entry in evidence.get("sources", []) or []:
-        if isinstance(entry, dict) and entry.get("id"):
-            registry[str(entry["id"])] = entry
-    item_ids = {i["id"] for i in items}
+    items = {i["id"]: i for i in evidence.get("items", [])}
+    registry = {e["id"]: e for e in evidence.get("sources", [])}
+    graph = {key: derived_operands(item) for key, item in items.items()}
 
-    cites_source = any(
-        str((i.get("source") or {}).get("source", "")).startswith("SRC") for i in items
-    )
-    if not registry:
-        if cites_source:
+    def error(detail, check="ref-integrity"):
+        findings.append(Finding("evidence", check, "error", "fail", detail))
+
+    for source_id, entry in registry.items():
+        raw = Path(entry["path"])
+        path = (run_root / raw).resolve()
+        if raw.is_absolute() or not path.is_relative_to(run_root.resolve() / "sources"):
+            error(f"source '{source_id}' must stay under sources/: {raw}")
+        elif not path.is_file():
+            users = ", ".join(
+                key
+                for key, item in items.items()
+                if item.get("source", {}).get("source") == source_id
+            )
+            error(f"source '{source_id}' path '{raw}' does not exist (evidence: {users})")
+
+    for item_id, item in items.items():
+        source = item.get("source") or {}
+        ref, locator = source.get("source", ""), source.get("locator", "")
+        if not str(locator).strip():
+            error(f"evidence {item_id} needs a non-empty source locator")
+        if ref != "derived" and ref not in registry:
+            error(
+                f"evidence {item_id} cites source '{ref}' which is not in the sources registry",
+                "source-registry" if not registry else "ref-integrity",
+            )
+        if ref != "derived" and "derived:" not in str(locator):
+            continue
+        operands = graph[item_id]
+        if not operands:
+            error(
+                f"evidence {item_id} has a derived locator with no operands "
+                "(expected 'derived:(E001,E002)')"
+            )
+        for operand in operands:
+            if operand not in items:
+                error(f"evidence {item_id} derived locator references missing evidence '{operand}'")
+        calculation = item.get("derived") or {}
+        if not calculation.get("formula"):
             findings.append(
                 Finding(
                     "evidence",
-                    "source-registry",
+                    "derived-calculation",
                     "warn",
                     "fail",
-                    "items cite SRCxx but no sources registry exists; provenance is unverifiable",
-                    "evidence",
+                    f"evidence {item_id}: no derived.formula; arithmetic has not been verified",
                 )
             )
-        return findings
+        else:
+            try:
+                result = calculate(
+                    calculation["formula"], {op: items[op]["value"]["number"] for op in operands}
+                )
+                precision = calculation.get("precision", 2)
+                actual = item["value"]["number"]
+                if round(result, precision) != round(actual, precision):
+                    error(
+                        f"evidence {item_id}: formula gives {result:g}, "
+                        f"recorded value is {actual:g}",
+                        "derived-calculation",
+                    )
+            except (ValueError, SyntaxError, TypeError, KeyError, ArithmeticError) as exc:
+                error(
+                    f"evidence {item_id}: invalid derived calculation: {exc}", "derived-calculation"
+                )
 
-    for item in items:
-        item_id = item.get("id", "?")
-        source_ref = (item.get("source") or {}).get("source", "")
-        source_ref = str(source_ref)
-        if source_ref.startswith("SRC"):
-            entry = registry.get(source_ref)
-            if entry is None:
-                findings.append(
-                    Finding(
-                        "evidence",
-                        "ref-integrity",
-                        "error",
-                        "fail",
-                        f"evidence {item_id} cites source '{source_ref}' which is not in "
-                        f"the sources registry",
-                        "evidence",
-                    )
-                )
-            else:
-                path = str(entry.get("path", ""))
-                if path and not (run_root / path).is_file():
-                    findings.append(
-                        Finding(
-                            "evidence",
-                            "ref-integrity",
-                            "error",
-                            "fail",
-                            f"evidence {item_id}: source '{source_ref}' path '{path}' does "
-                            f"not exist under the run workspace",
-                            "evidence",
-                        )
-                    )
-        locator = str((item.get("source") or {}).get("locator", ""))
-        if "derived:" in locator:
-            match = re.search(r"derived:\(([^)]*)\)", locator)
-            operands = [t.strip() for t in match.group(1).split(",")] if match else []
-            if not any(operands):
-                findings.append(
-                    Finding(
-                        "evidence",
-                        "ref-integrity",
-                        "error",
-                        "fail",
-                        f"evidence {item_id} has a derived locator with no operands "
-                        f"(expected 'derived:(E001,E002)')",
-                        "evidence",
-                    )
-                )
-            for operand in operands:
-                if operand and operand not in item_ids:
-                    findings.append(
-                        Finding(
-                            "evidence",
-                            "ref-integrity",
-                            "error",
-                            "fail",
-                            f"evidence {item_id} derived locator references missing "
-                            f"evidence '{operand}'",
-                            "evidence",
-                        )
-                    )
+    active, done = set(), set()
+
+    def visit(key):
+        if key in active:
+            error(f"derived evidence cycle reaches '{key}'")
+            return
+        if key in done:
+            return
+        active.add(key)
+        for op in graph.get(key, []):
+            if op in items:
+                visit(op)
+        active.remove(key)
+        done.add(key)
+
+    for key in items:
+        visit(key)
     return findings
 
 
@@ -199,6 +205,54 @@ def validate_refs(artifacts: dict[str, dict | None]) -> list[Finding]:
     deck = artifacts.get("deck_plan") or {}
     for page in deck.get("deck", {}).get("pages", []):
         beat = page.get("beat")
+        if page.get("page_role") not in {
+            "cover",
+            "agenda",
+            "section_divider",
+            "closing",
+            "appendix",
+        } and not page_beats(page):
+            findings.append(
+                Finding(
+                    "deck_plan",
+                    "ref-integrity",
+                    "error",
+                    "fail",
+                    f"content page {page['id']} must reference a story beat",
+                )
+            )
+        for ref in page_beats(page):
+            if ref != beat and ref not in beat_ids:
+                findings.append(
+                    Finding(
+                        "deck_plan",
+                        "ref-integrity",
+                        "error",
+                        "fail",
+                        f"page {page['id']} references missing beat '{ref}'",
+                    )
+                )
+        if len(page_beats(page)) > 1 and not page.get("merge_rationale", "").strip():
+            findings.append(
+                Finding(
+                    "deck_plan",
+                    "ref-integrity",
+                    "error",
+                    "fail",
+                    f"page {page['id']} merges beats without merge_rationale",
+                )
+            )
+        for ref in direct_evidence(page):
+            if ref not in evidence_ids:
+                findings.append(
+                    Finding(
+                        "deck_plan",
+                        "ref-integrity",
+                        "error",
+                        "fail",
+                        f"page {page['id']} references missing evidence '{ref}'",
+                    )
+                )
         if beat and beat not in beat_ids:
             findings.append(
                 Finding(
@@ -238,6 +292,16 @@ def validate_refs(artifacts: dict[str, dict | None]) -> list[Finding]:
 
     report_plan = artifacts.get("report_plan") or {}
     for section in report_plan.get("sections", []):
+        if len(section.get("beats", [])) > 1 and not section.get("merge_rationale", "").strip():
+            findings.append(
+                Finding(
+                    "report_plan",
+                    "ref-integrity",
+                    "error",
+                    "fail",
+                    f"section {section['id']} merges beats without merge_rationale",
+                )
+            )
         for ref in section.get("beats", []):
             if ref not in beat_ids:
                 findings.append(
@@ -346,20 +410,53 @@ def validate_numbers(
     findings: list[Finding] = []
     pool = _evidence_number_pool(artifacts.get("evidence"))
     narrative = artifacts.get("narrative") or {}
+    evidence_items = {i["id"]: i for i in (artifacts.get("evidence") or {}).get("items", [])}
     for claim in narrative.get("claims", []):
+        cited = [evidence_items[ref] for ref in claim.get("evidence", []) if ref in evidence_items]
+        claim_pool = _evidence_number_pool({"items": cited})
         for number in sorted(_numbers_in(claim.get("statement", ""))):
-            if number not in pool:
+            if number not in claim_pool:
                 findings.append(
                     Finding(
                         "narrative",
                         "number-consistency",
                         "error",
                         "fail",
-                        f"claim {claim['id']} uses number {number:g} that appears in no evidence "
-                        f"item; materialize it as a datum first",
+                        f"claim {claim['id']}: number {number:g} absent from its cited evidence "
+                        f"items; cite the matching datum or materialize it first",
                         "evidence",
                     )
                 )
+        units = {str((i.get("value") or {}).get("unit", "")) for i in cited} - {""}
+        unit_pattern = "|".join(
+            re.escape(u)
+            for u in sorted(
+                units | {"ms", "us", "ns", "ps", "s", "GB", "MB", "KB", "QPS", "%"},
+                key=len,
+                reverse=True,
+            )
+        )
+        quantity = re.compile(rf"(?<![A-Za-z\d])(-?\d+(?:\.\d+)?)\s*({unit_pattern})(?![A-Za-z])")
+        supported = {
+            (Decimal(m[1]), m[2]) for i in cited for m in quantity.finditer(i.get("content", ""))
+        }
+        for item in cited:
+            value = item.get("value") or {}
+            if value.get("number") is not None and value.get("unit"):
+                supported.add((Decimal(str(value["number"])), value["unit"]))
+        if units:
+            for match in quantity.finditer(claim.get("statement", "")):
+                token = re.sub(r"\s+", "", match.group())
+                if (Decimal(match[1]), match[2]) not in supported:
+                    findings.append(
+                        Finding(
+                            "narrative",
+                            "quantity-consistency",
+                            "error",
+                            "fail",
+                            f"claim {claim['id']}: quantity '{token}' absent from cited evidence",
+                        )
+                    )
     deck = artifacts.get("deck_plan") or {}
     for page in deck.get("deck", {}).get("pages", []):
         parts = [page.get("title", "")]
@@ -403,56 +500,56 @@ def validate_numbers(
 
 
 def validate_coverage(artifacts: dict[str, dict | None]) -> list[Finding]:
-    """Beats confirmed at Gate 2 must not silently vanish from projections.
-
-    A beat may be dropped intentionally by setting ``projection.status`` to
-    ``dropped``/``appendix`` in the narrative — that yields an info finding,
-    not a warning, so the decision stays visible in qa/findings.yaml.
-    """
-    findings: list[Finding] = []
-    narrative = artifacts.get("narrative") or {}
-    beat_ids = {b["id"] for b in narrative.get("story", [])}
-    covered: set[str] = set()
-    deck = artifacts.get("deck_plan") or {}
-    covered |= {p["beat"] for p in deck.get("deck", {}).get("pages", []) if p.get("beat")}
-    report_plan = artifacts.get("report_plan") or {}
-    for section in report_plan.get("sections", []):
-        covered |= set(section.get("beats", []))
-    dropped: set[str] = set()
-    for beat in narrative.get("story", []):
-        projection = beat.get("projection")
-        status = str(projection.get("status", "")) if isinstance(projection, dict) else ""
-        if status not in ("dropped", "appendix") or beat["id"] in covered:
+    """Every projection accounts for its own beats and intentional omissions."""
+    findings = []
+    beat_ids = {b["id"] for b in (artifacts.get("narrative") or {}).get("story", [])}
+    for key in ("deck_plan", "report_plan"):
+        plan = artifacts.get(key)
+        if plan is None:
             continue
-        dropped.add(beat["id"])
-        note = (
-            f" ({projection['note']})"
-            if isinstance(projection, dict) and projection.get("note")
-            else ""
-        )
-        findings.append(
-            Finding(
-                "narrative",
-                "beat-coverage",
-                "info",
-                "pass",
-                f"beat {beat['id']} projection.status={status}: intentionally not projected{note}",
-                "narrative",
+        covered = set()
+        if key == "deck_plan":
+            for page in plan.get("deck", {}).get("pages", []):
+                covered.update(page_beats(page))
+        else:
+            for section in plan.get("sections", []):
+                covered.update(section.get("beats", []))
+        omissions = plan.get("omissions", [])
+        omitted = set()
+        for omission in omissions:
+            beat = omission["beat"]
+            if beat not in beat_ids or not omission.get("reason", "").strip():
+                findings.append(
+                    Finding(
+                        key,
+                        "beat-coverage",
+                        "error",
+                        "fail",
+                        f"invalid omission for beat '{beat}': a real beat and reason are required",
+                    )
+                )
+            else:
+                omitted.add(beat)
+                findings.append(
+                    Finding(
+                        key,
+                        "beat-coverage",
+                        "info",
+                        "pass",
+                        f"beat {beat} omitted from {key}: {omission['reason']}",
+                    )
+                )
+        for beat in sorted(beat_ids - covered - omitted):
+            findings.append(
+                Finding(
+                    key,
+                    "beat-coverage",
+                    "warn",
+                    "fail",
+                    f"beat {beat} is not covered by {key}; "
+                    "add it or record a reason in this projection's omissions",
+                )
             )
-        )
-    for beat_id in sorted(beat_ids - covered - dropped):
-        findings.append(
-            Finding(
-                "narrative",
-                "beat-coverage",
-                "warn",
-                "fail",
-                f"beat {beat_id} is not covered by any deck page or report section; "
-                f"add coverage or mark it projection.status: dropped/appendix in the "
-                f"narrative",
-                "narrative",
-            )
-        )
     return findings
 
 
@@ -863,130 +960,140 @@ def validate_theme(artifacts: dict[str, dict | None], run_root: Path) -> list[Fi
 
 
 def validate_hard_constraints(
-    artifacts: dict[str, dict | None], report_md_text: str | None
+    artifacts: dict[str, dict | None],
+    report_md_text: str | None,
+    run_root: Path | None = None,
 ) -> list[Finding]:
-    """Deterministic enforcement of the brief's hard constraints (pattern registry)."""
-    findings: list[Finding] = []
+    """Check only stages in scope; pending content never blocks its own brief."""
+    from .render.theme import resolve_style
+
+    findings = []
     brief = artifacts.get("brief") or {}
-    hard = brief.get("constraints", {}).get("hard", [])
-    report_plan = artifacts.get("report_plan") or {}
-    matched: set[int] = set()
-
-    for index, constraint in enumerate(hard):
-        if _BACKGROUND_FORBIDS_DARK.search(constraint):
-            matched.add(index)
-            from .render.theme import resolve_style
-
-            style = (artifacts.get("deck_plan") or {}).get("deck", {}).get("style")
-            choice = resolve_style(style, allow_dark=False)
-            if choice.forced_light:
-                findings.append(
-                    Finding(
-                        "brief",
-                        "hard-constraint",
-                        "error",
-                        "fail",
-                        f"constraint '{constraint}' but the effective deck background is dark "
-                        f"(template '{choice.requested}' or its tokens_override); pick a light "
-                        f"palette — the renderer would force light anyway",
-                        "deck_plan",
-                    )
+    for medium in brief.get("media", []):
+        if (medium["medium"], medium["surface"]) not in MEDIA_OUTPUTS:
+            findings.append(
+                Finding(
+                    "brief",
+                    "media",
+                    "error",
+                    "fail",
+                    f"unsupported output: {medium['medium']}/{medium['surface']}",
                 )
-            else:
-                findings.append(
-                    Finding(
-                        "brief",
-                        "hard-constraint",
-                        "info",
-                        "pass",
-                        f"constraint '{constraint}' enforced: light background "
-                        f"'{choice.theme.background}' effective",
-                        "deck_plan",
-                    )
-                )
-        match = _MUST_INCLUDE.search(constraint)
-        if match:
-            matched.add(index)
-            phrase = match.group(1).strip()
-            haystacks = [report_md_text or ""]
-            sections = report_plan.get("sections", [])
-            haystacks += [s.get("heading", "") for s in sections]
-            haystacks += [m for s in sections for m in s.get("must_include", [])]
-            haystacks += _iter_strings(artifacts.get("deck_plan"))
-            if not any(phrase in h for h in haystacks):
-                findings.append(
-                    Finding(
-                        "brief",
-                        "hard-constraint",
-                        "error",
-                        "fail",
-                        f"constraint requires '{phrase}' but it appears in no report section "
-                        f"heading/must_include and no deck text",
-                        "report_plan",
-                    )
-                )
-        forbidden = _FORBIDDEN_PHRASE.search(constraint)
-        if forbidden:
-            matched.add(index)
-            phrase = forbidden.group(1).strip().strip("'\"“”‘’「」")
-            if not phrase:
-                continue
-            deck_strings = _iter_strings(artifacts.get("deck_plan"))
-            if phrase in (report_md_text or ""):
-                findings.append(
-                    Finding(
-                        "brief",
-                        "hard-constraint",
-                        "error",
-                        "fail",
-                        f"constraint forbids '{phrase}' but it appears in the report text",
-                        "report_md",
-                    )
-                )
-            deck_hits = [s for s in deck_strings if phrase in s]
-            if deck_hits:
-                findings.append(
-                    Finding(
-                        "brief",
-                        "hard-constraint",
-                        "error",
-                        "fail",
-                        f"constraint forbids '{phrase}' but it appears in deck text "
-                        f"({deck_hits[0][:40]!r}…)",
-                        "deck_plan",
-                    )
-                )
-    # A hard constraint that matches no pattern is neither enforced nor
-    # challenged — surface it so Gate 1 actually discusses the demotion.
-    for index, constraint in enumerate(hard):
-        if index not in matched and str(constraint).strip():
+            )
+    constraints = hard_constraints(brief)
+    ids = [c["id"] for c in constraints]
+    if len(ids) != len(set(ids)):
+        findings.append(
+            Finding(
+                "brief", "hard-constraint", "error", "fail", "hard constraint IDs must be unique"
+            )
+        )
+    for constraint in constraints:
+        check, scope = constraint["check"], constraint["scope"]
+        text, phrase = constraint["text"], str(constraint.get("value", ""))
+        if check == "manual":
             findings.append(
                 Finding(
                     "brief",
                     "hard-constraint",
                     "warn",
                     "pass",
-                    f"constraint '{constraint}' has no machine check; confirm at Gate 1 "
-                    f"that it was demoted to a soft preference (or add a validator "
-                    f"pattern)",
-                    "brief",
+                    f"constraint '{text}' has no machine check; retain as hard "
+                    f"and record manual acceptance in the final review ({constraint['id']})",
                 )
             )
+            continue
+        if check == "light_background":
+            if artifacts.get("deck_plan") is None:
+                continue
+            style = artifacts["deck_plan"].get("deck", {}).get("style")
+            choice = resolve_style(style, allow_dark=False, run_root=run_root)
+            findings.append(
+                Finding(
+                    "deck_plan",
+                    "hard-constraint",
+                    "error" if choice.forced_light else "info",
+                    "fail" if choice.forced_light else "pass",
+                    f"constraint '{text}': effective deck background is "
+                    f"{'dark; choose a light palette' if choice.forced_light else 'light'}",
+                    "deck_plan",
+                )
+            )
+            continue
+        targets = {}
+        if scope in ("all", "deck") and artifacts.get("deck_plan") is not None:
+            targets["deck_plan"] = deck_text(artifacts["deck_plan"])
+        if scope in ("all", "report"):
+            if report_md_text is not None:
+                targets["report_md"] = prose(report_md_text)
+            elif artifacts.get("report_plan") is not None:
+                plan = artifacts["report_plan"]
+                targets["report_plan"] = "\n".join(
+                    s["heading"] + " " + " ".join(s.get("must_include", []))
+                    for s in plan.get("sections", [])
+                )
+        for owner, content in targets.items():
+            violates = (check == "contains" and phrase not in content) or (
+                check == "forbidden" and phrase in content
+            )
+            if violates:
+                findings.append(
+                    Finding(
+                        owner,
+                        "hard-constraint",
+                        "error",
+                        "fail",
+                        f"constraint '{text}' ({check}: '{phrase}') violated in {owner}",
+                        owner,
+                    )
+                )
     return findings
 
 
-def run_all(run_root: Path) -> list[Finding]:
+def deck_text(plan: dict) -> str:
+    """Displayed text only: extension metadata cannot satisfy content requirements."""
+    texts = [plan.get("deck", {}).get("title", "")]
+    for page in plan.get("deck", {}).get("pages", []):
+        texts += [page.get("title", ""), page.get("kicker", "")]
+        for point in page.get("support_points", []):
+            texts += (
+                [point.get("point", ""), point.get("detail", "")]
+                if isinstance(point, dict)
+                else [point]
+            )
+        texts += [card.get("label", "") for card in page.get("metric_cards", [])]
+        texts += [(page.get("callout") or {}).get("text", "")]
+        visual = page.get("visual") or {}
+        texts += visual.get("columns", [])
+        texts += [entry.get("label", "") for entry in (visual.get("chart") or {}).get("series", [])]
+        texts += [a.get("caption", "") for a in visual.get("asset_refs", []) if isinstance(a, dict)]
+        texts += [(visual.get("diagram") or {}).get("caption", "")]
+    return "\n".join(str(t) for t in texts)
+
+
+def run_all(run_root: Path, keys: set[str] | None = None) -> list[Finding]:
     manifest = Manifest.load(run_root)
-    artifacts: dict[str, dict | None] = {}
-    findings: list[Finding] = []
-    for key in ("evidence", "brief", "narrative", "deck_plan", "report_plan"):
+    if keys is None:
+        brief, _ = load_artifact(run_root, "brief")
+        keys = required_artifacts(brief or {})
+    artifacts = {}
+    findings = []
+    for key in sorted(keys - {"report_md"}):
         data, schema_findings = load_artifact(run_root, key)
         artifacts[key] = data
-        findings += schema_findings
-
-    report_path = run_root / manifest.data["artifacts"]["report_md"]["path"]
-    report_md_text = report_path.read_text(encoding="utf-8") if report_path.is_file() else None
-
+        findings.extend(schema_findings)
+    # Never run semantic validators on malformed objects or incomplete references.
+    if any(f.severity == "error" for f in findings):
+        return findings
+    report_md_text = None
+    if "report_md" in keys:
+        report_path = manifest.artifact_path("report_md")
+        if report_path.is_file():
+            report_md_text = report_path.read_text(encoding="utf-8")
+        else:
+            findings.append(
+                Finding("report_md", "schema", "error", "fail", "report source missing")
+            )
     from .style_lint import validate_style
 
     findings += validate_style(artifacts, report_md_text)
@@ -999,28 +1106,19 @@ def run_all(run_root: Path) -> list[Finding]:
         findings += validate_coverage(artifacts)
         findings += validate_visuals(artifacts)
         findings += validate_reveal(artifacts)
+        findings += validate_report(artifacts, report_md_text)
     if artifacts.get("deck_plan") is not None:
         findings += validate_assets(artifacts, run_root)
         findings += validate_theme(artifacts, run_root)
     if artifacts.get("brief") is not None:
-        findings += validate_hard_constraints(artifacts, report_md_text)
-
-    for gate, record in manifest.data["gates"].items():
-        if record.get("confirmed") and not manifest.gate_valid(gate):
-            findings.append(
-                Finding(
-                    gate,
-                    "gate",
-                    "warn",
-                    "fail",
-                    f"gate '{gate}' confirmed at {record.get('at')} but the file changed since",
-                    gate,
-                )
-            )
+        findings += validate_hard_constraints(artifacts, report_md_text, run_root)
     return findings
 
 
 def write_findings(run_root: Path, findings: list[Finding]) -> Path:
+    from .qa import preserve_legacy_review
+
+    preserve_legacy_review(run_root)
     qa_dir = run_root / "qa"
     qa_dir.mkdir(parents=True, exist_ok=True)
     path = qa_dir / "findings.yaml"

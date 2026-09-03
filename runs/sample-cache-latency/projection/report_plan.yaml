@@ -9,7 +9,8 @@ sections:
     claims: []
     evidence: []
     depth: brief
-    must_include: [客户体验痛点]
+    must_include: [偶发卡顿]
+    review_points: [客户体验痛点]
 
   - id: R02
     heading: 实验方法
@@ -17,7 +18,8 @@ sections:
     claims: [C04]
     evidence: [E006]
     depth: detailed
-    must_include: [测试床, 负载模型, 重复轮次]
+    must_include: [3 节点, 回放流量模型, 重复运行]
+    review_points: [测试床, 负载模型, 重复轮次]
 
   - id: R03
     heading: 实验结果
@@ -25,7 +27,8 @@ sections:
     claims: [C01, C02, C05]
     evidence: [E001, E002, E003, E004, E007]
     depth: detailed
-    must_include: [结果汇总表, 逐轮波动说明]
+    must_include: [配置, 逐轮时序, 轮间波动区间]
+    review_points: [结果汇总表, 逐轮波动说明]
     merge_rationale: 结果与机制合并呈现——证据相邻，读者需要"数字 + 为什么"一起读
 
   - id: R04
@@ -34,7 +37,8 @@ sections:
     claims: [C03]
     evidence: [E005, E008]
     depth: detailed
-    must_include: [未验证假设, 高负载场景占比未知]
+    must_include: [尚未单独验证, 占比未知]
+    review_points: [未验证假设, 高负载场景占比未知]
 
   - id: R05
     heading: 建议与下一步

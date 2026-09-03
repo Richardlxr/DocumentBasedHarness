@@ -62,15 +62,48 @@ def _validator(name: str) -> Draft202012Validator:
 
 
 def load_yaml(path: Path) -> Any:
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+    class UniqueLoader(yaml.SafeLoader):
+        pass
+
+    def mapping(loader, node):
+        result = {}
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node)
+            if key in result:
+                raise yaml.constructor.ConstructorError(
+                    None, None, f"duplicate key: {key}", key_node.start_mark
+                )
+            result[key] = loader.construct_object(value_node)
+        return result
+
+    UniqueLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping)
+    return yaml.load(path.read_text(encoding="utf-8"), Loader=UniqueLoader)
 
 
 def validate_schema(name: str, data: Any) -> list[str]:
-    errors = sorted(_validator(name).iter_errors(data), key=lambda e: list(e.absolute_path))
-    return [
+    errors = sorted(
+        _validator(name).iter_errors(data), key=lambda e: tuple(map(str, e.absolute_path))
+    )
+    messages = [
         f"{'/'.join(str(p) for p in error.absolute_path) or '<root>'}: {error.message}"
         for error in errors
     ]
+    if not errors:
+        fields = {
+            "evidence": ("sources", "items"),
+            "narrative": ("claims", "story"),
+            "report_plan": ("sections",),
+        }.get(name, ())
+        groups = [(field, data.get(field, [])) for field in fields]
+        if name == "deck_plan":
+            groups = [("pages", data["deck"]["pages"])]
+        for label, entries in groups:
+            seen = set()
+            for entry in entries:
+                if entry["id"] in seen:
+                    messages.append(f"{label}: duplicate ID '{entry['id']}'")
+                seen.add(entry["id"])
+    return messages
 
 
 def load_artifact(run_root: Path, key: str) -> tuple[Any, list[Finding]]:
@@ -100,4 +133,4 @@ def load_artifact(run_root: Path, key: str) -> tuple[Any, list[Finding]]:
         Finding(key, "schema", "error", "fail", message, key)
         for message in validate_schema(key, data)
     ]
-    return data, findings
+    return (None if findings else data), findings

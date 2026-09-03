@@ -113,12 +113,12 @@ def load_theme(path: Path) -> DeckTheme:
 
 
 @lru_cache(maxsize=8)
-def _registry(repo_themes: str, run_themes: str | None) -> dict[str, DeckTheme]:
+def _registry(repo_themes: str, run_themes: str | None, fingerprint: tuple) -> dict[str, DeckTheme]:
     """Load themes; run-local directory wins over the repository directory."""
     themes: dict[str, DeckTheme] = {}
     directories = [Path(repo_themes)]
     if run_themes:
-        directories.insert(0, Path(run_themes))
+        directories.append(Path(run_themes))
     for directory in directories:
         if not directory.is_dir():
             continue
@@ -135,8 +135,14 @@ def _registry(repo_themes: str, run_themes: str | None) -> dict[str, DeckTheme]:
 
 
 def available_themes(run_root: Path | None = None) -> dict[str, DeckTheme]:
+    from ..lineage import hash_file
+
     run_themes = str((run_root / "themes").resolve()) if run_root else None
-    return _registry(str(_REPO_THEMES), run_themes)
+    directories = [Path(_REPO_THEMES)] + ([Path(run_themes)] if run_themes else [])
+    fingerprint = tuple(
+        (str(p), hash_file(p)) for d in directories for p in sorted(d.glob("*/theme.yaml"))
+    )
+    return _registry(str(_REPO_THEMES), run_themes, fingerprint)
 
 
 @dataclass(frozen=True, slots=True)

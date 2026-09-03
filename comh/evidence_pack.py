@@ -13,30 +13,44 @@ from pathlib import Path
 import yaml
 
 from .artifacts import load_yaml
+from .contracts import derived_operands, direct_evidence, page_beats
 from .manifest import Manifest
+from .report_checks import section_bodies
 
 
 def build_pack(run_root: Path, artifact: str, node_id: str) -> dict:
     manifest = Manifest.load(run_root)
     evidence = load_yaml(run_root / manifest.data["artifacts"]["evidence"]["path"])
     narrative = load_yaml(run_root / manifest.data["artifacts"]["narrative"]["path"])
-    evidence_by_id = {item["id"]: item for item in evidence.get("items", [])}
-    claims_by_id = {claim["id"]: claim for claim in narrative.get("claims", [])}
-    beats_by_id = {beat["id"]: beat for beat in narrative.get("story", [])}
+
+    def index(entries):
+        result = {}
+        for entry in entries:
+            if entry["id"] in result:
+                raise KeyError(f"duplicate ID '{entry['id']}' in evidence chain")
+            result[entry["id"]] = entry
+        return result
+
+    evidence_by_id = index(evidence.get("items", []))
+    claims_by_id = index(narrative.get("claims", []))
+    beats_by_id = index(narrative.get("story", []))
 
     if artifact == "deck":
         deck = load_yaml(run_root / manifest.data["artifacts"]["deck_plan"]["path"])
-        pages = {page["id"]: page for page in deck["deck"]["pages"]}
+        pages = index(deck["deck"]["pages"])
         if node_id not in pages:
             raise KeyError(f"no deck page '{node_id}' (known: {', '.join(pages)})")
-        node, beat_ids, extra_claim_ids = pages[node_id], [pages[node_id].get("beat")], []
+        node, beat_ids, extra_claim_ids = pages[node_id], page_beats(pages[node_id]), []
     elif artifact == "report":
         plan = load_yaml(run_root / manifest.data["artifacts"]["report_plan"]["path"])
-        sections = {s["id"]: s for s in plan["sections"]}
+        sections = index(plan["sections"])
         if node_id not in sections:
             raise KeyError(f"no report section '{node_id}' (known: {', '.join(sections)})")
         section = sections[node_id]
-        node = {"id": section["id"], "heading": section["heading"]}
+        node = dict(section)
+        report_path = manifest.artifact_path("report_md")
+        if report_path.is_file():
+            node["body"] = section_bodies(plan, report_path.read_text(encoding="utf-8"))[node_id]
         beat_ids, extra_claim_ids = list(section.get("beats", [])), list(section.get("claims", []))
     elif artifact == "narrative":
         if node_id not in beats_by_id:
@@ -76,17 +90,18 @@ def build_pack(run_root: Path, artifact: str, node_id: str) -> dict:
                 used_evidence.append(
                     evidence_by_id.get(evidence_id, {"id": evidence_id, "error": "not found"})
                 )
-    # Figures on the page carry their own evidence linkage (asset_refs).
-    if artifact == "deck":
-        for item in (node.get("visual") or {}).get("asset_refs", []):
-            evidence_id = item.get("evidence") if isinstance(item, dict) else None
-            if evidence_id and evidence_id not in seen_evidence:
-                seen_evidence.add(evidence_id)
-                used_evidence.append(
-                    evidence_by_id.get(evidence_id, {"id": evidence_id, "error": "not found"})
-                )
+    pending = direct_evidence(node)
+    pending += [operand for item in used_evidence for operand in derived_operands(item)]
+    while pending:
+        evidence_id = pending.pop(0)
+        if evidence_id in seen_evidence:
+            continue
+        seen_evidence.add(evidence_id)
+        item = evidence_by_id.get(evidence_id, {"id": evidence_id, "error": "not found"})
+        used_evidence.append(item)
+        pending.extend(derived_operands(item))
 
-    sources_by_id = {s["id"]: s for s in evidence.get("sources", [])}
+    sources_by_id = index(evidence.get("sources", []))
     seen_sources: set[str] = set()
     sources = []
     for item in used_evidence:

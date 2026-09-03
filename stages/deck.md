@@ -34,7 +34,8 @@
 - 但不要机械执行：`page_role` 为 `cover` / `agenda` / `section_divider` /
   `closing` / `appendix` 的页面用主题式标题是正当的。系统按 role 理解页面，QA 也按
   role 分规则检查。
-- `beat`：引用 `Sxx`。一 beat 拆多页可以；多 beat 并一页必须写 `merge_rationale`。
+- `beat`：引用 `Sxx`。一 beat 拆多页可以；多 beat 并一页写 `beats: [Sxx, Syy]` 与 `merge_rationale`。
+  本媒介不呈现的 beat，在计划顶层登记 `omissions: [{beat, reason}]`。
 
 ## 让页面充实（展开结构）
 
@@ -85,8 +86,7 @@
   ```
   纯字符串仍然允许（自由备注，renderer 忽略）。地址在 validate 期确定性解析——
   写错名字/越界会直接报 error。**HTML surface（`comh render deck-html`）已执行这份
-  语义**（reveal.js fragment：出场顺序/点击步进/强调高亮）；PPTX 动画词汇表后续接入
-  同一份语义。
+  语义**（reveal.js fragment：出场顺序/点击步进/强调高亮）；PPTX 通过实验性动画开关执行同一份语义，默认关闭；须在实际播放器核验。
 - 所有数字必须来自 evidence（派生数字先落库，见 stages/evidence.md）。
 
 - **版式原型（`page_role` 扩展）**：
@@ -101,7 +101,7 @@
   - **实测保底与素材铁律**：背景图必须在 `assets/manifest.yaml` 登记溯源；系统使用 PIL 实测 worst-case 对比度，不足 4.5:1 时动态步进 α 蒙层（封顶 0.90），保证文字绝对清晰。HTML 支持毛玻璃，PPTX 自动优雅降级为实色半透明矩形。
 
 - **样板先行与局部精细微调工作流（对话协议）**：
-  1. **样板对齐（Specimen Preview）**：在生成整套 Deck 前，Agent 必须先根据风格诉求生成 1-2 页样板（Cover + 带卡片/图表的 Content/Hero 页）并渲染，供用户在浏览器预览确认。
+  1. **样板对齐（Specimen Preview）**：在生成整套 Deck 前，新风格尚未对齐时，Agent 先根据风格诉求生成 1-2 页样板（Cover + 带卡片/图表的 Content/Hero 页）并渲染，供用户在浏览器预览确认。用户已选定成熟主题或明确要求直接出稿时可直接生成。
   2. **精准单页微调（Surgical Page Tuning）**：成品生成后，当用户指出某页（如 P03）某部分需要调整时，直接针对该页 `Pxx` 的字段（如版式 role、要点措辞、背景透明度、卡片数据）进行手术式修改并重新校验渲染，绝不破坏其他页面的既有结构。
 
 ## 样式方向：选型或生成（对话式，不只是学术汇报）
@@ -155,8 +155,8 @@
 
 ## 素材：对话、检索与落地（三铁律）
 
-照片、插画、老图让页面活，但它们是**装饰，不是证据**：图片不进
-page→beat→claim→evidence 溯源链；图的含义靠 `asset_refs` 的 `{ref, caption,
+装饰照片、插画登记素材出处；承载事实的图表/截图按 evidence 阶段提取，不能混为装饰。
+图的含义靠 `asset_refs` 的 `{ref, caption,
 evidence}` 挂接（caption 讲这是什么，evidence 挂它支撑的论断）。
 
 三铁律（校验器抽查登记，协议靠你执行）：

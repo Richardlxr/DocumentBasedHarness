@@ -125,6 +125,13 @@ def test_render_blocked_by_validation_errors_and_deliver_flow(tmp_path: Path, ca
     assert main(["save", "deck_plan", "--run", str(run)]) == 0
     assert main(["render", "deck", "--run", str(run)]) == 0
 
+    _write(
+        run,
+        ".workspace/review.yaml",
+        "completed_checks: [narrative, audience, reader, style]\nfindings: []\n",
+    )
+    assert main(["review", str(run / ".workspace/review.yaml"), "--run", str(run)]) == 0
+
     # deliver before acceptance: records and pins output hashes
     assert main(["deliver", "--run", str(run), "--note", "user read-through ok"]) == 0
     status = capsys.readouterr().out
@@ -137,6 +144,9 @@ def test_render_blocked_by_validation_errors_and_deliver_flow(tmp_path: Path, ca
     output.write_bytes(output.read_bytes() + b"\0")
     assert main(["status", "--run", str(run)]) == 0
     assert "invalidated" in capsys.readouterr().out
+    assert main(["deliver", "--run", str(run)]) == 2
+    assert main(["render", "deck", "--run", str(run)]) == 0
+    assert main(["review", str(run / ".workspace/review.yaml"), "--run", str(run)]) == 0
     assert main(["deliver", "--run", str(run)]) == 0
 
     # a deck_plan with a dangling beat ref cannot be saved, let alone rendered
@@ -198,10 +208,10 @@ def test_validate_sources_catches_broken_chain(tmp_path: Path):
 
     no_registry = {"evidence": {"items": artifacts["evidence"]["items"][:1]}}
     warns = validate_sources(no_registry, tmp_path)
-    assert any(f.check == "source-registry" and f.severity == "warn" for f in warns)
+    assert any(f.check == "source-registry" and f.severity == "error" for f in warns)
 
 
-def test_coverage_respects_dropped_projection_status():
+def test_coverage_respects_projection_owned_omissions():
     from comh.validate import validate_coverage
 
     artifacts = {
@@ -213,16 +223,18 @@ def test_coverage_respects_dropped_projection_status():
                     "purpose": "p",
                     "message": "m",
                     "claims": [],
-                    "projection": {"status": "dropped", "note": "附录材料"},
                 },
             ]
         },
-        "deck_plan": {"deck": {"pages": [{"id": "P01", "beat": "S01", "title": "t"}]}},
-        "report_plan": {"sections": []},
+        "deck_plan": {
+            "deck": {"pages": [{"id": "P01", "beat": "S01", "title": "t"}]},
+            "omissions": [{"beat": "S02", "reason": "报告展开"}],
+        },
+        "report_plan": {"sections": [{"id": "R01", "beats": ["S01", "S02"]}]},
     }
     findings = validate_coverage(artifacts)
     dropped = [f for f in findings if "S02" in f.detail]
-    assert dropped and dropped[0].severity == "info" and dropped[0].owning_artifact == "narrative"
+    assert dropped and dropped[0].severity == "info" and dropped[0].artifact == "deck_plan"
     assert not any(f.severity == "warn" for f in findings)
 
 

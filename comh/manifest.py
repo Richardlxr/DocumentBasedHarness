@@ -12,13 +12,19 @@ comparing current file hashes against the recorded ones.
 
 from __future__ import annotations
 
+import os
+import platform
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from importlib.metadata import version
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import yaml
 
-from .lineage import hash_dir, hash_file
+from .contracts import OUTPUT_ARTIFACT, requested_outputs, required_artifacts
+from .lineage import hash_bytes, hash_dir, hash_file
 
 MANIFEST_NAME = "run.yaml"
 
@@ -34,7 +40,21 @@ DERIVATION: dict[str, list[str]] = {
 
 GATE_OF_ARTIFACT = {"brief": "brief", "narrative": "narrative"}
 
-BUILD_OUTPUTS = {"deck": "build/deck.pptx", "report_docx": "build/report.docx"}
+BUILD_OUTPUTS = {
+    "deck": "build/deck.pptx",
+    "deck_html": "build/deck.html",
+    "report_docx": "build/report.docx",
+}
+
+
+def upstream_chain(key: str) -> set[str]:
+    keys, stack = {key}, [key]
+    while stack:
+        for up in DERIVATION.get(stack.pop(), []):
+            if up != "sources" and up not in keys:
+                keys.add(up)
+                stack.append(up)
+    return keys
 
 
 def now_iso() -> str:
@@ -67,6 +87,7 @@ def default_manifest(name: str) -> dict:
             "narrative": {"confirmed": False, "at": None, "hash": None},
         },
         "build": dict(BUILD_OUTPUTS),
+        "build_records": {},
         "deliveries": [],
     }
 
@@ -110,9 +131,19 @@ class Manifest:
         return cls(root, yaml.safe_load(path.read_text(encoding="utf-8")))
 
     def save(self) -> None:
-        self.path.write_text(
-            yaml.safe_dump(self.data, allow_unicode=True, sort_keys=False), encoding="utf-8"
-        )
+        # A failed write must not truncate the only lifecycle record. One writer
+        # owns a run; this atomic replace is not a multi-writer locking protocol.
+        temporary = None
+        try:
+            with NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=self.root, delete=False
+            ) as file:
+                temporary = Path(file.name)
+                file.write(yaml.safe_dump(self.data, allow_unicode=True, sort_keys=False))
+            os.replace(temporary, self.path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
 
     # -- hashing helpers -----------------------------------------------------
 
@@ -148,15 +179,26 @@ class Manifest:
             if up == "sources":
                 continue
             upstream_state = self.artifact_state(up)
-            if upstream_state.state in ("stale", "modified", "unsaved"):
+            if not upstream_state.is_fresh:
                 return ArtifactState(
                     key, True, "stale", f"upstream '{up}' is {upstream_state.state}"
                 )
-        if GATE_OF_ARTIFACT.get(key) and self.gate_valid(GATE_OF_ARTIFACT[key]):
+        if (
+            GATE_OF_ARTIFACT.get(key)
+            and self._gate_content_valid(key)
+            and (key != "narrative" or self.gate_valid("brief"))
+        ):
             return ArtifactState(key, True, "confirmed", "gate confirmed")
         return ArtifactState(key, True, "saved", "up to date with upstream")
 
     def gate_valid(self, gate: str) -> bool:
+        return (
+            self._gate_content_valid(gate)
+            and self.artifact_state(gate).is_fresh
+            and (gate != "narrative" or self.gate_valid("brief"))
+        )
+
+    def _gate_content_valid(self, gate: str) -> bool:
         record = self.data["gates"][gate]
         if not record.get("confirmed"):
             return False
@@ -200,12 +242,133 @@ class Manifest:
 
     # -- delivery acceptance ---------------------------------------------------
 
+    def brief(self) -> dict:
+        path = self.artifact_path("brief")
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        if not isinstance(data, dict):
+            raise RunError("brief must be a YAML object")
+        return data
+
+    def input_snapshot(self, keys: set[str]) -> dict:
+        """Content dependencies, including non-artifact render inputs."""
+        snapshot = {key: self._current_hash(key) for key in sorted(keys)}
+        for directory in ("sources", "assets", "themes", "templates"):
+            snapshot[f"directory:{directory}"] = hash_dir(self.root / directory)
+        repo = Path(__file__).resolve().parents[1]
+        snapshot["shared-themes"] = hash_dir(repo / "themes")
+        # Exclude caches; pin the implementation and bundled renderer resources.
+        files = sorted(
+            p
+            for folder in (repo / "comh", repo / "docx_harness")
+            for p in folder.rglob("*")
+            if p.is_file() and p.suffix in {".py", ".json", ".js", ".css", ".docx"}
+        )
+        snapshot["engine"] = hash_bytes(
+            "\n".join(f"{p.relative_to(repo)}:{hash_file(p)}" for p in files).encode()
+        )
+        snapshot["runtime"] = {
+            "python": platform.python_version(),
+            "platform": platform.platform(),
+            "packages": {
+                name: version(name)
+                for name in (
+                    "python-pptx",
+                    "python-docx",
+                    "myst-parser",
+                    "markdown-it-py",
+                    "Pillow",
+                )
+            },
+            "tools": {
+                name: os.environ.get(name)
+                for name in ("DRAWIO_CLI", "DRAWIO_ACCEPT_VERSION", "COMH_CHROME")
+            },
+        }
+        return snapshot
+
+    def output_selection(self) -> set[str]:
+        brief = self.brief()
+        outputs = requested_outputs(brief)
+        keys = required_artifacts(brief)
+        # Include compiled companions that actually exist for selected media.
+        for key, artifact in OUTPUT_ARTIFACT.items():
+            rel = self.data.get("build", {}).get(key)
+            if artifact in keys and rel and (self.root / rel).is_file():
+                outputs.add(key)
+        return outputs
+
+    def output_path(self, key: str) -> Path:
+        if key == "report_md":
+            return self.artifact_path(key)
+        return self.root / self.data.get("build", {}).get(key, BUILD_OUTPUTS[key])
+
+    def review_snapshot(self) -> dict:
+        snapshot = self.input_snapshot(required_artifacts(self.brief()))
+        outputs = self.output_selection()
+        snapshot["outputs"] = {
+            key: hash_file(self.output_path(key)) if self.output_path(key).is_file() else None
+            for key in sorted(outputs)
+        }
+        snapshot["build_records"] = {
+            key: self.data.get("build_records", {}).get(key)
+            for key in sorted(outputs - {"report_md"})
+        }
+        snapshot["render_qa"] = {}
+        for key, record in snapshot["build_records"].items():
+            qa = self.root / record["qa_path"] if record else None
+            snapshot["render_qa"][key] = hash_file(qa) if qa and qa.is_file() else None
+        snapshot["gates"] = self.data["gates"]
+        return deepcopy(snapshot)
+
+    def begin_build(self, key: str) -> dict:
+        self.data.setdefault("build", {}).setdefault(key, BUILD_OUTPUTS[key])
+        self.data.setdefault("build_records", {}).pop(key, None)
+        # Even a byte-identical re-render requires a new read-through.
+        self.data["build_generation"] = self.data.get("build_generation", 0) + 1
+        self.save()
+        return self.input_snapshot(upstream_chain(OUTPUT_ARTIFACT[key]))
+
+    def record_build(self, key: str, inputs: dict, qa_path: Path, success: bool) -> None:
+        self.data.setdefault("build_records", {})[key] = {
+            "generation": self.data["build_generation"],
+            "inputs": inputs,
+            "output": hash_file(self.output_path(key)),
+            "qa_path": qa_path.relative_to(self.root).as_posix(),
+            "qa_hash": hash_file(qa_path),
+            "success": success,
+        }
+        self.save()
+
+    def require_build(self, key: str) -> None:
+        record = self.data.get("build_records", {}).get(key)
+        path = self.output_path(key)
+        if not record or not record.get("success") or not path.is_file():
+            raise RunError(f"'{key}' has no successful build receipt; re-render it")
+        qa = self.root / record["qa_path"]
+        if (
+            record["inputs"] != self.input_snapshot(upstream_chain(OUTPUT_ARTIFACT[key]))
+            or record["output"] != hash_file(path)
+            or not qa.is_file()
+            or record["qa_hash"] != hash_file(qa)
+        ):
+            raise RunError(f"'{key}' build is stale or its output/QA changed; re-render it")
+
     def delivery_state(self) -> tuple[str, dict | None]:
         """(state, record) for the latest delivery: none | accepted | invalidated."""
         records = self.data.get("deliveries") or []
         if not records:
             return "none", None
         record = records[-1]
+        if not record.get("inputs"):
+            return "invalidated", record  # legacy acceptance did not pin inputs
+        try:
+            if record["inputs"] != self.review_snapshot():
+                return "invalidated", record
+        except (RunError, KeyError, yaml.YAMLError):
+            return "invalidated", record
+        review = self.root / "qa" / "model-findings.yaml"
+        if not review.is_file() or record.get("review_hash") != hash_file(review):
+            return "invalidated", record
         for rel, recorded in (record.get("outputs") or {}).items():
             path = self.root / rel
             if not path.is_file() or hash_file(path) != recorded:
@@ -215,11 +378,15 @@ class Manifest:
     def record_delivery(self, note: str | None = None) -> dict:
         """Pin the current build outputs as user-accepted (the final gate)."""
         outputs = {}
-        for rel in self.data.get("build", {}).values():
-            path = self.root / str(rel)
-            if path.is_file():
-                outputs[str(rel)] = hash_file(path)
-        record = {"accepted_at": now_iso(), "outputs": outputs}
+        for key in self.output_selection():
+            path = self.output_path(key)
+            outputs[path.relative_to(self.root).as_posix()] = hash_file(path)
+        record = {
+            "accepted_at": now_iso(),
+            "outputs": outputs,
+            "inputs": self.review_snapshot(),
+            "review_hash": hash_file(self.root / "qa" / "model-findings.yaml"),
+        }
         if note:
             record["note"] = note
         self.data.setdefault("deliveries", []).append(record)

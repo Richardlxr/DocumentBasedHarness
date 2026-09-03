@@ -189,6 +189,19 @@ comh validate all             # 全量校验 → qa/findings.yaml
 comh render deck|deck-html|report   # 有 error 拒渲；渲染报告进 qa/
 comh evidence-pack deck P05   # 修复循环取证
 comh theme-from-pptx 模板.pptx --name brand   # 从模板提取品牌主题
+comh review <审稿文件.yaml>   # 记录当前版本审查，格式见 stages/qa.md
 comh deliver [--note ...]     # 你验收后落记录：钉住成品指纹，重渲染即作废
 comh check-schema <file>      # 单文件 schema 校验
 ```
+
+## 校验与旧 run 升级
+
+`comh validate <artifact>` 检查该产物及其上游；`comh validate all` 检查所选媒介并汇总
+机械、模型和渲染问题。模型发现写独立审稿文件，通过 `comh review` 导入，不手改汇总文件。
+报告计划的 heading 对应正文标题（忽略章节序号）；must_include 是需要字面出现的文字，
+evidence 要在本节用 `[Exxx]` 引用。语义要求放进人工检查项。
+
+旧 run 的产物内容可以继续使用，但无输入指纹的构建不能直接交付：逐层修正并保存产物、
+必要时重新确认 Gate，然后重渲染、记录当前审稿、用户验收。旧 narrative 中的
+`projection.status` 移到相应计划顶层 `omissions: [{beat, reason}]`，迁移后重新确认故事。
+旧自然语言硬约束保留兼容；无法自动判断的要求仍是硬约束，在 review 中逐项人工验收。

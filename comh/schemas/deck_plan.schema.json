@@ -3,38 +3,59 @@
   "title": "deck_plan",
   "description": "Presentation projection. Content-complete: the renderer is pure code. Visual intent lives here; pixel layout does not.",
   "type": "object",
-  "required": ["version", "deck"],
+  "required": [
+    "version",
+    "deck"
+  ],
   "additionalProperties": true,
   "$defs": {
     "revealStep": {
       "type": "object",
-      "required": ["elements"],
+      "required": [
+        "elements"
+      ],
       "additionalProperties": true,
       "properties": {
         "elements": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Semantic element addresses: title | callout | visual | support_points[i] | metric_cards[i]. Bare block name (support_points) = the whole block. Renderers resolve addresses to shapes (pptx) or DOM nodes (html); validate-time resolution is deterministic."
         },
         "verb": {
           "type": "string",
           "description": "appear | fade_in | emphasize | highlight (fragment-style verb set; open vocabulary, renderers warn-and-ignore unknown)."
         },
-        "trigger": { "type": "string", "description": "click | with_previous | after." },
-        "note": { "type": "string" }
+        "trigger": {
+          "type": "string",
+          "description": "click | with_previous | after."
+        },
+        "note": {
+          "type": "string"
+        }
       }
     }
   },
   "properties": {
-    "version": { "const": 1 },
+    "version": {
+      "const": 1
+    },
     "deck": {
       "type": "object",
-      "required": ["title", "pages"],
+      "required": [
+        "title",
+        "pages"
+      ],
       "additionalProperties": true,
       "properties": {
-        "title": { "type": "string" },
-        "subtitle": { "type": "string" },
+        "title": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
         "style": {
           "type": "object",
           "description": "Open object declaring this deck's style/template intent. Code passes unknown keys through; consumed keys: template (theme name), transition (fade|push|wipe|cut), animations (experimental pptx timing, needs PowerPoint verification), tokens_override (same shape as theme.yaml sections: colors/fonts/sizes).",
@@ -45,16 +66,29 @@
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["id", "page_role", "title"],
+            "required": [
+              "id",
+              "page_role",
+              "title"
+            ],
             "additionalProperties": true,
             "properties": {
-              "id": { "type": "string", "pattern": "^P[0-9]{2,}$" },
-              "beat": { "type": "string", "description": "Story beat ID (Sxx). Optional for covers; multi-beat merges need merge_rationale." },
+              "id": {
+                "type": "string",
+                "pattern": "^P[0-9]{2,}$"
+              },
+              "beat": {
+                "type": "string",
+                "description": "Story beat ID (Sxx). Optional for covers; multi-beat merges need merge_rationale."
+              },
               "page_role": {
                 "type": "string",
                 "description": "Known roles with validator rules: cover, agenda, section_divider, content, closing, appendix. Unknown roles are treated as content."
               },
-              "title": { "type": "string", "description": "Message-style title: what the audience should remember from this page." },
+              "title": {
+                "type": "string",
+                "description": "Message-style title: what the audience should remember from this page."
+              },
               "kicker": {
                 "type": "string",
                 "description": "Small accent eyebrow above the title, e.g. '背景 · 为什么关注' or 'RESULTS'. Optional editorial furniture."
@@ -64,15 +98,28 @@
                 "description": "Page body. Plain strings, or {point, detail} objects: bold lead-in phrase plus a lighter explanation line — the standard way to elaborate without piling on bullets.",
                 "items": {
                   "anyOf": [
-                    { "type": "string" },
+                    {
+                      "type": "string"
+                    },
                     {
                       "type": "object",
-                      "required": ["point"],
+                      "required": [
+                        "point"
+                      ],
                       "additionalProperties": true,
                       "properties": {
-                        "point": { "type": "string", "description": "Bold lead-in." },
-                        "detail": { "type": "string", "description": "One-or-two-line explanation under the lead-in." },
-                        "icon": { "type": "string", "description": "Semantic icon name shown beside the lead-in." }
+                        "point": {
+                          "type": "string",
+                          "description": "Bold lead-in."
+                        },
+                        "detail": {
+                          "type": "string",
+                          "description": "One-or-two-line explanation under the lead-in."
+                        },
+                        "icon": {
+                          "type": "string",
+                          "description": "Semantic icon name shown beside the lead-in."
+                        }
                       }
                     }
                   ]
@@ -83,48 +130,83 @@
                 "description": "Big-number tiles for data pages. Values pulled from evidence at render time (value_from), so card numbers cannot drift.",
                 "items": {
                   "type": "object",
-                  "required": ["value_from"],
+                  "required": [
+                    "value_from"
+                  ],
                   "additionalProperties": true,
                   "properties": {
-                    "label": { "type": "string" },
-                    "value_from": { "type": "string", "description": "Evidence ID whose value.number is displayed." }
+                    "label": {
+                      "type": "string"
+                    },
+                    "value_from": {
+                      "type": "string",
+                      "description": "Evidence ID whose value.number is displayed."
+                    }
                   }
                 }
               },
               "callout": {
                 "type": "object",
                 "description": "Bottom 'so what' band. Reinforces this page's message with its implication — never introduces a second message.",
-                "required": ["text"],
+                "required": [
+                  "text"
+                ],
                 "additionalProperties": true,
                 "properties": {
-                  "text": { "type": "string" },
-                  "evidence": { "type": "string", "description": "Optional evidence backing the callout." }
+                  "text": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "type": "string",
+                    "description": "Optional evidence backing the callout."
+                  }
                 }
               },
               "visual": {
                 "type": "object",
                 "additionalProperties": true,
                 "properties": {
-                  "intent": { "type": "string", "description": "Free-form visual intent; the renderer decides how to realize it." },
+                  "intent": {
+                    "type": "string",
+                    "description": "Free-form visual intent; the renderer decides how to realize it."
+                  },
                   "chart": {
                     "type": "object",
                     "description": "Native chart drawn from the evidence store at render time. Values are pulled by value_from reference, so chart numbers cannot drift from evidence.",
-                    "required": ["series"],
+                    "required": [
+                      "series"
+                    ],
                     "additionalProperties": true,
                     "properties": {
-                      "type": { "type": "string", "description": "bar | column | line (renderer warns on unknown)" },
-                      "title": { "type": "string" },
-                      "series_name": { "type": "string", "description": "Defaults to the evidence unit." },
+                      "type": {
+                        "type": "string",
+                        "description": "bar | column | line (renderer warns on unknown)"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "series_name": {
+                        "type": "string",
+                        "description": "Defaults to the evidence unit."
+                      },
                       "series": {
                         "type": "array",
                         "minItems": 1,
                         "items": {
                           "type": "object",
-                          "required": ["value_from"],
+                          "required": [
+                            "value_from"
+                          ],
                           "additionalProperties": true,
                           "properties": {
-                            "label": { "type": "string", "description": "Category label; defaults to the evidence ID." },
-                            "value_from": { "type": "string", "description": "Evidence ID whose value.number is plotted." }
+                            "label": {
+                              "type": "string",
+                              "description": "Category label; defaults to the evidence ID."
+                            },
+                            "value_from": {
+                              "type": "string",
+                              "description": "Evidence ID whose value.number is plotted."
+                            }
                           }
                         }
                       }
@@ -133,12 +215,22 @@
                   "diagram": {
                     "type": "object",
                     "description": "Native diagram compiled from mermaid through the deterministic layout chain (measured glyphs, collision-checked) into PNG. Currently the flowchart/graph subset; subgraph and non-flowchart types fail loudly at validation time.",
-                    "required": ["mermaid"],
+                    "required": [
+                      "mermaid"
+                    ],
                     "additionalProperties": true,
                     "properties": {
-                      "mermaid": { "type": "string", "description": "Mermaid flowchart source." },
-                      "caption": { "type": "string" },
-                      "evidence": { "type": "string", "description": "Evidence backing the diagram's content." }
+                      "mermaid": {
+                        "type": "string",
+                        "description": "Mermaid flowchart source."
+                      },
+                      "caption": {
+                        "type": "string"
+                      },
+                      "evidence": {
+                        "type": "string",
+                        "description": "Evidence backing the diagram's content."
+                      }
                     }
                   },
                   "asset_refs": {
@@ -146,15 +238,27 @@
                     "description": "Image assets for this page. Plain path strings (relative to run root) or objects {ref, caption, evidence} — caption renders with the image, evidence links the figure into the ID chain. Figures must not be a traceability blind spot.",
                     "items": {
                       "anyOf": [
-                        { "type": "string" },
+                        {
+                          "type": "string"
+                        },
                         {
                           "type": "object",
-                          "required": ["ref"],
+                          "required": [
+                            "ref"
+                          ],
                           "additionalProperties": true,
                           "properties": {
-                            "ref": { "type": "string", "description": "Path relative to run root." },
-                            "caption": { "type": "string" },
-                            "evidence": { "type": "string", "description": "Evidence ID backing this figure." }
+                            "ref": {
+                              "type": "string",
+                              "description": "Path relative to run root."
+                            },
+                            "caption": {
+                              "type": "string"
+                            },
+                            "evidence": {
+                              "type": "string",
+                              "description": "Evidence ID backing this figure."
+                            }
                           }
                         }
                       ]
@@ -162,33 +266,101 @@
                   }
                 }
               },
-              "notes": { "type": "string", "description": "Speaker notes. First-class content, not an afterthought." },
-              "density_hint": { "type": "string" },
+              "notes": {
+                "type": "string",
+                "description": "Speaker notes. First-class content, not an afterthought."
+              },
+              "density_hint": {
+                "type": "string"
+              },
               "demotions": {
                 "type": "array",
                 "description": "Audit of content cut from this page and where it went.",
                 "items": {
                   "type": "object",
-                  "required": ["content", "to"],
+                  "required": [
+                    "content",
+                    "to"
+                  ],
                   "additionalProperties": true,
                   "properties": {
-                    "content": { "type": "string" },
-                    "to": { "type": "string", "description": "notes | appendix | report_only" }
+                    "content": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string",
+                      "description": "notes | appendix | report_only"
+                    }
                   }
                 }
               },
               "emphasis": {
                 "type": "array",
                 "description": "What to emphasize on this page. Plain strings are free-form notes; objects are formal reveal steps (elements + verb) that animation renderers execute.",
-                "items": { "anyOf": [{ "type": "string" }, { "$ref": "#/$defs/revealStep" }] }
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "$ref": "#/$defs/revealStep"
+                    }
+                  ]
+                }
               },
               "reveal": {
                 "type": "array",
                 "description": "Reveal order: what appears when. Plain strings are free-form notes; objects are formal steps — animation is sequencing semantics, not visual properties (fragment model).",
-                "items": { "anyOf": [{ "type": "string" }, { "$ref": "#/$defs/revealStep" }] }
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "$ref": "#/$defs/revealStep"
+                    }
+                  ]
+                }
               },
-              "merge_rationale": { "type": "string", "description": "Required when one page merges multiple beats." }
+              "merge_rationale": {
+                "type": "string",
+                "description": "Required when one page merges multiple beats."
+              },
+              "beats": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidence": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              }
             }
+          }
+        }
+      }
+    },
+    "omissions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "beat",
+          "reason"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "beat": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }

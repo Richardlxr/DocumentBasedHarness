@@ -10,7 +10,8 @@
   不同（报告可以方法前置，deck 通常不行）——这正是 co-projection 的意义。
 - 每个 section：`heading`（报告标题可以是主题式的）、`beats`、`claims`、`evidence`
   （要求 inline 引用的 `Exxx`）、`depth`（`brief` / `detailed` / 自定义）、
-  `must_include`。
+  `must_include`（正文必须出现的字面文字；语义要求放到人工审稿清单）。
+  `heading` 必须与正文标题对应，允许正文带“一、”或数字序号；同名目标标题只能出现一次。
 - 报告的职责：展开 context / method / evidence / analysis / limitation / implication。
   deck 上放不下、被 demote 到 `report_only` 的内容，必须在这里有着落——plan 阶段就
   对账，不要等写完发现丢了。
@@ -28,6 +29,8 @@
   caption 与证据标注写在图片语法里，报告里的图和 deck 里的图同样不许成为溯源盲区。
 - 方言写错编译器会带行号报错——把编译错误当免费质检，改完重编译。
 - 引用标注：正文中以 `[E001]` 形式 inline 标注证据；数字一律来自 evidence。
+  每节必须在本节内引用计划要求的 evidence；不存在的引用、缺失标题、缺失 must_include
+  会拒绝保存。跨节覆盖不能代替本节引用。代码示例不算正文证据。
 - 长度与深度按 `report_plan.depth` 和 brief 的 spec 判断，没有死规则。
 
 ## 收尾

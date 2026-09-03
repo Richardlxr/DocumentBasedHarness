@@ -35,11 +35,17 @@
 - `objective`：这次沟通要达成什么决定/行动/认知。
 - `delivery_context`：场合与时长（"30 分钟客户评审会" / "异步阅读的周报"）。
 - `media`：每个输出 `{medium, surface}` 二元组。当前支持 `pptx/presentation`、
-  `markdown/report`（docx 为编译副产物）、`html/*`（预留）。
+  `markdown/report`（docx 为可选编译副产物）、`docx/report`、
+  `html/presentation` 与 `html/data_story`。只生成用户选择的媒介。
 - `takeaways`：受众看完应该记住什么。**这是 QA 读者测试的比对基准**，写具体。
-- `constraints.hard`：只有能落到确定性检查的才放这里（如 "不要黑底" → renderer
-  白名单；"必须包含:局限性" → report 存在性检查）。无法落到检查点的，向用户提议
-  降级为 soft preference，并说明原因。
+- `constraints.hard`：保留所有用户硬要求。推荐结构化对象：
+  `{id: limits, text: 必须说明局限性, check: contains, scope: report, value: 局限性}`。
+  `check` 为 `contains | forbidden | light_background | manual`；`scope` 为
+  `deck | report | all`（默认 all，每个所选媒介都要满足）。contains/forbidden 的
+  `value` 是待检查的字面文字。自然语言旧格式仍可用。
+  无法机器判断时写 `{id, text, check: manual, acceptance: 人工验收方法}`，保持硬约束，
+  在最终 review 中逐项登记通过依据。只有用户明确同意才能改成 soft。
+  Gate 1 只检查契约；尚未生成的内容处于待检查状态。投影检查安排，正文检查实现。
 - `constraints.soft`：偏好，尽力满足不保证。
 - `visual_materials`（素材方向，Gate 1 必谈）：这批成品的视觉素材从哪来——
   纯排版（typography-only 也是显式选择）/ 图标点缀（`assets/vendor/tabler-outline`，

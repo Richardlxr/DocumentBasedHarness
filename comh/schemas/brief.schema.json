@@ -3,43 +3,78 @@
   "title": "brief",
   "description": "Communication contract. Gate 1 artifact: audience, objective, constraints, desired takeaways.",
   "type": "object",
-  "required": ["version", "language", "audience", "objective", "media", "takeaways"],
+  "required": [
+    "version",
+    "language",
+    "audience",
+    "objective",
+    "media",
+    "takeaways"
+  ],
   "additionalProperties": true,
   "properties": {
-    "version": { "const": 1 },
+    "version": {
+      "const": 1
+    },
     "language": {
       "type": "string",
       "description": "Language of ALL deliverables (deck, report), e.g. 'zh-CN', 'en'. Consumers: renderer font selection, docx template/preset choice, every stage's writing language. Explicit at Gate 1 — never inferred downstream."
     },
     "audience": {
       "type": "object",
-      "required": ["description"],
+      "required": [
+        "description"
+      ],
       "additionalProperties": true,
       "properties": {
-        "description": { "type": "string", "description": "Plain-language description of who consumes the artifacts." },
-        "expertise": { "type": "string" },
-        "prior_knowledge": { "type": "string" }
+        "description": {
+          "type": "string",
+          "description": "Plain-language description of who consumes the artifacts."
+        },
+        "expertise": {
+          "type": "string"
+        },
+        "prior_knowledge": {
+          "type": "string"
+        }
       }
     },
-    "objective": { "type": "string", "description": "What this communication is supposed to achieve." },
-    "delivery_context": { "type": "string", "description": "When/how the artifacts will be used, e.g. '30-min client review meeting'." },
+    "objective": {
+      "type": "string",
+      "description": "What this communication is supposed to achieve."
+    },
+    "delivery_context": {
+      "type": "string",
+      "description": "When/how the artifacts will be used, e.g. '30-min client review meeting'."
+    },
     "media": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["medium", "surface"],
+        "required": [
+          "medium",
+          "surface"
+        ],
         "additionalProperties": true,
         "properties": {
-          "medium": { "type": "string", "description": "e.g. pptx, markdown, html" },
-          "surface": { "type": "string", "description": "e.g. presentation, report, data_story" }
+          "medium": {
+            "type": "string",
+            "description": "e.g. pptx, markdown, html"
+          },
+          "surface": {
+            "type": "string",
+            "description": "e.g. presentation, report, data_story"
+          }
         }
       }
     },
     "takeaways": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "What the audience should walk away with. The QA reader test compares against these."
     },
     "constraints": {
@@ -48,10 +83,97 @@
       "properties": {
         "hard": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "object",
+                "required": [
+                  "id",
+                  "text",
+                  "check"
+                ],
+                "additionalProperties": true,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "check": {
+                    "enum": [
+                      "contains",
+                      "forbidden",
+                      "light_background",
+                      "manual"
+                    ]
+                  },
+                  "scope": {
+                    "enum": [
+                      "all",
+                      "deck",
+                      "report"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "acceptance": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "check": {
+                          "enum": [
+                            "contains",
+                            "forbidden"
+                          ]
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "value"
+                      ]
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "check": {
+                          "const": "manual"
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": [
+                        "acceptance"
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
           "description": "User hard constraints. Must be deterministically checkable or enforceable; otherwise demote to soft at Gate 1."
         },
-        "soft": { "type": "array", "items": { "type": "string" } }
+        "soft": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
     "voice": {
@@ -59,20 +181,46 @@
       "description": "Language style contract, aligned at Gate 1. Style is a per-run choice: plain is the DEFAULT profile, not a boundary. Provide samples to imitate, or let the model draft 2-3 style candidates on a real beat message and pick/tune one.",
       "additionalProperties": true,
       "properties": {
-        "style": { "type": "string", "description": "Open vocabulary: plain | formal | academic | punchy | warm | any custom name. Drives which lint rules are relaxed." },
-        "description": { "type": "string", "description": "One-sentence statement of the chosen voice (model-synthesized or the user's own words)." },
+        "style": {
+          "type": "string",
+          "description": "Open vocabulary: plain | formal | academic | punchy | warm | any custom name. Drives which lint rules are relaxed."
+        },
+        "description": {
+          "type": "string",
+          "description": "One-sentence statement of the chosen voice (model-synthesized or the user's own words)."
+        },
         "samples": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Imitation material: 2+ sentences of the user's own writing (or a style they like). All writing aligns to these."
         },
         "rules": {
           "type": "object",
           "additionalProperties": true,
           "properties": {
-            "relax": { "type": "array", "items": { "type": "string" }, "description": "Default lint rules to switch off for this run, e.g. [em-dash, contrast-frame]." },
-            "extra_forbidden": { "type": "array", "items": { "type": "string" }, "description": "Words/phrases to forbid in addition to the defaults." },
-            "extra_metaphor_markers": { "type": "array", "items": { "type": "string" }, "description": "Additional metaphor markers for this run's vocabulary." }
+            "relax": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Default lint rules to switch off for this run, e.g. [em-dash, contrast-frame]."
+            },
+            "extra_forbidden": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Words/phrases to forbid in addition to the defaults."
+            },
+            "extra_metaphor_markers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Additional metaphor markers for this run's vocabulary."
+            }
           }
         },
         "deck": {
@@ -80,9 +228,16 @@
           "description": "Deck-surface override: spoken register (short, sayable lines). Merges over the global voice.",
           "additionalProperties": true,
           "properties": {
-            "style": { "type": "string" },
-            "description": { "type": "string" },
-            "rules": { "type": "object", "additionalProperties": true }
+            "style": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "rules": {
+              "type": "object",
+              "additionalProperties": true
+            }
           }
         },
         "report": {
@@ -90,9 +245,16 @@
           "description": "Report-surface override: written prose (complete sentences, fuller formality). Merges over the global voice.",
           "additionalProperties": true,
           "properties": {
-            "style": { "type": "string" },
-            "description": { "type": "string" },
-            "rules": { "type": "object", "additionalProperties": true }
+            "style": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "rules": {
+              "type": "object",
+              "additionalProperties": true
+            }
           }
         }
       }
@@ -111,11 +273,17 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["question"],
+        "required": [
+          "question"
+        ],
         "additionalProperties": true,
         "properties": {
-          "question": { "type": "string" },
-          "answer": { "type": "string" }
+          "question": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          }
         }
       }
     }

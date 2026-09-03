@@ -142,7 +142,7 @@ def lint_text(
             )
         )
     for marker in voice.markers:
-        if marker in text:
+        if marker in text and voice.enforces("metaphor"):
             findings.append(
                 Finding(
                     "deck_plan",
@@ -215,7 +215,7 @@ def lint_report(text: str, voice: VoiceConfig | None = None) -> list[Finding]:
                 )
             )
         hits = [m for m in voice.markers if m in paragraph]
-        if hits:
+        if hits and voice.enforces("metaphor"):
             findings.append(
                 Finding(
                     "report_md",
@@ -268,7 +268,7 @@ def validate_style(artifacts: dict[str, dict | None], report_md_text: str | None
                         Finding(
                             "deck_plan" if medium == "deck" else "report_md",
                             "style:forbidden-word",
-                            "warn",
+                            "error",
                             "fail",
                             f"{page_id} {element}: '{word}' is forbidden by brief.voice.rules",
                             "deck_plan" if medium == "deck" else "report_md",

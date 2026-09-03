@@ -183,7 +183,10 @@ def test_hard_constraint_must_include():
         {"id": "R02", "heading": "局限性", "beats": [], "claims": [], "evidence": []}
     )
     findings = validate_hard_constraints(artifacts, "report body")
-    assert not any("局限性" in f.detail and f.severity == "error" for f in findings)
+    assert any("局限性" in f.detail and f.artifact == "report_md" for f in findings)
+    artifacts["deck_plan"]["deck"]["pages"][0]["support_points"] = ["局限性：固定负载"]
+    findings = validate_hard_constraints(artifacts, "局限性：固定负载")
+    assert not any(f.severity == "error" for f in findings)
 
 
 def test_hard_constraint_forbidden_phrase():

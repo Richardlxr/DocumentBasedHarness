@@ -3,25 +3,49 @@
   "title": "narrative",
   "description": "Medium-agnostic story structure. Gate 2 artifact: ordered beats + claims registry. No layout, word counts, page numbers, or visual fields.",
   "type": "object",
-  "required": ["version", "claims", "story"],
+  "required": [
+    "version",
+    "claims",
+    "story"
+  ],
   "additionalProperties": true,
   "properties": {
-    "version": { "const": 1 },
+    "version": {
+      "const": 1
+    },
     "claims": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "statement", "evidence", "status"],
+        "required": [
+          "id",
+          "statement",
+          "evidence",
+          "status"
+        ],
         "additionalProperties": true,
         "properties": {
-          "id": { "type": "string", "pattern": "^C[0-9]{2,}$" },
-          "statement": { "type": "string" },
-          "evidence": { "type": "array", "items": { "type": "string" } },
+          "id": {
+            "type": "string",
+            "pattern": "^C[0-9]{2,}$"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "status": {
             "type": "string",
             "description": "Known: supported, partial, background, assumption, needs_research. Unknown values are warned, not rejected."
           },
-          "importance": { "type": "string", "description": "e.g. primary, supporting, minor (open vocabulary)." }
+          "importance": {
+            "type": "string",
+            "description": "e.g. primary, supporting, minor (open vocabulary)."
+          }
         }
       }
     },
@@ -30,27 +54,61 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["id", "purpose", "message"],
+        "required": [
+          "id",
+          "purpose",
+          "message"
+        ],
         "additionalProperties": true,
         "properties": {
-          "id": { "type": "string", "pattern": "^S[0-9]{2,}$" },
+          "id": {
+            "type": "string",
+            "pattern": "^S[0-9]{2,}$"
+          },
           "purpose": {
             "type": "string",
             "description": "Open vocabulary communication move, e.g. establish_problem, demonstrate_effect, concede_limit."
           },
-          "message": { "type": "string", "description": "The one sentence this beat should land in the audience's head." },
-          "claims": { "type": "array", "items": { "type": "string" } },
-          "projection": {
-            "type": "object",
-            "additionalProperties": true,
-            "description": "How this beat is projected into deliverables. status dropped/appendix marks an intentional non-coverage (beat-coverage then reports info, not warn).",
-            "properties": {
-              "status": { "type": "string", "description": "covered (default) | dropped | appendix — open vocabulary" },
-              "note": { "type": "string", "description": "Why it is not projected, for the record." }
+          "message": {
+            "type": "string",
+            "description": "The one sentence this beat should land in the audience's head."
+          },
+          "claims": {
+            "type": "array",
+            "items": {
+              "type": "string"
             }
+          }
+        },
+        "propertyNames": {
+          "not": {
+            "enum": [
+              "projection",
+              "layout",
+              "visual",
+              "page_role",
+              "page_count",
+              "word_count",
+              "style",
+              "colors"
+            ]
           }
         }
       }
+    }
+  },
+  "propertyNames": {
+    "not": {
+      "enum": [
+        "projection",
+        "layout",
+        "visual",
+        "page_role",
+        "page_count",
+        "word_count",
+        "style",
+        "colors"
+      ]
     }
   }
 }

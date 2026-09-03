@@ -38,7 +38,8 @@
 
 narrative 里**禁止**出现任何媒介信息：布局、字数、页数、颜色、"slide"、"章节"。
 检验标准：一份电台讲稿和一份 deck 应该能同时是同一个 narrative 的投影。媒介取舍
-全部留给 projection 层。
+全部留给 projection 层。删去某个 beat 时，在相应计划顶层写
+`omissions: [{beat: Sxx, reason: 原因}]`，不要在 narrative 写 projection/status。
 
 ## 叙事设计要求
 
