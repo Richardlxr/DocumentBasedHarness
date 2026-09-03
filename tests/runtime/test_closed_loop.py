@@ -69,10 +69,13 @@ def _write(root: Path, rel: str, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def _pipeline_through_narrative(root: Path) -> None:
+def _pipeline_through_narrative(root: Path, *, appearance: dict | None = None) -> None:
     (root / "sources" / "a.csv").write_text("v\n220\n", encoding="utf-8")
     _write(root, "evidence/evidence.yaml", MIN_EVIDENCE)
-    _write(root, "brief/brief.yaml", MIN_BRIEF)
+    brief = yaml.safe_load(MIN_BRIEF)
+    if appearance is not None:
+        brief["appearance"] = appearance
+    _write(root, "brief/brief.yaml", yaml.safe_dump(brief))
     _write(root, "narrative/narrative.yaml", GOOD_NARRATIVE)
     assert main(["save", "evidence", "--run", str(root)]) == 0
     assert main(["save", "brief", "--run", str(root)]) == 0

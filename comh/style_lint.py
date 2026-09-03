@@ -30,6 +30,7 @@ from __future__ import annotations
 import re
 
 from .artifacts import Finding
+from .visible_text import page_texts
 
 # Open vocabulary — extend freely; these are heuristics, not grammar laws.
 METAPHOR_MARKERS = (
@@ -97,17 +98,7 @@ class VoiceConfig:
 
 def _page_texts(page: dict) -> list[tuple[str, str]]:
     """(element, text) pairs of the speakable surface of one page."""
-    pairs: list[tuple[str, str]] = [("title", str(page.get("title", "")))]
-    for index, entry in enumerate(page.get("support_points") or []):
-        if isinstance(entry, dict):
-            pairs.append((f"support_points[{index}]", str(entry.get("point", ""))))
-            if entry.get("detail"):
-                pairs.append((f"support_points[{index}].detail", str(entry["detail"])))
-        else:
-            pairs.append((f"support_points[{index}]", str(entry)))
-    if page.get("callout"):
-        pairs.append(("callout", str(page["callout"].get("text", ""))))
-    return [(element, text) for element, text in pairs if text]
+    return page_texts(page)
 
 
 def lint_text(

@@ -230,6 +230,9 @@ def test_outline_blocks_render_and_ignores_pure_theme_changes(tmp_path):
     write(root, "projection/deck_plan.yaml", deck)
     assert cli(root, "save", "deck_plan") == 0
     assert valid(Manifest.load(root), "deck_outline")
+    assert cli(root, "render", "deck") == 2
+    assert cli(root, "render", "deck", "--preview") == 0
+    assert approve(root, "deck_appearance") == 0
     assert cli(root, "render", "deck") == 0
     deck["deck"]["pages"][0]["title"] = "新的结构重点"
     write(root, "projection/deck_plan.yaml", deck)

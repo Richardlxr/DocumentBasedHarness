@@ -9,7 +9,7 @@
 ## 先展示，再记录实际回复
 
 1. 写好并 `comh save` 当前 artifact。
-2. `comh present brief|narrative|deck_outline|report_outline`，可用 `--summary <markdown>` 附短摘要。
+2. `comh present brief|narrative|deck_outline|deck_appearance|report_outline`，可用 `--summary <markdown文件路径>` 附短摘要。
 3. 将返回的 view、推断、关键未知和取舍以自然语言展示给用户，保留请求 ID；停止相依的下游动作。
 4. 收到回复后 `comh respond D0001 --decision accepted --reply '实际原话' --source '消息引用'`。
    修改意见用 changes_requested；大纲/细化的明确委托用 delegated。brief、narrative 和 delivery 需要接受。
@@ -25,7 +25,7 @@ run.yaml 里的旧 gate 若无请求依据会显示 legacy，内容不删除，�
 ## 契约对齐记录
 
 brief.alignment 按字段记录，字段为 language、audience、objective、delivery_context、media、
-takeaways、constraints、voice、visual_materials。例：
+takeaways、constraints、voice、visual_materials，有演示稿时的 presentation，以及交付 PPTX 时的 appearance。例：
 
 ```yaml
 voice: {style: plain}
@@ -42,6 +42,22 @@ status 为 provided/confirmed/proposed/delegated/deferred/not_applicable/unresol
 provided、confirmed、delegated 需要用户依据；proposed 是等待本次 Gate 接受的建议。
 非核心字段允许 not_applicable 并写 basis；视觉材料可 deferred 并写 due: projection，届时必须处理。
 核心方向、受众、语言、媒介和目标不能延期。constraints 无额外要求可显式写空列表。
+presentation 记录场合与密度预设：学术默认充实，用户指定优先。建议默认可随 Gate 1 一起接受，
+不必强制用户另行选档；不能把默认值写成用户已明确要求。报告单独交付时无需此字段。
+appearance 的 selection 可为 deferred：Gate 1 接受“稍后选”的安排，粗大纲之后必须用
+deck_appearance 解决，不用把整个 brief 改写并重走故事线。appearance 本身不能省略处置。
+
+## 样式选择与样张
+
+单模板选择可直接沿用用户原话；首次编译适配的结果仍需要样张审阅，除非用户明确委托。
+模板合集的测试授权不等于选中某个正式模板。样式决策在故事线和粗大纲之后、批量细化之前。
+默认主题可在 Gate 1 一起接受，不强制多问一轮。`review: delegated` 必须有明确用户依据。
+原生样式使用 `render deck --preview` 创建可核验样张，`present deck_appearance` 锁定样式
+配置和展示文件；等待回复期间换样张必须重新展示。正式内容重编译不重复询问同一套样式。
+改变颜色、字体、保留元素或重要调整说明会使样式接受失效；机械性单行修复不会改变样式意向，
+但会使构建过期，仍须重新编译、QA 和交付验收。当前只复用同一 run 的样式接受。
+用户重新打开当前样式审阅时，等待回复或要求修改的状态也会阻断正式渲染、审稿登记与交付，
+包括原先已采用默认样式的情况；已有构建文件不能代替当前决定。
 
 open_questions 有答案写 answer；未回答默认阻塞 Gate 1。确实可延期的写
 `{question, status: deferred, due: projection, reason}`；不适用写 status: not_applicable 与 reason。

@@ -21,10 +21,15 @@
 
 ## Step 2 — report.md（正文，Markdown 为主、DOCX 为辅）
 
+先处理延期到 authoring 的问题和选择；即使未采用共同打磨模式，正文保存也会检查这些截止项。
+尚未到期的问题可以继续保留，不能为了提前清空列表而重复询问。
+
 用 docx-harness 的 Markdown/MyST 方言写 `documents/report.md`：
 
 - **语域：报告是书面语。**完整句子、主语齐全、严谨展开——deck 上砍掉的细节
   在这里补全；和 deck 的口语短句不是一档，brief.voice.report 可覆盖全局风格。
+- 按 [受众文案规则](../references/audience-copy.md) 写给实际读者：标题、正文、表格和图注
+  都要传达具体内容。内部策划理由不进成品，真实限制展开说明，不能删掉限制来规避检查。
 - 普通 Markdown：标题、段落、列表、表格、图片、链接。公式用 `$...$` / `$$...$$`；
   示意图用 ```` ```mermaid ```` fenced 块（flowchart/graph 子集，确定性编译；
   需要 `DRAWIO_CLI` 指向 draw.io Desktop）。

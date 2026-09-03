@@ -17,6 +17,8 @@ def aligned(data):
         "constraints": {"hard": [], "soft": []},
         "voice": {"style": "plain"},
         "visual_materials": "纯排版",
+        "appearance": {"selection": "default", "review": "sample"},
+        "presentation": {"setting": "general"},
     }.items():
         data.setdefault(key, default)
     data["alignment"] = {

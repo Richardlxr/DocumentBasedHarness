@@ -1,6 +1,7 @@
 # 用户指南：从材料到成品
 
-这份指南走完一次完整任务：轻量 intake → 证据 → 契约确认 → 故事线确认 → 大纲确认 → 可选精修 → 渲染 → QA → 验收。
+这份指南走完一次完整任务：轻量 intake → 证据 → 契约确认 → 故事线确认 → 大纲确认 → 适用的样式审阅 → 可选精修 → 渲染 → QA → 验收。
+按阶段的自然语言要求、确认范围与修改影响，先看 [README 工作流](../README.md#工作流每个阶段你可以怎样参与)。
 全程以仓库自带的样例 `runs/sample-cache-latency/`（缓存实验 → 客户汇报）为例。
 所有命令都在仓库根目录执行；`--run` 可省略（命令会向上找 `run.yaml`）。
 
@@ -55,6 +56,11 @@ AI 综合材料概况和你的自然语言描述，推断出 `brief.yaml`：受�
 只有用户可以降级。`brief.alignment` 必须说明每项契约的来源、处置和依据；proposed
 明确代表本次待接受的建议。关键未知未答不能确认，确实晚些才需要的问题可注明截止阶段。
 完整字段及示例见 [对话协议](../references/dialogue-protocol.md)。
+
+有演示稿时记录 `presentation.setting`：学术默认 academic-rich，其他场合默认 balanced，
+用户指定的密度优先，见 [内容预设](../references/presentation-profiles.md)。交付 PPTX 时还要记录
+`appearance` 的模板意向和样张审阅方式。两项均纳入 alignment，随契约一起展示。
+实际受众与委托人须区分，文案按 [受众规则](../references/audience-copy.md) 检查。
 
 看摘要、改内容，满意后放行：
 
@@ -111,6 +117,10 @@ Gate 后内容或证据依据改变会作废确认，需要重新对齐。以上
 草稿顶层可写 `draft: true`，完成后改为 false。只补正文证据或样式不重问粗结构，
 改变标题、顺序、beat 覆盖或取舍则需要新大纲决策。
 
+原生 PPTX 模板的首次适配在粗大纲接受后制作实际样张，再 `present deck_appearance`；
+给定模板不等于已接受适配结果，明确的样式审阅委托才可省略这轮。内容精修委托与样式委托分开。
+延期到 authoring 的问题也会在报告正文保存前检查，和正式渲染保持一致。
+
 ## 6. 渲染
 
 成品和样式调整都**在对话里完成**：你说想要什么，agent 落配置、跑渲染，你看
@@ -118,11 +128,11 @@ Gate 后内容或证据依据改变会作废确认，需要重新对齐。以上
 
 | 你说 | agent 在底层做什么 |
 |---|---|
-| "渲染出来看看" | 渲染三件套：`build/deck.pptx`、`build/deck.html`（reveal.js 单文件：方向键翻页、点击步进动画、`S` 演讲者视图）、`build/report.docx`（`documents/report.md` 是正主） |
+| "渲染出来看看" | 根据已选媒介生成 PPTX、HTML 或报告；草案先用 preview，Markdown 可独立交付 |
 | "换个主题" / "要吸睛一点" / "像杂志" | 从内置方向选型（tier1-light / slate-tech / midnight / poster-pop / gallery-noir，学术到创意艺术）或按次微调 token，重渲染 |
-| "用我的模板出品牌主题" | 从你的 pptx 提取色板和中英文字体生成 run 级主题，三端贯穿 |
-| "定一套'赛博霓虹'主题" | 气质没被内置命中时现场生成 run 级主题（纯数据），自动过对比度/可读性体检，样张对齐后三端贯穿 |
-| "这页放张照片" / "去找点素材" | 征得同意后检索，落盘 `assets/` 并登记出处（`assets/manifest.yaml`：来源+许可），出版本对齐 |
+| "用我的 PPTX 模板" | 检查并导入背景、品牌元素和文字样式，经适用的样张审阅后编译；原生样式不支持 HTML。仅提取色板/字体可用 theme-from-pptx |
+| "定一套'赛博霓虹'主题" | 创建演示稿主题 token 并检查可读性，适用于支持的 PPTX/HTML 主题路径；报告有独立 DOCX 模板 |
+| "这页放张照片" / "去找点素材" | 未授权时先问；已明确授权则按范围检索，落盘 `assets/`、登记来源与许可，再展示选用结果 |
 | "PPTX 动画打开试试" | deck.style 开 `animations: true`（实验性，**先在真机 PowerPoint 验证再交付**） |
 
 save / confirm / render 都会自动先跑校验、**有 error 直接拒绝**——不需要记得
@@ -224,6 +234,9 @@ comh validate all             # 全量校验 → qa/findings.yaml
 comh render deck|deck-html|report   # 有 error 拒渲；渲染报告进 qa/
 comh evidence-pack deck P05   # 修复循环取证
 comh theme-from-pptx 模板.pptx --name brand   # 从模板提取品牌主题
+comh style-inspect 模板.pptx  # 检查原生背景、品牌资源与文字兼容风险
+comh style-import 模板.pptx --name brand   # 导入样式源，随后配置 surfaces 并审阅样张
+comh presentation-profiles academic-rich  # 查看内容密度与布局建议
 comh review <审稿文件.yaml>   # 记录当前版本审查，格式见 stages/qa.md
 comh present delivery         # 当前审稿通过后展示成品；收到验收回复后 respond
 comh deliver [--note ...]     # 钉住已接受的成品、审稿和请求，重渲染即作废

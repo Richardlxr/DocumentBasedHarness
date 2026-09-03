@@ -8,6 +8,14 @@
 
 ## 判断型检查清单
 
+### PPTX 模板兼容性（owning: 样式配置或 renderer）
+
+阅读 render report 的 `native_text_diagnostics`，并检查实际 PPTX 渲染：品牌短字、页脚、
+边缘装饰与新增正文都要看。字体替代、width_pressure、自适应是检查线索，不是自动确认的缺陷。
+遇到错位，用相同软件/字体环境对照原模板与成品，核对源页/图层/shape 的文字、几何和继承。
+编译引入的变化修 renderer；源文件也异常时检查替代字体与播放器兼容性。修复后重新预览，
+记录软件版本、字体缺失及尚未验证的平台，不能将 XML 原样保留等同于视觉一致。
+
 ### Narrative Validator（owning: narrative）
 
 - 问题与结论是否对应？recommendation 能否从前文推出？
@@ -17,7 +25,13 @@
 ### Audience Validator（owning: narrative 或 deck_plan / report_plan）
 
 - 是否假定过多背景知识？关键术语首次出现是否解释？
-- 密度是否符合 brief 的 spec.dimensions（不是死字数）？
+- 是否直接对实际读者说话？读者、委托人、材料作者有没有混淆？
+- 标题、页眉、图注、卡片底注等可见区域是否残留内部策划理由或空标签？
+  依照 [受众文案规则](../references/audience-copy.md) 检查，不只重跑关键词检测。
+- 每句话增加了什么具体信息？相同结论是否重复填充多个区域？抽象“验证通过”是否说明
+  检查了什么及仍不能证明什么？限制条件是否保留且可理解？
+- 密度是否符合 presentation_profile 和用户补充偏好？字数仅作信号，不能据此判定信息质量。
+  主图页允许少字；文本页应有必要展开；只用小字把页面塞满也不算通过。
 
 ### 说人话检查（owning: deck_plan / narrative）
 

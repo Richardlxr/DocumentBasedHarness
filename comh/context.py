@@ -84,6 +84,20 @@ def next_action(manifest: Manifest) -> dict:
         target = "deck_outline" if key == "deck_plan" else "report_outline"
         if not valid(manifest, target):
             return _decision(manifest, target)
+        if key == "deck_plan":
+            from .appearance import needs_review, preview_errors
+
+            if needs_review(manifest) and not valid(manifest, "deck_appearance"):
+                errors = preview_errors(manifest)
+                if errors:
+                    return {
+                        "stage": "deck",
+                        "action": "render_preview",
+                        "output": "deck",
+                        "target": "deck_appearance",
+                        "blockers": errors,
+                    }
+                return _decision(manifest, "deck_appearance")
         if (
             state(manifest)["mode"] == "collaborative"
             and latest(manifest, target)["state"] != "delegated"
@@ -195,6 +209,43 @@ def context_pack(manifest: Manifest, stage: str | None = None, node: str | None 
         ]
         pack["evidence_omitted"] = max(0, len(items) - 20)
         pack["evidence_path"] = str(evidence_path)
+    if stage in {"deck", "projection"}:
+        from .presentation_profile import resolve_profile
+
+        try:
+            pack["presentation_profile"] = resolve_profile(brief)
+        except ValueError as error:
+            pack["presentation_profile"] = {"error": str(error)}
+        pack["copy_contract"] = {
+            "audience": brief.get("audience"),
+            "rules": "Visible copy addresses the actual audience. "
+            "Keep planning rationale in notes/metadata; "
+            "state evidence, meaning and conditions. Never delete limitations to increase density.",
+            "reference": str(files("comh").joinpath("instructions/references/audience-copy.md")),
+        }
+        deck = load("deck_plan").get("deck", {})
+        reference = (deck.get("style") or {}).get("pptx_style")
+        if reference:
+            from .pptx_style import StyleError, load_style
+
+            try:
+                appearance = load_style(manifest.root, reference)
+                selected = [p for p in deck.get("pages", []) if not node or p["id"] == node]
+                roles = {appearance.surface(p.get("page_role", "content")).role for p in selected}
+                pack["appearance"] = {
+                    "profile": reference,
+                    "name": appearance.name,
+                    "profile_sha256": appearance.profile_hash,
+                    "tokens": appearance.tokens,
+                    "surfaces": [
+                        {"role": s.role, "tokens": s.tokens}
+                        for s in appearance.surfaces
+                        if s.role in roles
+                    ],
+                    "boundary": "Appearance only; content density and structure stay in the plan.",
+                }
+            except StyleError as error:
+                pack["appearance"] = {"error": str(error), "profile": reference}
     coverage = manifest.root / "evidence/coverage.yaml"
     pack["coverage_path"] = str(coverage)
     pack["follow_up"] = (

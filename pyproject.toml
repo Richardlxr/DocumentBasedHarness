@@ -21,6 +21,7 @@ dependencies = [
   "PyYAML>=6,<7",
   "jsonschema>=4,<6",
   "python-pptx>=1.0,<2",
+  "lxml>=5,<7",
 ]
 
 [project.optional-dependencies]
@@ -38,7 +39,7 @@ include = ["comh*", "docx_harness*"]
 
 [tool.setuptools.package-data]
 "docx_harness.project" = ["resources/*"]
-"comh" = ["schemas/*.json", "instructions/stages/*.md", "instructions/references/*.md", "instructions/skill/*.md"]
+"comh" = ["schemas/*.json", "presets/*.json", "instructions/stages/*.md", "instructions/references/*.md", "instructions/skill/*.md"]
 "comh.render" = ["web/*"]
 
 [tool.pytest.ini_options]

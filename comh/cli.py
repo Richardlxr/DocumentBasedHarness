@@ -10,6 +10,8 @@ Commands mirror the artifact lifecycle:
     render <target>      deck → build/deck.pptx; report → build/report.docx
     evidence-pack ...    ID-chain slice for one page/beat/section (repair-loop QA)
     theme-from-pptx ...  extract a brand theme from a template .pptx
+    style-inspect ...   inspect native PPTX appearance resources
+    style-import ...    copy a PPTX style source and create an explicit appearance profile
     deliver              record user acceptance of the build outputs (final gate)
 
 Stage guards are enforced here, not by prompt discipline: downstream commands
@@ -138,6 +140,9 @@ def cmd_save(args: argparse.Namespace) -> int:
     key = args.artifact
     if key == "report_md":
         require_outline(manifest, "report_plan", details=True)
+        errors = readiness(manifest, "report_detail")
+        if errors:
+            raise RunError("; ".join(errors))
     if key not in manifest.data["artifacts"]:
         raise RunError(f"unknown artifact '{key}' (known: {', '.join(manifest.data['artifacts'])})")
     # Guards: an artifact may only be saved from a valid upstream state.
@@ -260,6 +265,18 @@ def cmd_context(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_presentation_profiles(args: argparse.Namespace) -> int:
+    from .presentation_profile import profiles
+
+    data = profiles()
+    if args.name:
+        if args.name not in data:
+            raise RunError(f"unknown presentation profile: {args.name}")
+        data = {args.name: data[args.name]}
+    print(json.dumps(data, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_instructions(args: argparse.Namespace) -> int:
     _print_data(instructions(args.stage), args.json)
     return 0
@@ -306,6 +323,10 @@ def cmd_render(args: argparse.Namespace) -> int:
     if errors:
         raise RunError("; ".join(errors))
     _require_validated(manifest, _upstream_chain(artifact), f"render {args.target}")
+    if key == "deck" and not args.preview:
+        from .appearance import require_appearance
+
+        require_appearance(manifest)
     if args.preview:
         inputs = manifest.input_snapshot(_upstream_chain(artifact))
         suffix = ".html" if key == "deck_html" else ".pptx"
@@ -324,22 +345,51 @@ def cmd_render(args: argparse.Namespace) -> int:
         evidence, _ = load_artifact(run_root, "evidence")
         brief = manifest.brief()
         renderer = render_html_deck if key == "deck_html" else render_deck
-        result = renderer(
-            plan,
-            run_root,
-            output,
-            language=brief.get("language", "en"),
-            evidence=evidence,
-            allow_dark=not forbids_dark(brief),
-        )
+        from .pptx_style import StyleError
+
+        try:
+            result = renderer(
+                plan,
+                run_root,
+                output,
+                language=brief.get("language", "en"),
+                evidence=evidence,
+                allow_dark=not forbids_dark(brief),
+            )
+        except StyleError as error:
+            metadata.update(
+                count={"error": 1, "warn": 0, "info": 0},
+                findings=[
+                    Finding("deck_plan", "pptx-style", "error", "fail", str(error)).as_dict()
+                ],
+                published=False,
+            )
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(yaml.safe_dump(metadata, allow_unicode=True, sort_keys=False))
+            if not args.preview:
+                manifest.record_build(key, inputs, report_path, False)
+            raise
+
         if key == "deck_html":
             _headless_layout_check(output, result)
         findings = result.findings
         metadata.update(theme=result.theme, transition=result.transition)
+        metadata.update(getattr(result, "metadata", {}))
+        risky = [d for d in metadata.get("native_text_diagnostics", []) if d["risks"]]
+        if risky:
+            print(
+                f"native text compatibility: {len(risky)} element(s) need visual review; "
+                "see native_text_diagnostics in render report (measurement is not player proof)"
+            )
     metadata.update(
         count={s: sum(f.severity == s for f in findings) for s in ("error", "warn", "info")},
         findings=[f.as_dict() for f in findings],
     )
+    if key == "deck" and args.preview:
+        from .appearance import signature
+        from .lineage import hash_file
+
+        metadata.update(appearance_signature=signature(manifest), output_sha256=hash_file(output))
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(
         yaml.safe_dump(metadata, allow_unicode=True, sort_keys=False), encoding="utf-8"
@@ -441,6 +491,26 @@ def cmd_theme_from_pptx(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_style_inspect(args: argparse.Namespace) -> int:
+    from .pptx_style import inspect_pptx
+
+    result = inspect_pptx(Path(args.pptx), slide=args.slide)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_style_import(args: argparse.Namespace) -> int:
+    from .pptx_style import import_style
+
+    root = _resolve_run(args)
+    path = import_style(Path(args.pptx), args.name, root)
+    print(f"style source imported → {path}")
+    print("Select appearance elements from inventory.json and set surfaces in style.yaml.")
+    print("Only backgrounds, branding/icons and typography belong here; no content slots/density.")
+    print(f"deck.style.pptx_style: {path.relative_to(root).as_posix()}")
+    return 0
+
+
 def cmd_evidence_pack(args: argparse.Namespace) -> int:
     run_root = _resolve_run(args)
     pack = build_pack(run_root, args.artifact, args.id)
@@ -473,6 +543,10 @@ def _require_deliverables(manifest: Manifest) -> set[str]:
     outputs = manifest.output_selection()
     if not outputs:
         raise RunError("no supported outputs selected in brief.media")
+    if "deck" in outputs:
+        from .appearance import require_appearance
+
+        require_appearance(manifest)
     for key in outputs:
         if key == "report_md":
             manifest.require_fresh(key)
@@ -586,6 +660,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_instructions)
 
+    p = add("presentation-profiles", "list density and layout guidance without a run")
+    p.add_argument("name", nargs="?")
+    p.set_defaults(func=cmd_presentation_profiles)
+
     p = add("validate", "schema + cross-artifact checks")
     p.add_argument("target", nargs="?", default="all")
     p.set_defaults(func=cmd_validate)
@@ -608,6 +686,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("pptx", help="path to the template .pptx")
     p.add_argument("--name", required=True, help="theme name to create under themes/")
     p.set_defaults(func=cmd_theme_from_pptx)
+
+    p = add("style-inspect", "inspect a PPTX's appearance resources without a run")
+    p.add_argument("pptx")
+    p.add_argument("--slide", type=int, help="one source slide, in visible presentation order")
+    p.set_defaults(func=cmd_style_inspect)
+
+    p = add("style-import", "copy a native PPTX style source into the run")
+    p.add_argument("pptx")
+    p.add_argument("--name", required=True)
+    p.set_defaults(func=cmd_style_import)
 
     p = add("review", "record a version-bound model review from a YAML file")
     p.add_argument("file", help="YAML with completed_checks, findings and manual_constraints")

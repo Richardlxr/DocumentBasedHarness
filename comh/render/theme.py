@@ -67,6 +67,15 @@ class DeckTheme:
     latin_fonts: tuple[str, str] = ("Calibri", "Calibri")  # (title, body)
     cjk_fonts: tuple[str, str] = ("Microsoft YaHei", "Microsoft YaHei")
     notes: str = ""
+    title_text: RGBColor | None = None
+    title_bold: bool = True
+    title_italic: bool = False
+    body_bold: bool = True
+    body_italic: bool = False
+
+    @property
+    def title_color(self) -> RGBColor:
+        return self.title_text if self.title_text is not None else self.text
 
 
 def _rgb(value: str) -> RGBColor:
@@ -231,6 +240,8 @@ def merge_tokens(theme: DeckTheme, override: dict | None) -> DeckTheme:
 
     changes: dict = {}
     colors = override.get("colors") or {}
+    if "title" in colors:
+        changes["title_text"] = _rgb(str(colors["title"]).lstrip("#").upper())
     for key in ("background", "text", "muted", "accent", "accent_soft", "card_fill", "card_line"):
         if key in colors:
             changes[key] = _rgb(str(colors[key]).lstrip("#").upper())
@@ -239,9 +250,15 @@ def merge_tokens(theme: DeckTheme, override: dict | None) -> DeckTheme:
         if key in sizes:
             changes[field_name] = int(sizes[key])
     fonts = override.get("fonts") or {}
-    if "latin" in fonts and isinstance(fonts["latin"], (list, tuple)) and fonts["latin"]:
-        latin = [str(f) for f in fonts["latin"]] + ["Calibri", "Calibri"]
-        changes["latin_fonts"] = (latin[0], latin[1])
+    for role, properties in (override.get("font_styles") or {}).items():
+        if role in {"title", "body"}:
+            for key in ("bold", "italic"):
+                if key in properties:
+                    changes[f"{role}_{key}"] = bool(properties[key])
+    for key, fallback in (("latin", "Calibri"), ("cjk", "Microsoft YaHei")):
+        if key in fonts and isinstance(fonts[key], (list, tuple)) and fonts[key]:
+            faces = [str(f) for f in fonts[key]] + [fallback, fallback]
+            changes[f"{key}_fonts"] = (faces[0], faces[1])
     return dataclasses.replace(theme, **changes) if changes else theme
 
 
@@ -256,6 +273,24 @@ def resolve_style(
     light theme to midnight via tokens_override is caught deterministically.
     """
     style = style or {}
+    if "pptx_style" in style:
+        from ..pptx_style.profile import StyleError, load_style
+
+        if run_root is None:
+            raise StyleError("pptx_style requires a run workspace")
+        if style.get("template"):
+            raise StyleError("pptx_style cannot be combined with a token template")
+        profile = load_style(run_root, style["pptx_style"])
+        merged = merge_tokens(_emergency_default(), profile.tokens)
+        merged = merge_tokens(merged, style.get("tokens_override"))
+        import dataclasses
+
+        merged = dataclasses.replace(
+            merged, name=profile.name, is_light=background_is_light(merged.background)
+        )
+        return ThemeChoice(
+            merged, profile.name, forced_light=not allow_dark and not merged.is_light
+        )
     choice = select_theme(style, allow_dark=allow_dark, run_root=run_root)
     if choice.forced_light:
         return choice

@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cache
 
@@ -21,6 +23,17 @@ _MARGIN = 1.08  # measured widths are estimates of the final render; stay safe
 _CJK_RANGES = ((0x2E80, 0x9FFF), (0xF900, 0xFAFF), (0xFF00, 0xFFEF), (0x20000, 0x2FA1F))
 _FALLBACK_LATIN = 0.52  # width in em for the fallback model
 _FALLBACK_CJK = 1.0
+FIXED_TEXT_SIZES = ContextVar("fixed_text_sizes", default=False)
+
+
+@contextmanager
+def fixed_text_sizes():
+    """A style-template build must report excess content instead of shrinking its typography."""
+    token = FIXED_TEXT_SIZES.set(True)
+    try:
+        yield
+    finally:
+        FIXED_TEXT_SIZES.reset(token)
 
 
 def _is_cjk(char: str) -> bool:
@@ -29,13 +42,14 @@ def _is_cjk(char: str) -> bool:
 
 
 @cache
-def _font_path(family: str) -> str | None:
+def _font_path(family: str, bold: bool = False, italic: bool = False) -> str | None:
     configured = shutil.which("fc-match")
     if not configured:
         return None
     try:
+        style = " ".join(s for s, enabled in (("Bold", bold), ("Italic", italic)) if enabled)
         completed = subprocess.run(
-            [configured, "-f", "%{file}\n", f"{family}:style=Regular"],
+            [configured, "-f", "%{file}\n", f"{family}:style={style or 'Regular'}"],
             capture_output=True,
             text=True,
             check=False,
@@ -48,8 +62,10 @@ def _font_path(family: str) -> str | None:
 
 
 @cache
-def _font(family: str, size_pt: int) -> ImageFont.FreeTypeFont | None:
-    path = _font_path(family)
+def _font(
+    family: str, size_pt: int, bold: bool = False, italic: bool = False
+) -> ImageFont.FreeTypeFont | None:
+    path = _font_path(family, bold, italic)
     if not path:
         return None
     try:
@@ -58,10 +74,32 @@ def _font(family: str, size_pt: int) -> ImageFont.FreeTypeFont | None:
         return None
 
 
+def font_resolution(family: str, *, bold: bool = False, italic: bool = False) -> dict:
+    """Record measurement substitution; this does not identify the presentation player's font."""
+    font = _font(family, 24, bold, italic)
+    actual = font.getname()[0] if font is not None else None
+    return {
+        "requested": family,
+        "measurement_family": actual,
+        "measurement_file": _font_path(family, bold, italic),
+        "requested_style": {"bold": bold, "italic": italic},
+        "substitution": actual is None or actual.casefold() != family.casefold(),
+        "method": "fontconfig/Pillow" if font is not None else "conservative character widths",
+        "player_font": "unverified",
+    }
+
+
 @cache
-def text_width(text: str, size_pt: int, family: str = "Microsoft YaHei") -> float:
+def text_width(
+    text: str,
+    size_pt: int,
+    family: str = "Microsoft YaHei",
+    *,
+    bold: bool = False,
+    italic: bool = False,
+) -> float:
     """Width of ``text`` in points (1 pt treated as 1 px at 72 dpi)."""
-    font = _font(family, size_pt)
+    font = _font(family, size_pt, bold, italic)
     if font is not None and text:
         return float(font.getlength(text)) * _MARGIN
     em = size_pt

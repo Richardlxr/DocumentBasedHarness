@@ -92,6 +92,13 @@ def render_html_deck(
     evidence: dict | None = None,
     allow_dark: bool = True,
 ) -> HtmlResult:
+    if "pptx_style" in plan.get("deck", {}).get("style", {}):
+        from ..pptx_style import StyleError
+
+        raise StyleError(
+            "pptx_style is a native PPTX appearance; render deck --preview and "
+            "inspect that PPTX. HTML cannot reproduce this style template."
+        )
     theme = render_theme(
         plan.get("deck", {}).get("style"), language, allow_dark=allow_dark, run_root=run_root
     )

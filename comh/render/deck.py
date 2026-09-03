@@ -32,8 +32,8 @@ from pptx.oxml.ns import qn
 from pptx.util import Inches, Pt
 
 from ..artifacts import Finding
-from .metrics import fit_box, wrap_lines
-from .ooxml import set_shape_translucent_fill
+from .metrics import FIXED_TEXT_SIZES, fit_box, wrap_lines
+from .ooxml import set_east_asian_font, set_shape_translucent_fill
 from .scrim import solve_scrim
 from .theme import RenderTheme, render_theme
 
@@ -70,6 +70,7 @@ class RenderResult:
     shape_map: dict[str, dict[str, int]] = field(default_factory=dict)
     # page_id -> slide index (for the animation pass)
     slide_index: dict[str, int] = field(default_factory=dict)
+    metadata: dict = field(default_factory=dict)
 
 
 def render_deck(
@@ -80,9 +81,20 @@ def render_deck(
     language: str = "en",
     evidence: dict | None = None,
     allow_dark: bool = True,
+    _appearance_themes: list[RenderTheme] | None = None,
 ) -> RenderResult:
-    theme = render_theme(
-        plan.get("deck", {}).get("style"), language, allow_dark=allow_dark, run_root=run_root
+    if "pptx_style" in plan.get("deck", {}).get("style", {}) and _appearance_themes is None:
+        from ..pptx_style.compiler import compile_deck
+
+        return compile_deck(
+            plan, run_root, output, language=language, evidence=evidence, allow_dark=allow_dark
+        )
+    theme = (
+        _appearance_themes[0]
+        if _appearance_themes
+        else render_theme(
+            plan.get("deck", {}).get("style"), language, allow_dark=allow_dark, run_root=run_root
+        )
     )
     result = RenderResult(output=output, theme=theme.theme.name, transition=None)
     if theme.fallback_reason:
@@ -107,6 +119,8 @@ def render_deck(
     total = len(plan["deck"]["pages"])
 
     for slide_number, page in enumerate(plan["deck"]["pages"]):
+        if _appearance_themes:
+            theme = _appearance_themes[slide_number]
         role = page.get("page_role", "content")
         page_id = page.get("id", f"P{slide_number + 1:02d}")
         slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -131,7 +145,7 @@ def render_deck(
             _render_content(slide, page, run_root, theme, result, evidence, shapes)
         result.shape_map[page_id] = shapes
         result.slide_index[page_id] = slide_number
-        if role != "cover":
+        if role != "cover" and not _appearance_themes:
             _add_footer(slide, page_id, slide_number, total, plan, theme)
         _add_notes(slide, page)
 
@@ -220,13 +234,18 @@ def _textbox(slide, left, top, width, height) -> object:
     return box
 
 
-def _set(paragraph, text: str, *, size: int, font: str, color, bold: bool = False) -> None:
+def _set(
+    paragraph, text: str, *, size: int, font: str, color, bold: bool = False, italic: bool = False
+) -> None:
     paragraph.text = text
     for run in paragraph.runs:
         run.font.size = Pt(size)
         run.font.bold = bold
+        run.font.italic = italic
         run.font.color.rgb = color
         run.font.name = font
+        if FIXED_TEXT_SIZES.get():
+            set_east_asian_font(run, font)
 
 
 def _add_notes(slide, page: dict) -> None:
@@ -252,7 +271,7 @@ def _fit_or_report(
         width_pt=width_in * _PT_PER_IN,
         height_pt=height_in * _PT_PER_IN,
         max_size=max_size,
-        min_size=min_size,
+        min_size=max_size if FIXED_TEXT_SIZES.get() else min_size,
         family=family,
     )
     if fit.overflows:
@@ -354,8 +373,9 @@ def _render_cover(
         page["title"],
         size=size,
         font=theme.title_font,
-        color=t.text,
-        bold=True,
+        color=t.title_color,
+        bold=t.title_bold,
+        italic=t.title_italic,
     )
     if joined:
         paragraph = box.text_frame.add_paragraph()
@@ -381,8 +401,9 @@ def _render_agenda(
         page["title"],
         size=t.banner_title_size,
         font=theme.title_font,
-        color=t.text,
-        bold=True,
+        color=t.title_color,
+        bold=t.title_bold,
+        italic=t.title_italic,
     )
 
     entries = page.get("support_points", [])
@@ -467,8 +488,9 @@ def _render_banner(
         page["title"],
         size=size,
         font=theme.title_font,
-        color=t.text,
-        bold=True,
+        color=t.title_color,
+        bold=t.title_bold,
+        italic=t.title_italic,
     )
     for entry in points:
         point, _ = _point_parts(entry)
@@ -550,8 +572,9 @@ def _render_content(
         page["title"],
         size=size,
         font=theme.title_font,
-        color=t.text,
-        bold=True,
+        color=t.title_color,
+        bold=t.title_bold,
+        italic=t.title_italic,
     )
     # full-width hairline with a short accent segment — editorial separation
     hair_y = title_top + 1.06
@@ -579,6 +602,9 @@ def _render_content(
     strip.line.fill.background()
 
     content_top = _BODY_TOP if title_top < 0.5 else _BODY_TOP + 0.2
+    # Reserve the conclusion band only when it exists. Otherwise the body can
+    # use that space while staying clear of the footer (starts at 7.06in).
+    content_bottom = _BODY_BOTTOM if page.get("callout") else 6.8
     if cards:
         _render_metric_cards(
             slide,
@@ -605,7 +631,7 @@ def _render_content(
             x=6.55,
             y=content_top,
             w=5.9,
-            h=_BODY_BOTTOM - content_top,
+            h=content_bottom - content_top,
             shapes=shapes,
         )
         body_width = 5.35
@@ -634,7 +660,7 @@ def _render_content(
             x=_MARGIN_X,
             y=content_top,
             width_in=body_width,
-            height_in=_BODY_BOTTOM - content_top,
+            height_in=content_bottom - content_top,
             theme=theme,
             findings=result.findings,
             shapes=shapes,
@@ -817,7 +843,7 @@ def _render_metric_cards(
                         Inches(top + 0.14),
                         height=Inches(0.34),
                     )
-                    icon_shape.name = "decor"
+                    icon_shape.name = f"icon:{card_icon}"
                 except RuntimeError as error:
                     result.findings.append(
                         Finding(
@@ -904,7 +930,7 @@ def _render_points(
 
     max_size = t.body_size if width_in < _BODY_W else t.body_size_wide
     size = 14
-    for candidate in range(max_size, 13, -1):
+    for candidate in [max_size] if FIXED_TEXT_SIZES.get() else range(max_size, 13, -1):
         if sum(card_height(e, candidate) for e in points) <= height_in:
             size = candidate
             break
@@ -915,7 +941,8 @@ def _render_points(
                 "layout",
                 "warn",
                 "fail",
-                f"page {page_id} body points do not fit at 14pt — demote content to "
+                f"page {page_id} body points do not fit at "
+                f"{max_size if FIXED_TEXT_SIZES.get() else 14}pt — demote content to "
                 f"notes/appendix (see stages/deck.md)",
                 "deck_plan",
             )
@@ -952,7 +979,7 @@ def _render_points(
                         Inches(cursor + heights[index] / 2 - 0.14),
                         height=Inches(0.28),
                     )
-                    picture.name = "decor"
+                    picture.name = f"icon:{icon_name}"
                     icon_width = 0.42
                 except RuntimeError as error:
                     findings.append(
@@ -987,7 +1014,15 @@ def _render_points(
         frame.margin_right = Inches(pad_h)
         frame.margin_top = Inches(pad_v)
         frame.margin_bottom = Inches(pad_v)
-        _set(frame.paragraphs[0], point, size=size, font=theme.body_font, color=t.text, bold=True)
+        _set(
+            frame.paragraphs[0],
+            point,
+            size=size,
+            font=theme.body_font,
+            color=t.text,
+            bold=t.body_bold,
+            italic=t.body_italic,
+        )
         if detail:
             detail_para = frame.add_paragraph()
             detail_para.space_before = Pt(2)
@@ -1087,8 +1122,9 @@ def _render_hero_split(
         page["title"],
         size=size,
         font=theme.title_font,
-        color=t.text,
-        bold=True,
+        color=t.title_color,
+        bold=t.title_bold,
+        italic=t.title_italic,
     )
 
     hair_y = title_top + 1.35
@@ -1199,8 +1235,9 @@ def _render_fullscreen_backdrop(
         page["title"],
         size=size,
         font=theme.title_font,
-        color=t.text,
-        bold=True,
+        color=t.title_color,
+        bold=t.title_bold,
+        italic=t.title_italic,
     )
 
     hair_y = title_top + 1.15
@@ -1299,8 +1336,9 @@ def _render_timeline(
         page["title"],
         size=size,
         font=theme.title_font,
-        color=t.text,
-        bold=True,
+        color=t.title_color,
+        bold=t.title_bold,
+        italic=t.title_italic,
     )
 
     hair_y = title_top + 1.12
@@ -1382,7 +1420,9 @@ def _render_timeline(
             title_lines = len(wrap_lines(pt_text, pt_size, inner_w, theme.body_font))
             budget = box_h * _PT_PER_IN - 8 - title_lines * pt_size * _LINE_SPACING
             detail_size = t.detail_size
-            for candidate in range(t.detail_size, 10, -1):
+            for candidate in (
+                [t.detail_size] if FIXED_TEXT_SIZES.get() else range(t.detail_size, 10, -1)
+            ):
                 lines = wrap_lines(pt_detail, candidate, inner_w, theme.body_font)
                 if len(lines) * candidate * 1.3 <= budget:
                     detail_size = candidate
@@ -1449,8 +1489,9 @@ def _render_versus(
         page["title"],
         size=size,
         font=theme.title_font,
-        color=t.text,
-        bold=True,
+        color=t.title_color,
+        bold=t.title_bold,
+        italic=t.title_italic,
     )
 
     hair_y = title_top + 1.12

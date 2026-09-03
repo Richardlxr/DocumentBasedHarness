@@ -36,6 +36,51 @@
         },
         "prior_knowledge": {
           "type": "string"
+        },
+        "copy_exceptions": {
+          "type": "array",
+          "description": "Explicit user-requested quotation/teaching exceptions. Exact text and location only; does not waive factual or evidence constraints.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artifact",
+              "location",
+              "rule",
+              "text",
+              "reason",
+              "source"
+            ],
+            "properties": {
+              "artifact": {
+                "enum": [
+                  "narrative",
+                  "deck_plan",
+                  "report_md"
+                ]
+              },
+              "location": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rule": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
       }
     },
@@ -323,6 +368,123 @@
           "value": {},
           "due": {
             "type": "string"
+          }
+        }
+      }
+    },
+    "appearance": {
+      "type": "object",
+      "required": [
+        "selection"
+      ],
+      "additionalProperties": false,
+      "description": "PPTX appearance policy resolved at Gate 1. Template choice is distinct from prototype approval and from content layout.",
+      "properties": {
+        "selection": {
+          "enum": [
+            "default",
+            "specified",
+            "deferred",
+            "delegated"
+          ]
+        },
+        "reference": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact run-relative PPTX style profile, or token theme name, when specified."
+        },
+        "review": {
+          "enum": [
+            "sample",
+            "delegated"
+          ],
+          "default": "sample",
+          "description": "Delegated means the user explicitly delegates appearance adaptation review; outline delegation does not imply this."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "selection": {
+                "const": "specified"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reference"
+            ]
+          }
+        }
+      ]
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "setting"
+      ],
+      "description": "Presentation content density and layout guidance. Academic settings default to academic-rich; an explicit profile or overrides win. Independent of visual appearance and voice.",
+      "properties": {
+        "setting": {
+          "enum": [
+            "academic",
+            "general"
+          ]
+        },
+        "profile": {
+          "enum": [
+            "academic-rich",
+            "balanced",
+            "concise"
+          ]
+        },
+        "overrides": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "text_budget": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "zh_chars": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "words": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            },
+            "substantive_blocks": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "layout_patterns": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           }
         }
       }

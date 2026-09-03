@@ -32,6 +32,8 @@
   室内默认风格。
 - `audience`：具体的人，不是标签。"客户方技术负责人，熟悉存储系统但不了解我们的
   缓存方案" 远好于 "technical"。
+  区分实际读者与委托/制作人，说明读者已知什么、需要据此判断什么。不能把“委托方
+  最终关心的价值”等制作视角直接写到交付给委托方的页面上。
 - `objective`：这次沟通要达成什么决定/行动/认知。
 - `delivery_context`：场合与时长（"30 分钟客户评审会" / "异步阅读的周报"）。
 - `media`：每个输出 `{medium, surface}` 二元组。当前支持 `pptx/presentation`、
@@ -51,6 +53,19 @@
   纯排版（typography-only 也是显式选择）/ 图标点缀（`assets/vendor/tabler-outline`，
   5 千+语义图标）/ 需要配图（用户提供 or 显式申请外部获取，绝不静默抓取）。
   写成开放字段记进 brief，deck 投影时消费。
+- `appearance`（交付 PPTX 时必填）：记录样式模板意向与样张审阅方式，并纳入 alignment。
+  `selection: default | specified | deferred | delegated` 分别表示采用默认、用户指定、稍后选择、
+  用户委托选择；specified 同时写 `reference`（run 内样式配置路径或 token 主题名）。
+  `review: sample | delegated` 默认 sample；用户明确委托样式审阅才能写 delegated，
+  不得从“不要逐页磨大纲”推导。已给单个模板直接记录，不再问是否使用；给模板合集时
+  记录 deferred，故事线与粗大纲接受后展示候选和样张再定。不指定时可把默认方案并入
+  本次契约一起确认，不必另开一轮。appearance 不承载密度和结构；内容预设在下一项单独记录。
+- `presentation`（有 presentation 输出时必填）：记录 `setting: academic | general`，
+  学术/研究评审默认 `academic-rich`（学术充实），其他场合默认 balanced。用户明确指定
+  密度时用 profile/overrides 覆盖，不能因学术默认忽略用户的“简短”要求。并入 alignment
+  和本次契约接受，不另开一轮审批。密度、布局建议见 [内容预设](../references/presentation-profiles.md)，
+  与字体、背景等 appearance 以及语言 voice 分开。setting 从已知场合判断并披露依据，
+  不根据术语多少猜测；不清楚且影响交付才问。
 - `spec.dimensions`：自由发明的维度表（`technical_rigor`、`storytelling`、
   `evidence_density`、以及任何你觉得能表达这次沟通风格的新词）。代码只透传不解释，
   下游靠你自己在各 stage 里贯彻。
@@ -65,7 +80,9 @@
 
 ## Gate 1（硬规则）
 
-给用户看：语言 / 受众 / 目标 / 场合 / 媒介 / 期望带走什么 / 硬约束清单 / spec 摘要。
+给用户看：语言 / 受众 / 目标 / 场合 / 媒介 / 期望带走什么 / 文风 / 硬约束清单 / spec 摘要，
+有演示稿时说明内容密度的生效预设与用户覆盖；交付 PPTX 时说明样式模板意向、何时看样张。
+把用户要求、推断、建议默认与未决项分开。缺少适用的密度或模板意向处置会阻止接受。
 用户修改后更新文件；先保存、生成展示请求，再等待用户回复：
 
 ```

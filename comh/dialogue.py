@@ -23,6 +23,7 @@ TARGETS = (
     "brief",
     "narrative",
     "deck_outline",
+    "deck_appearance",
     "report_outline",
     "deck_detail",
     "report_detail",
@@ -33,6 +34,7 @@ ARTIFACT = {
     "brief": "brief",
     "narrative": "narrative",
     "deck_outline": "deck_plan",
+    "deck_appearance": "deck_plan",
     "report_outline": "report_plan",
     "deck_detail": "deck_plan",
     "report_detail": "report_plan",
@@ -94,6 +96,12 @@ def view(manifest: Manifest, target: str, node: str | None = None) -> dict:
         raise RunError(f"unknown decision target: {target}")
     if target in {"brief", "narrative"}:
         return read(manifest, target)
+    if target == "deck_appearance":
+        from .appearance import view as appearance_view
+
+        if node:
+            raise RunError("appearance review does not take --node")
+        return appearance_view(manifest)
     if target == "delivery":
         from .qa import reader_receipt
 
@@ -128,6 +136,10 @@ def view(manifest: Manifest, target: str, node: str | None = None) -> dict:
 
 
 def binding(manifest: Manifest, target: str, node: str | None = None) -> dict:
+    if target == "deck_appearance":
+        from .appearance import signature
+
+        return {"run": str(manifest.root.resolve()), "appearance": signature(manifest)}
     parents = (
         [] if target == "brief" else ["brief"] if target == "narrative" else ["brief", "narrative"]
     )
@@ -186,6 +198,10 @@ def readiness(manifest: Manifest, target: str) -> list[str]:
     )
     errors += question_errors(list(questions.values()), stage)
     errors += coverage_errors(manifest.root)
+    if target == "deck_appearance":
+        from .appearance import preview_errors
+
+        errors += preview_errors(manifest)
     if target != "brief":
         errors += narrative_errors(read(manifest, "narrative"))
     return list(dict.fromkeys(errors))
@@ -198,6 +214,12 @@ def require_parents(manifest: Manifest, target: str) -> None:
         manifest.require_gate("narrative")
     if target.endswith("detail"):
         require_outline(manifest, "deck_plan" if target.startswith("deck") else "report_plan")
+    if target == "deck_appearance":
+        require_outline(manifest, "deck_plan")
+    if target == "deck_detail":
+        from .appearance import require_appearance
+
+        require_appearance(manifest)
 
 
 def present(manifest: Manifest, target: str, node: str | None = None, summary: str = "") -> dict:
@@ -213,6 +235,11 @@ def present(manifest: Manifest, target: str, node: str | None = None, summary: s
         and old["binding"] == current_binding
         and old.get("summary", "") == summary
         and old["state"] in {"awaiting_user", "accepted", "delegated"}
+        and (
+            target != "deck_appearance"
+            or old["state"] != "awaiting_user"
+            or old["view"]["sample"] == view(manifest, target)["sample"]
+        )
     ):
         return old
     pending = [r for r in state(manifest)["requests"] if r["state"] == "awaiting_user"]
@@ -275,6 +302,11 @@ def respond(manifest: Manifest, request_id: str, decision: str, reply: str, sour
         require_parents(manifest, target)
         if request["binding"] != binding(manifest, target, node):
             raise RunError("proposal changed since presentation; present the current version again")
+        if (
+            target == "deck_appearance"
+            and request["view"]["sample"] != view(manifest, target)["sample"]
+        ):
+            raise RunError("appearance sample changed; present the current preview again")
         if target in ARTIFACT:
             manifest.require_fresh(ARTIFACT[target])
         if decision == "delegated" and target in {"brief", "narrative", "delivery"}:

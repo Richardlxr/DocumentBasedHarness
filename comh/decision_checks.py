@@ -18,6 +18,8 @@ BRIEF_FIELDS = (
     "constraints",
     "voice",
     "visual_materials",
+    "appearance",
+    "presentation",
 )
 STAGES = ("intake", "evidence", "brief", "narrative", "projection", "authoring", "qa", "deliver")
 
@@ -52,7 +54,12 @@ def question_errors(questions: list, stage: str) -> list[str]:
 
 
 def brief_errors(brief: dict, stage: str = "brief") -> list[str]:
-    errors = question_errors(brief.get("open_questions", []), stage)
+    from .appearance import applicable, policy_errors
+    from .presentation_profile import applicable as has_presentation
+    from .presentation_profile import policy_errors as presentation_errors
+
+    errors = question_errors(brief.get("open_questions", []), stage) + policy_errors(brief)
+    errors += presentation_errors(brief)
     if not has_text(brief.get("audience", {}).get("description")):
         errors.append("brief.audience.description cannot be blank")
     for field in ("language", "objective"):
@@ -64,6 +71,10 @@ def brief_errors(brief: dict, stage: str = "brief") -> list[str]:
     if not isinstance(alignment, dict):
         return errors + ["brief.alignment must record the disposition of every contract field"]
     for field in BRIEF_FIELDS:
+        if field == "appearance" and not applicable(brief):
+            continue
+        if field == "presentation" and not has_presentation(brief):
+            continue
         entry = alignment.get(field)
         if not isinstance(entry, dict):
             errors.append(f"alignment.{field} is missing")

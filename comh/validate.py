@@ -1094,9 +1094,13 @@ def run_all(run_root: Path, keys: set[str] | None = None) -> list[Finding]:
             findings.append(
                 Finding("report_md", "schema", "error", "fail", "report source missing")
             )
+    from .audience_lint import validate_audience_copy
+    from .presentation_profile import validate_density
     from .style_lint import validate_style
 
     findings += validate_style(artifacts, report_md_text)
+    findings += validate_audience_copy(artifacts, report_md_text)
+    findings += validate_density(artifacts)
     if artifacts.get("evidence") is not None:
         findings += validate_sources(artifacts, run_root)
     if all(artifacts.get(k) is not None for k in ("evidence", "narrative")):
@@ -1108,6 +1112,21 @@ def run_all(run_root: Path, keys: set[str] | None = None) -> list[Finding]:
         findings += validate_reveal(artifacts)
         findings += validate_report(artifacts, report_md_text)
     if artifacts.get("deck_plan") is not None:
+        style = artifacts["deck_plan"].get("deck", {}).get("style", {})
+        if "pptx_style" in style:
+            from .contracts import forbids_dark
+            from .pptx_style.compiler import resolve_plan
+            from .pptx_style.profile import StyleError
+
+            try:
+                resolve_plan(
+                    artifacts["deck_plan"],
+                    run_root,
+                    allow_dark=not forbids_dark(artifacts.get("brief") or {}),
+                )
+            except StyleError as error:
+                findings.append(Finding("deck_plan", "pptx-style", "error", "fail", str(error)))
+                return findings
         findings += validate_assets(artifacts, run_root)
         findings += validate_theme(artifacts, run_root)
     if artifacts.get("brief") is not None:

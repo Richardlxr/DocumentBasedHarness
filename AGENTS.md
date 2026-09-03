@@ -65,6 +65,12 @@ upstream by replacing the package directory and re-running `tests/compiler/`.
   from it by pure code (no model in the loop at render time). Visual upgrades (templates,
   layout engine, constrained animation vocabulary, HTML surface) must stay renderer-side
   and must not leak visual fields back into the narrative.
+- PPTX appearance templates (`comh/pptx_style/`, run `templates/*/style.yaml`) supply
+  native backgrounds, selected branding/icons and typography only. Organizational style
+  is separate: density and layout guidance now use `brief.presentation`; full reusable
+  content-slot/layout templates remain a separate concern. Never import
+  sample content panels merely because they live on a master/layout. Profiles are strict;
+  imported source files are hash-pinned. Exact previews use PPTX, not the HTML backend.
 - Web-sourced assets (photos, illustrations) are dialogue-gated: the agent asks for
   consent before any network fetch, downloads into the run workspace, and registers
   provenance in `runs/<name>/assets/manifest.yaml` (file, origin_url, license,
@@ -99,6 +105,24 @@ upstream by replacing the package directory and re-running `tests/compiler/`.
   `brief.alignment` accounts for every contract field; distinguish user input from inference
   and proposed defaults. Ask only for material unknowns; do not repeat answered questions.
   Partial/assumed/unresearched claims need an explicit qualification or omission at Gate 2.
+- PPTX contracts must account for `brief.appearance`: template intent at Gate 1, actual
+  choice/sample after the narrative and outline, before bulk authoring. `deck_appearance`
+  pins appearance separately from content. A provided template is not acceptance of its
+  first compiled adaptation; explicit appearance-review delegation may waive that round.
+  Outline delegation does not imply appearance delegation. Reuse current same-run style
+  receipts; fix unintended wrapping without asking again, then recompile and verify.
+- Native-text diagnostics are compatibility risk estimates, not proof of player output.
+  Compare original and generated PPTX in the same renderer to separate compiler changes
+  from source/font/player behavior. Single-line repairs are explicit, measured and checked
+  for new collisions; never apply no-wrap to all template text or promise universal fidelity.
+- Presentation contracts record academic/general setting and optional density overrides.
+  Academic settings default to academic-rich unless the user requests otherwise. Density
+  and layout advice are authoring guidance, never word quotas or permission to invent facts,
+  shrink type, or import source content panels. Keep this independent of appearance/voice.
+- Audience copy checks cover all known visible fields, including labels and captions.
+  Planning rationale stays in metadata/notes. Clear production-language leaks block save/render;
+  compressed jargon and limitations trigger review. Preserve real limitations and distinguish
+  reproducibility from accuracy. Phrase detection cannot certify audience understanding.
 - Preview decks use `comh render deck|deck-html --preview`; outputs stay in `.workspace/`
   and cannot be delivered. Never remove formal guards to generate a specimen.
 - Runs carry lineage state; private runs are Git-ignored except the checked-in sample.
