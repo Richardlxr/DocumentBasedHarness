@@ -189,9 +189,14 @@ def test_icon_validation_and_search() -> None:
 
 
 def test_pptx_card_icons_render(tmp_path: Path):
+    import pytest
     from pptx import Presentation
 
     from comh.render.deck import render_deck
+    from comh.render.icons import _chrome
+
+    if _chrome() is None:
+        pytest.skip("Chromium is not installed in this integration-test environment")
 
     plan = {
         "version": 1,
