@@ -83,6 +83,19 @@ def test_diagram_metrics_resolve_registered_windows_font(tmp_path: Path, monkeyp
     assert diagram_metrics.FontMetrics("SimHei")._resolve(13, False) == regular
 
 
+def test_diagram_metrics_fall_back_to_available_windows_font(tmp_path: Path, monkeypatch) -> None:
+    fonts = tmp_path / "Windows" / "Fonts"
+    fallback = fonts / "segoeui.ttf"
+    fonts.mkdir(parents=True)
+    fallback.touch()
+    monkeypatch.setattr(diagram_metrics.platform, "system", lambda: "Windows")
+    monkeypatch.setattr(diagram_metrics, "_windows_registry_fonts", lambda: ())
+    monkeypatch.setenv("WINDIR", str(tmp_path / "Windows"))
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+
+    assert diagram_metrics.FontMetrics("SimHei")._resolve(13, False) == fallback
+
+
 def test_deck_metrics_do_not_trust_a_narrow_missing_cjk_glyph(monkeypatch) -> None:
     metrics.text_width.cache_clear()
     monkeypatch.setattr(metrics, "_font", lambda *args, **kwargs: _NarrowMissingGlyphFont())

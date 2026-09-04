@@ -10,16 +10,16 @@ Chromium。只安装 Python 依赖的极简容器不等于完整运行环境。
 
 ## 支持矩阵
 
-| 能力 | Windows 10/11 x64 | Linux x86_64 | Linux ARM64 |
+| 能力 | Windows x64/ARM64 | Linux x64/ARM64 | macOS x64/ARM64 |
 |---|---|---|---|
 | Python CLI、校验、状态机 | 支持，Python 3.11+ | 支持，Python 3.11+ | 支持，Python 3.11+ |
 | HTML 输出 | 支持 | 支持 | 支持 |
-| DOCX / PPTX 输出 | 支持；建议用 Microsoft Office 做最终视觉验收 | 支持；建议用 LibreOffice/WPS 做视觉检查 | 支持；同左 |
-| Draw.io 图形导出 | 手工安装 26.0.16；自动发现标准位置或设置 `DRAWIO_CLI` | 可自动安装固定版本 | 手工安装兼容版本并设置 `DRAWIO_CLI` |
-| PPTX 图标与 HTML 布局检查 | 自动发现 Chrome、Edge 或 Chromium；也可设置 `COMH_CHROME` | 自动发现 Chrome/Chromium；也可设置 `COMH_CHROME` | 同左 |
-| 字体测量 | Windows 字体注册表及字体目录 | Fontconfig (`fc-match`) | Fontconfig (`fc-match`) |
+| DOCX / PPTX 输出 | 建议用 Microsoft Office 做最终视觉验收 | 建议用 LibreOffice/WPS 做视觉检查 | 建议用 Microsoft Office/Keynote 做视觉检查 |
+| Draw.io 图形导出 | 手工安装 26.0.16；自动发现标准位置或设置 `DRAWIO_CLI` | x64 可自动安装；ARM64 手工安装 | 手工安装并设置 `DRAWIO_CLI` |
+| PPTX 图标与 HTML 布局检查 | 自动发现 Chrome、Edge 或 Chromium；也可设置 `COMH_CHROME` | 自动发现 Chrome/Chromium；也可设置 `COMH_CHROME` | 自动发现 Chrome/Chromium；也可设置 `COMH_CHROME` |
+| 字体测量 | Windows 字体注册表及字体目录；缺字库时回退并保守估算 CJK | Fontconfig (`fc-match`) | Fontconfig (`fc-match`) |
 
-自动化测试在 Windows 与 Ubuntu 上运行 Python 测试和 Ruff。CI 不安装 Microsoft Office，
+自动化测试在 Windows、Ubuntu 与 macOS 的 x64/ARM64 runner 上运行。CI 不安装 Microsoft Office，
 也不把跳过的 Draw.io 实机导出当成已验证；成品仍需在实际交付播放器中检查。
 
 ## Windows PowerShell

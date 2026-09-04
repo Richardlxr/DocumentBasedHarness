@@ -267,7 +267,9 @@ def import_style(source: Path, name: str, run_root: Path) -> Path:
     root.mkdir(parents=True)
     try:
         shutil.copyfile(source, root / "source.pptx")
-        (root / "inventory.json").write_text(json.dumps(inventory, ensure_ascii=False, indent=2))
+        (root / "inventory.json").write_text(
+            json.dumps(inventory, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         data = {
             "version": 1,
             "kind": "pptx-style",
@@ -277,7 +279,9 @@ def import_style(source: Path, name: str, run_root: Path) -> Path:
             "tokens": theme_tokens(Package(source)),
             "surfaces": {},
         }
-        profile.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False))
+        profile.write_text(
+            yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8"
+        )
     except Exception:
         # Preserve partial imports for diagnosis; never remove user template data.
         raise

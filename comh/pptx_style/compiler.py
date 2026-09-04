@@ -145,7 +145,7 @@ def compile_deck(
     stage.mkdir(parents=True, exist_ok=True)
     lock = stage / "active.lock"
     try:
-        handle = lock.open("x")
+        handle = lock.open("x", encoding="utf-8")
     except FileExistsError as error:
         raise StyleError(
             f"another style build is active, or interrupted: inspect {lock}"

@@ -365,7 +365,10 @@ def cmd_render(args: argparse.Namespace) -> int:
                 published=False,
             )
             report_path.parent.mkdir(parents=True, exist_ok=True)
-            report_path.write_text(yaml.safe_dump(metadata, allow_unicode=True, sort_keys=False))
+            report_path.write_text(
+                yaml.safe_dump(metadata, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
             if not args.preview:
                 manifest.record_build(key, inputs, report_path, False)
             raise

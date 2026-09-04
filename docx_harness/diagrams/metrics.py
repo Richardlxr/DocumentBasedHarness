@@ -22,6 +22,7 @@ _WINDOWS_FONT_FILES = {
     "simhei": ("simhei.ttf",),
     "times new roman": ("times.ttf",),
 }
+_WINDOWS_FALLBACK_FAMILIES = ("Microsoft YaHei", "Segoe UI", "Arial")
 
 
 def _conservative_width(text: str, size: int) -> float:
@@ -111,6 +112,16 @@ class FontMetrics:
             return configured
         if platform.system() == "Windows":
             candidate = _windows_font_path(self.family, bold)
+            if candidate is None:
+                candidate = next(
+                    (
+                        fallback
+                        for family in _WINDOWS_FALLBACK_FAMILIES
+                        if family.casefold() != self.family.casefold()
+                        if (fallback := _windows_font_path(family, bold)) is not None
+                    ),
+                    None,
+                )
             if candidate is not None:
                 self._paths[key] = candidate
                 return candidate

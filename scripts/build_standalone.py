@@ -97,9 +97,6 @@ def build(output: Path, version: str | None) -> Path:
         shutil.rmtree(staging)
     work = output / "pyinstaller-work"
     spec = output / "pyinstaller-spec"
-    for disposable in (work, spec):
-        if disposable.exists():
-            shutil.rmtree(disposable)
     separator = os.pathsep
     run(
         [

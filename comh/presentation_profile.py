@@ -14,7 +14,9 @@ from .visible_text import page_texts
 
 @cache
 def profiles() -> dict:
-    return json.loads(files("comh").joinpath("presets/presentation.json").read_text())
+    return json.loads(
+        files("comh").joinpath("presets/presentation.json").read_text(encoding="utf-8")
+    )
 
 
 def applicable(brief: dict) -> bool:

@@ -436,7 +436,7 @@ def test_diagram_builds_are_offline_by_default(tmp_path: Path, monkeypatch) -> N
     monkeypatch.setattr("docx_harness.diagrams.drawio_cli.shutil.which", lambda command: None)
 
     assert DiagramExportProfile().auto_install_drawio is False
-    with pytest.raises(DocumentError, match="install-drawio"):
+    with pytest.raises(DocumentError, match="install-drawio|install draw.io Desktop"):
         DrawioCli().locate()
 
 
