@@ -1,4 +1,4 @@
-output: /Users/richard/Vault/Code/Fun/DocumentBasedHarness/runs/sample-cache-latency/build/deck.html
+output: build/deck.html
 theme: slate-tech
 transition: fade
 count:

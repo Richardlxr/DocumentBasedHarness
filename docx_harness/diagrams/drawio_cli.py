@@ -23,8 +23,30 @@ _RELEASE_BASE = "https://github.com/jgraph/drawio-desktop/releases/download/v26.
 
 
 def _default_cache() -> Path:
-    root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+    configured = os.environ.get("XDG_CACHE_HOME")
+    if configured:
+        root = Path(configured)
+    elif platform.system() == "Windows":
+        root = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    else:
+        root = Path.home() / ".cache"
     return root / "docx-harness" / "drawio" / DRAWIO_VERSION
+
+
+def _installed_candidates() -> tuple[Path, ...]:
+    """Return native draw.io Desktop locations which are not normally on PATH."""
+
+    if platform.system() != "Windows":
+        return ()
+    roots = (
+        (os.environ.get("PROGRAMFILES"), Path("draw.io") / "draw.io.exe"),
+        (os.environ.get("PROGRAMFILES(X86)"), Path("draw.io") / "draw.io.exe"),
+        (
+            os.environ.get("LOCALAPPDATA"),
+            Path("Programs") / "draw.io" / "draw.io.exe",
+        ),
+    )
+    return tuple(Path(root) / relative for root, relative in roots if root)
 
 
 def _verify_sha512(path: Path, expected_base64: str) -> None:
@@ -115,15 +137,22 @@ class DrawioCli:
             if candidate.exists():
                 return candidate
             raise DocumentError(f"DRAWIO_CLI does not exist: {candidate}")
-        for command in ("drawio", "draw.io"):
+        for command in ("drawio", "draw.io", "drawio.exe", "draw.io.exe"):
             found = shutil.which(command)
             if found:
                 return Path(found)
+        for candidate in _installed_candidates():
+            if candidate.is_file():
+                return candidate
         cached = _default_cache() / "squashfs-root" / "AppRun"
         if cached.exists():
             return cached
         if self.auto_install:
             return install_drawio()
+        if platform.system() == "Windows":
+            raise DocumentError(
+                "draw.io CLI was not found; install draw.io Desktop 26.0.16 or set DRAWIO_CLI"
+            )
         raise DocumentError(
             "draw.io CLI was not found; run 'docx-harness install-drawio' or set DRAWIO_CLI"
         )
@@ -193,7 +222,7 @@ class DrawioCli:
         if not os.environ.get("DISPLAY") and shutil.which("xvfb-run"):
             command = ["xvfb-run", "-a", *command]
         environment = os.environ.copy()
-        if executable.name == "AppRun":
+        if executable.name.casefold() == "apprun":
             # Extracted AppImages do not receive the runtime-provided APPDIR automatically.
             environment["APPDIR"] = str(executable.parent)
         try:

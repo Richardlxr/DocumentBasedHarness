@@ -7,12 +7,26 @@
 
 ## 0. 准备
 
+macOS / Linux：
+
 ```bash
 python -m venv .venv && .venv/bin/pip install -e '.[dev]'
 # 图形渲染（可选，mermaid 示意图需要）：
 export DRAWIO_CLI="/Applications/draw.io.app/Contents/MacOS/draw.io"
 export DRAWIO_ACCEPT_VERSION=30.0.4   # 仅当你的 draw.io 版本与上游 pin 不一致
 ```
+
+Windows PowerShell：
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+# 非标准安装位置才需要：
+$env:DRAWIO_CLI = "C:\Tools\draw.io\draw.io.exe"
+```
+
+Windows/Linux 的外部程序发现、字体和验证边界见[平台支持说明](platform-support.md)。下文
+`.venv/bin/comh` 在 Windows 中对应 `.\.venv\Scripts\comh.exe`。
 
 ## 1. 开工作区、收材料
 
@@ -24,14 +38,14 @@ cp ~/experiment/*.csv ~/experiment/*.md runs/my-report/sources/
 `sources/` 是全部原始材料的家。之后材料的任何增删改都会沿血缘把下游标脏——
 这是特性，不是麻烦。
 
-先按 [intake 指令](../stages/intake.md) 写目标草案、材料范围与用户依据，执行
+先按 [intake 指令](../comh/instructions/stages/intake.md) 写目标草案、材料范围与用户依据，执行
 `comh intake .workspace/intake.yaml`。默认关键节点对齐；用户要共同打磨或委托细化时，
 用 `comh collaborate collaborative|delegated --reply "实际原话" --source "消息引用"` 记录。
 不重复询问已经给出的信息。
 
 ## 2. evidence：把材料变成事实库
 
-AI 按 `stages/evidence.md` 提取：每条事实带出处（文件 + 定位），数字类带
+AI 按 `comh/instructions/stages/evidence.md` 提取：每条事实带出处（文件 + 定位），数字类带
 `value: {number, unit}` 结构化锚点。两条铁律：
 
 - **派生数字先落库再用**：`derived:(E001,E002)` 标注来源，否则校验器判 finding；
@@ -55,12 +69,14 @@ AI 综合材料概况和你的自然语言描述，推断出 `brief.yaml`：受�
 **关键规则**：能机械检查的硬约束落到代码；其余保持硬约束并写人工验收方法，
 只有用户可以降级。`brief.alignment` 必须说明每项契约的来源、处置和依据；proposed
 明确代表本次待接受的建议。关键未知未答不能确认，确实晚些才需要的问题可注明截止阶段。
-完整字段及示例见 [对话协议](../references/dialogue-protocol.md)。
+完整字段及示例见 [对话协议](../comh/instructions/references/dialogue-protocol.md)。
 
 有演示稿时记录 `presentation.setting`：学术默认 academic-rich，其他场合默认 balanced，
-用户指定的密度优先，见 [内容预设](../references/presentation-profiles.md)。交付 PPTX 时还要记录
+用户指定的密度优先，见
+[内容预设](../comh/instructions/references/presentation-profiles.md)。交付 PPTX 时还要记录
 `appearance` 的模板意向和样张审阅方式。两项均纳入 alignment，随契约一起展示。
-实际受众与委托人须区分，文案按 [受众规则](../references/audience-copy.md) 检查。
+实际受众与委托人须区分，文案按
+[受众规则](../comh/instructions/references/audience-copy.md) 检查。
 
 看摘要、改内容，满意后放行：
 
@@ -237,7 +253,7 @@ comh theme-from-pptx 模板.pptx --name brand   # 从模板提取品牌主题
 comh style-inspect 模板.pptx  # 检查原生背景、品牌资源与文字兼容风险
 comh style-import 模板.pptx --name brand   # 导入样式源，随后配置 surfaces 并审阅样张
 comh presentation-profiles academic-rich  # 查看内容密度与布局建议
-comh review <审稿文件.yaml>   # 记录当前版本审查，格式见 stages/qa.md
+comh review <审稿文件.yaml>   # 记录当前版本审查，格式见 comh/instructions/stages/qa.md
 comh present delivery         # 当前审稿通过后展示成品；收到验收回复后 respond
 comh deliver [--note ...]     # 钉住已接受的成品、审稿和请求，重渲染即作废
 comh check-schema <file>      # 单文件 schema 校验

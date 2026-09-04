@@ -74,7 +74,7 @@ Logo 碰撞、嵌套 icon 不带入兄弟正文、内容 icon 保留、浅色背
   --basetemp=/private/tmp/codex-dev-cache/DocumentBasedHarness/pptx-style-tests
 .venv/bin/ruff check . --no-cache
 .venv/bin/python scripts/probe_pptx_styles.py \
-  --source-dir '/Users/richard/Vault/SJTU视觉形象/上海交大PPT模板-文明办出品' \
+  --source-dir '/path/to/approved-pptx-template-directory' \
   --output runs/pptx-style-probe
 ```
 

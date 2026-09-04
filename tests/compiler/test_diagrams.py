@@ -25,6 +25,7 @@ from docx_harness.diagrams import (
     create_mermaid_flowchart_converter,
     default_diagram_registry,
 )
+from docx_harness.diagrams import drawio_cli as drawio_cli_module
 from docx_harness.diagrams.drawio_cli import DRAWIO_VERSION
 from docx_harness.errors import DocumentError, SourceLocation
 from docx_harness.ir import DiagramBlock
@@ -448,3 +449,35 @@ def test_drawio_cli_uses_product_cache(tmp_path: Path, monkeypatch) -> None:
     executable.touch()
 
     assert DrawioCli().locate() == executable
+
+
+def test_drawio_cli_discovers_standard_windows_install(tmp_path: Path, monkeypatch) -> None:
+    program_files = tmp_path / "Program Files"
+    executable = program_files / "draw.io" / "draw.io.exe"
+    executable.parent.mkdir(parents=True)
+    executable.touch()
+    monkeypatch.setattr(drawio_cli_module.platform, "system", lambda: "Windows")
+    monkeypatch.setenv("PROGRAMFILES", str(program_files))
+    monkeypatch.delenv("PROGRAMFILES(X86)", raising=False)
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    monkeypatch.delenv("DRAWIO_CLI", raising=False)
+    monkeypatch.setattr(drawio_cli_module.shutil, "which", lambda command: None)
+
+    assert DrawioCli().locate() == executable
+
+
+def test_drawio_cache_uses_windows_local_app_data(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(drawio_cli_module.platform, "system", lambda: "Windows")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
+
+    assert drawio_cli_module._default_cache() == (
+        tmp_path / "docx-harness" / "drawio" / DRAWIO_VERSION
+    )
+
+
+def test_drawio_auto_install_explains_windows_manual_setup(monkeypatch) -> None:
+    monkeypatch.setattr(drawio_cli_module.platform, "system", lambda: "Windows")
+
+    with pytest.raises(DocumentError, match="supports Linux x86_64"):
+        drawio_cli_module.install_drawio()

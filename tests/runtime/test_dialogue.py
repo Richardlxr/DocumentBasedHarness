@@ -480,9 +480,12 @@ def test_context_keeps_older_rejections_outside_recent_history(tmp_path):
     assert pack["older_rejections"][0]["response"]["decision"] == "changes_requested"
 
 
-def test_repository_skill_discovery_link_resolves_to_canonical_source():
+def test_repository_skill_discovery_entry_is_windows_checkout_safe():
     root = Path(__file__).resolve().parents[2]
-    assert (root / ".agents/skills/communication-harness/SKILL.md").resolve() == (
-        root / "comh/instructions/skill/SKILL.md"
-    )
-    assert (root / ".agents/skills/communication-harness/SKILL.md").is_file()
+    entry = root / ".agents/skills/communication-harness/SKILL.md"
+    canonical = root / "comh/instructions/skill/SKILL.md"
+
+    assert entry.is_file()
+    assert not entry.is_symlink()
+    assert canonical.is_file()
+    assert "../../../comh/instructions/skill/SKILL.md" in entry.read_text(encoding="utf-8")

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "communication-harness"
-version = "0.1.0"
+version = "1.2.0"
 description = "Evidence -> narrative -> projections. A communication harness that turns source material into reports and presentations through explicit, traceable artifacts."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,6 +28,9 @@ dependencies = [
 dev = [
   "pytest>=8.3,<9",
   "ruff>=0.12,<1",
+]
+release = [
+  "pyinstaller==6.22.2",
 ]
 
 [project.scripts]

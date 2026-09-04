@@ -26,12 +26,34 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 ICON_DIR = _REPO_ROOT / "assets" / "vendor" / "tabler-outline"
 
-_CHROME_CANDIDATES = (
+_POSIX_BROWSER_CANDIDATES = (
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "/Applications/Chromium.app/Contents/MacOS/Chromium",
     "/usr/bin/google-chrome",
     "/usr/bin/chromium",
 )
+
+
+def _installed_browser_candidates() -> tuple[Path, ...]:
+    """Return common browser locations which installers do not add to PATH."""
+
+    import os
+    import platform
+
+    if platform.system() != "Windows":
+        return tuple(Path(value) for value in _POSIX_BROWSER_CANDIDATES)
+    candidates: list[Path] = []
+    roots = (
+        (os.environ.get("PROGRAMFILES"), Path("Google/Chrome/Application/chrome.exe")),
+        (os.environ.get("PROGRAMFILES(X86)"), Path("Google/Chrome/Application/chrome.exe")),
+        (os.environ.get("LOCALAPPDATA"), Path("Google/Chrome/Application/chrome.exe")),
+        (os.environ.get("PROGRAMFILES"), Path("Microsoft/Edge/Application/msedge.exe")),
+        (os.environ.get("PROGRAMFILES(X86)"), Path("Microsoft/Edge/Application/msedge.exe")),
+        (os.environ.get("LOCALAPPDATA"), Path("Microsoft/Edge/Application/msedge.exe")),
+        (os.environ.get("LOCALAPPDATA"), Path("Chromium/Application/chrome.exe")),
+    )
+    candidates.extend(Path(root) / relative for root, relative in roots if root)
+    return tuple(candidates)
 
 
 @lru_cache(maxsize=1)
@@ -94,10 +116,25 @@ def _chrome() -> str | None:
     configured = os.environ.get("COMH_CHROME")
     if configured and Path(configured).exists():
         return configured
-    for candidate in _CHROME_CANDIDATES:
-        if Path(candidate).exists():
-            return candidate
-    return shutil.which("chromium") or shutil.which("google-chrome")
+    for candidate in _installed_browser_candidates():
+        if candidate.is_file():
+            return str(candidate)
+    return next(
+        (
+            found
+            for command in (
+                "chromium",
+                "google-chrome",
+                "chrome",
+                "chromium.exe",
+                "chrome.exe",
+                "msedge",
+                "msedge.exe",
+            )
+            if (found := shutil.which(command))
+        ),
+        None,
+    )
 
 
 def icon_png(name: str, *, color, background, px: int, run_root: Path) -> Path:
@@ -115,7 +152,7 @@ def icon_png(name: str, *, color, background, px: int, run_root: Path) -> Path:
     chrome = _chrome()
     if chrome is None:
         raise RuntimeError(
-            "icon rasterization needs headless Chrome (set COMH_CHROME); "
+            "icon rasterization needs a Chromium-based browser (set COMH_CHROME); "
             "icons otherwise render on the HTML surface only"
         )
     svg = icon_svg(name, f"#{fg}")

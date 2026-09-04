@@ -378,6 +378,8 @@ HTML 将本地图片处理后内联，适合离线查看。大图较多时还应
 
 ## 快速开始
 
+macOS / Linux：
+
 ```bash
 git clone git@github.com:Richardlxr/DocumentBasedHarness.git
 cd DocumentBasedHarness
@@ -391,15 +393,31 @@ python -m venv .venv && .venv/bin/pip install -e '.[dev]'
 .venv/bin/comh init-run runs/my-report    # 材料丢进 sources/，然后按上面的阶段跟 agent 协作
 ```
 
-仓库通过 `.agents/skills/communication-harness` 提供发现入口。阶段和参考资料的唯一源在
-`comh/instructions/`，随 wheel 打包；根目录 `skill/`、`stages/`、`references/` 是兼容链接。
+Windows PowerShell：
+
+```powershell
+git clone git@github.com:Richardlxr/DocumentBasedHarness.git
+Set-Location DocumentBasedHarness
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\comh.exe status --run runs/sample-cache-latency
+.\.venv\Scripts\comh.exe init-run runs/my-report
+```
+
+仓库通过常规文件 `.agents/skills/communication-harness/SKILL.md` 提供跨平台发现入口。
+阶段和参考资料的唯一源在 `comh/instructions/`，随 wheel 打包；根目录 `skill/`、`stages/`、
+`references/` 是 POSIX 兼容链接，Windows 可直接使用规范目录，不依赖符号链接。
 独立安装后可用 `comh instructions skill` 或 `comh instructions intake` 读取；安装 Python 包
 不会替宿主注册技能，需按宿主约定接入入口。恢复任务先 `comh next --json`、`comh context`，
 单页工作用 `comh context --stage deck --node P01`。
 
-图形（mermaid 示意图）渲染需要 draw.io Desktop；macOS 上：
+图形（mermaid 示意图）渲染需要 draw.io Desktop；Linux x86_64 可运行
+`docx-harness install-drawio`，macOS 上：
 `export DRAWIO_CLI="/Applications/draw.io.app/Contents/MacOS/draw.io"`
-（版本与内置 pin 不一致时再加 `DRAWIO_ACCEPT_VERSION=<版本号>`）。
+Windows 会自动查找标准安装位置，也可设置
+`$env:DRAWIO_CLI = "$env:ProgramFiles\draw.io\draw.io.exe"`。版本与内置 pin 不一致时再设置
+`DRAWIO_ACCEPT_VERSION`。完整依赖、字体和验证边界见
+**[平台支持说明](docs/platform-support.md)**。
 
 ---
 
@@ -421,7 +439,8 @@ python -m venv .venv && .venv/bin/pip install -e '.[dev]'
 
 - **[用户指南](docs/user-guide.md)** —— 命令与进阶操作手册：风格锚定、
   验证器抓什么、修复循环怎么用、材料更新后怎么办
-- **给 AI 操作者** —— `skill/SKILL.md` 路由各阶段指令（`stages/`）
+- **给 AI 操作者** —— `comh/instructions/skill/SKILL.md` 路由
+  `comh/instructions/stages/` 中的各阶段指令
 - **架构与纪律** —— `AGENTS.md`；内置 DOCX 编译器的设计：`docs/compiler/`
 
 ## 设计原则（八句话）
@@ -443,4 +462,5 @@ python -m venv .venv && .venv/bin/pip install -e '.[dev]'
 - 旧确认无请求依据时保留为 legacy，不补造历史回复；需补当前确认。旧构建和审稿按迁移说明更新。
 - 读者测试需实际输出文件及执行信息；代码能核对存在和版本，不能单独证明审阅独立性。
 
-审稿格式与 `comh review` 用法见 [QA 阶段说明](stages/qa.md)。
+审稿格式与 `comh review` 用法见
+[QA 阶段说明](comh/instructions/stages/qa.md)。
