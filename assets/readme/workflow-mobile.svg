@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="432" height="816" viewBox="0 0 432 816" role="img" aria-labelledby="title desc">
+<title id="title">从材料到成品的四个阶段</title>
+<desc id="desc">依次交材料、对齐方向、打磨内容、验收交付。每个阶段分别说明用户与 agent 的工作。</desc>
+<style>text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }</style>
+<rect width="432" height="816" rx="16" fill="#ffffff"/>
+<g transform="translate(12 12)">
+<rect width="408" height="184" rx="14" fill="#f8fafc" stroke="#dbe3ed"/>
+<rect x="24" y="24" width="40" height="40" rx="12" fill="#e5edff"/>
+<text x="44" y="50" text-anchor="middle" fill="#254cb3" font-size="18" font-weight="700">01</text>
+<text x="80" y="52" fill="#17283f" font-size="26" font-weight="650">交材料</text>
+<text x="24" y="108" fill="#243951" font-size="19">你：放入材料，说清汇报用途</text>
+<text x="24" y="144" fill="#465970" font-size="18">Agent：阅读来源，整理证据与缺口</text>
+</g>
+<g transform="translate(12 212)">
+<rect width="408" height="184" rx="14" fill="#f8fafc" stroke="#dbe3ed"/>
+<rect x="24" y="24" width="40" height="40" rx="12" fill="#e5edff"/>
+<text x="44" y="50" text-anchor="middle" fill="#254cb3" font-size="18" font-weight="700">02</text>
+<text x="80" y="52" fill="#17283f" font-size="26" font-weight="650">对齐方向</text>
+<text x="24" y="108" fill="#243951" font-size="19">你：确认目标、故事线与大纲</text>
+<text x="24" y="144" fill="#465970" font-size="18">Agent：提出方案，解释取舍</text>
+</g>
+<g transform="translate(12 412)">
+<rect width="408" height="184" rx="14" fill="#f8fafc" stroke="#dbe3ed"/>
+<rect x="24" y="24" width="40" height="40" rx="12" fill="#e5edff"/>
+<text x="44" y="50" text-anchor="middle" fill="#254cb3" font-size="18" font-weight="700">03</text>
+<text x="80" y="52" fill="#17283f" font-size="26" font-weight="650">打磨内容</text>
+<text x="24" y="108" fill="#243951" font-size="19">你：反馈或委托细化，按需审样张</text>
+<text x="24" y="144" fill="#465970" font-size="18">Agent：制作图表、页面与样张</text>
+</g>
+<g transform="translate(12 612)">
+<rect width="408" height="184" rx="14" fill="#f8fafc" stroke="#dbe3ed"/>
+<rect x="24" y="24" width="40" height="40" rx="12" fill="#e5edff"/>
+<text x="44" y="50" text-anchor="middle" fill="#254cb3" font-size="18" font-weight="700">04</text>
+<text x="80" y="52" fill="#17283f" font-size="26" font-weight="650">验收交付</text>
+<text x="24" y="108" fill="#243951" font-size="19">你：审阅成品，确认当前版本</text>
+<text x="24" y="144" fill="#465970" font-size="18">Agent：检查质量，交付文件</text>
+</g>
+</svg>

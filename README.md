@@ -68,18 +68,13 @@ agent 会在需要你决定的地方给出方案，完成后告诉你成品位�
 给你看当前方案、依据和待定项。**提出要求、接受当前版本、委托某项工作是三种不同的回复。**
 一句“继续”只对应当前明确展示的提案，不代表接受尚未展示的故事、大纲和成品。
 
-```mermaid
-flowchart LR
-  A[材料与目标] --> B[证据与缺口]
-  B --> C[沟通契约确认]
-  C --> D[故事线确认]
-  D --> E[各媒介粗大纲]
-  E -->|需审阅 PPTX 样式| F[模板选择与样张]
-  E -->|无待定样式审阅| G[内容细化]
-  F --> G
-  G --> H[编译与 QA]
-  H --> I[当前版本验收与交付]
-```
+<picture>
+  <source media="(max-width: 600px)" srcset="assets/readme/workflow-mobile.svg">
+  <img src="assets/readme/workflow.svg" alt="四个阶段：交材料（你说明用途，agent 整理证据）；对齐方向（你确认目标、故事线和大纲）；打磨内容（你反馈或委托细化，agent 制作页面）；验收交付（你确认当前成品，agent 检查并交付）。" width="880">
+</picture>
+
+<details>
+<summary>展开查看完整的 9 个阶段与参与方式</summary>
 
 | 阶段 | 你会看到什么 | 最适合在这里提出的要求 |
 |---|---|---|
@@ -92,6 +87,8 @@ flowchart LR
 | [7. 内容细化](#workflow-authoring) | 当前页/节的要点、证据、图文和讲解 | 加解释、换图、改表达、调密度、安排出场顺序 |
 | [8. 编译与 QA](#workflow-qa) | 成品预览、检查结果、读者反馈、修复对比 | 查错位、查受众理解、查论断与证据是否相称 |
 | [9. 验收与修订](#workflow-delivery) | 当前成品、验证范围、已知限制 | 接受这版、指定局部修改、补充材料后更新 |
+
+</details>
 
 <a id="workflow-intake"></a>
 
