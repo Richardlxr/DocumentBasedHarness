@@ -302,6 +302,42 @@ def test_charts_remain_editable_and_bound_to_evidence(tmp_path):
         assert any(n.startswith("ppt/embeddings/") for n in archive.namelist())
 
 
+@pytest.mark.parametrize("ratio", ["16:9", "4:3"])
+def test_editable_table_grid_tracks_template_canvas(tmp_path, ratio):
+    _, run, _ = fixture(tmp_path, ratio=ratio)
+    p = plan()
+    p["deck"]["pages"][0].pop("support_points")
+    p["deck"]["pages"][0]["visual"] = {
+        "arrangement": "full",
+        "table": {"columns": ["方案", "条件"], "rows": [["基线", "固定环境"]]},
+    }
+    result = render_deck(p, run, run / "table.pptx")
+    prs = Presentation(result.output)
+    frame = next(s for s in prs.slides[0].shapes if s.has_table)
+    assert abs(sum(c.width for c in frame.table.columns) - frame.width) < 10
+    assert abs(sum(r.height for r in frame.table.rows) - frame.height) < 10
+    frame.table.cell(1, 0).text = "修改方案"
+    prs.save(result.output)
+    reopened = Presentation(result.output)
+    table = next(s.table for s in reopened.slides[0].shapes if s.has_table)
+    assert table.cell(1, 0).text == "修改方案"
+
+
+def test_diagram_readability_checked_after_template_scaling(tmp_path):
+    _, run, _ = fixture(tmp_path, ratio="4:3")
+    p = plan()
+    p["deck"]["pages"][0].pop("support_points")
+    p["deck"]["pages"][0]["visual"] = {
+        "arrangement": "full",
+        "diagram": {
+            "mermaid": "flowchart LR\n a[Measurement] --> b[Measurement] --> c[Measurement]"
+        },
+    }
+    with pytest.raises(StyleError, match="below 17pt on the template canvas"):
+        render_deck(p, run, run / "diagram.pptx")
+    assert not (run / "diagram.pptx").exists()
+
+
 def test_page_edits_leave_other_content_and_style_parts_unchanged(tmp_path):
     _, run, _ = fixture(tmp_path)
     p = plan()

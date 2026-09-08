@@ -33,6 +33,13 @@
 - 密度是否符合 presentation_profile 和用户补充偏好？字数仅作信号，不能据此判定信息质量。
   主图页允许少字；文本页应有必要展开；只用小字把页面塞满也不算通过。
 
+### 视线与编辑检查（owning: deck_plan 或 renderer）
+
+按 [研究与技术汇报](../references/research-presentations.md) 在真实页面检查首眼入口、
+阅读顺序、比较对齐、解释邻接、分区间距；记录具体页面问题，不以标题醒目代替正文检查。
+查 render report 的 editability 清单，复查大图片是否将正文压平；允许原始截图。
+抽样修改文字、表格单元格、图节点并保存重开。HTML 不能证明原生 PPTX 编辑或模板兼容。
+
 ### 说人话检查（owning: deck_plan / narrative）
 
 把每页标题和要点**朗读一遍**：任何"念出来像密码"的句子（名词堆叠、无动词、
@@ -41,7 +48,7 @@
 
 ### Title Validator（owning: deck_plan）
 
-- `content` 页标题是否表达 takeaway，而不是无信息量的话题？
+- 结果页标题是否表达有据的 takeaway？背景、机制、架构页是否准确命名对象，避免强造断言？
 - `cover/agenda/section_divider/closing/appendix` 页的主题式标题是否正当？
 - 标题与该页 `beat.message` 是否一致（投影不得偷换重点）？
 
@@ -54,6 +61,7 @@
 2. 哪里没看懂 / 需要更多背景？
 3. 哪个结论你觉得证据不足？
 4. 看完你下一步会做什么？
+5. 第一眼看到哪个区域？随后按什么顺序读？在哪里需要回看或不知道下一步看哪里？
 
 把回答 1 与 `brief.takeaways` 求差：缺失的 takeaway 是 finding（owning 通常是
 narrative——故事没承载，而不是页面没写出来）。回答 2/3 的每条都对照 ID 链定位

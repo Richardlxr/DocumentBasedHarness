@@ -78,8 +78,15 @@ def direct_evidence(node: dict) -> list[str]:
     entries = [
         *(node.get("metric_cards") or []),
         *((visual.get("chart") or {}).get("series") or []),
+        *(
+            cell
+            for row in (visual.get("table") or {}).get("rows", [])
+            for cell in row
+            if isinstance(cell, dict)
+        ),
     ]
     refs += [entry["value_from"] for entry in entries if entry.get("value_from")]
+    refs += [entry["evidence"] for entry in entries if entry.get("evidence")]
     for entry in [*(visual.get("asset_refs") or []), visual.get("diagram"), node.get("callout")]:
         if isinstance(entry, dict) and entry.get("evidence"):
             refs.append(entry["evidence"])

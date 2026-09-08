@@ -459,15 +459,9 @@ def validate_numbers(
                     )
     deck = artifacts.get("deck_plan") or {}
     for page in deck.get("deck", {}).get("pages", []):
-        parts = [page.get("title", "")]
-        for entry in page.get("support_points", []):
-            if isinstance(entry, dict):
-                parts.append(str(entry.get("point", "")))
-                parts.append(str(entry.get("detail", "") or ""))
-            else:
-                parts.append(str(entry))
-        if page.get("callout"):
-            parts.append(str(page["callout"].get("text", "")))
+        from .visible_text import page_texts
+
+        parts = [text for _, text in page_texts(page)]
         text = " ".join(parts)
         for number in sorted(_numbers_in(text)):
             if number not in pool:
@@ -592,7 +586,7 @@ def validate_visuals(artifacts: dict[str, dict | None]) -> list[Finding]:
         page_id = page["id"]
         # Known visual subkeys placed at page level are a silent footgun in an
         # open schema: the renderer would never see them. Surface the typo.
-        for stray in ("chart", "diagram", "asset_refs"):
+        for stray in ("chart", "diagram", "asset_refs", "table"):
             if stray in page:
                 findings.append(
                     Finding(
@@ -606,6 +600,39 @@ def validate_visuals(artifacts: dict[str, dict | None]) -> list[Finding]:
                     )
                 )
         chart = (page.get("visual") or {}).get("chart")
+        visual = page.get("visual") or {}
+        from .presentation_profile import presentation_structure_errors
+
+        for error in presentation_structure_errors(page):
+            findings.append(
+                Finding(
+                    "deck_plan",
+                    "visual-structure",
+                    "error",
+                    "fail",
+                    f"page {page_id}: {error}",
+                    "deck_plan",
+                )
+            )
+        table = visual.get("table") or {}
+        for row in table.get("rows", []):
+            for cell in row:
+                if not isinstance(cell, dict):
+                    continue
+                if "value_from" in cell:
+                    check_value_ref(page_id, cell["value_from"], "table cell")
+                if cell.get("evidence") and cell["evidence"] not in evidence_items:
+                    findings.append(
+                        Finding(
+                            "deck_plan",
+                            "ref-integrity",
+                            "error",
+                            "fail",
+                            f"page {page_id} table references missing evidence "
+                            f"'{cell['evidence']}'",
+                            "evidence",
+                        )
+                    )
         if chart:
             for entry in chart.get("series", []):
                 check_value_ref(page_id, str(entry.get("value_from", "")), "chart series")
@@ -718,7 +745,7 @@ def _address_error(page: dict, address: str) -> str | None:
         return f"'{base}' takes no index"
     if base == "visual":
         visual = page.get("visual") or {}
-        if not (visual.get("chart") or visual.get("diagram") or visual.get("asset_refs")):
+        if not any(visual.get(k) for k in ("chart", "diagram", "asset_refs", "table")):
             return "'visual' addressed but the page has no chart/diagram/figure"
     if base == "callout" and not page.get("callout"):
         return "'callout' addressed but the page has none"
@@ -1068,6 +1095,15 @@ def deck_text(plan: dict) -> str:
         texts += [entry.get("label", "") for entry in (visual.get("chart") or {}).get("series", [])]
         texts += [a.get("caption", "") for a in visual.get("asset_refs", []) if isinstance(a, dict)]
         texts += [(visual.get("diagram") or {}).get("caption", "")]
+        from .visible_text import page_texts
+
+        texts += [
+            text
+            for field, text in page_texts(page)
+            if field.startswith("visual.table")
+            or field == "visual.chart.title"
+            or field.startswith("visual.diagram.labels")
+        ]
     return "\n".join(str(t) for t in texts)
 
 

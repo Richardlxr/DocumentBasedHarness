@@ -12,6 +12,16 @@ from pptx.oxml import parse_xml
 from pptx.oxml.ns import qn
 
 
+def set_connector_arrow(shape, *, at_start: bool = False) -> None:
+    """Arrow at the endpoint of an editable native connector."""
+    line = shape.line._get_or_add_ln()
+    tag = "a:headEnd" if at_start else "a:tailEnd"
+    tail = line.find(qn(tag))
+    if tail is None:
+        tail = etree.SubElement(line, qn(tag))
+    tail.set("type", "triangle")
+
+
 def set_east_asian_font(run, family: str) -> None:
     """Pin CJK face as well as Latin face; template theme inheritance must not override it."""
     properties = run._r.get_or_add_rPr()

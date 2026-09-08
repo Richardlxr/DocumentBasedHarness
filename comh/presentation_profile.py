@@ -87,7 +87,7 @@ def validate_density(artifacts: dict) -> list[Finding]:
         count = (
             len(re.sub(r"\s", "", content)) if chinese else len(re.findall(r"\b[\w'-]+\b", content))
         )
-        has_visual = any(visual.get(k) for k in ("chart", "diagram", "asset_refs"))
+        has_visual = any(visual.get(k) for k in ("chart", "diagram", "asset_refs", "table"))
         blocks = len(page.get("support_points") or []) + bool(page.get("metric_cards")) + has_visual
         too_sparse = count < low and not has_visual
         if too_sparse or count > high:
@@ -106,4 +106,74 @@ def validate_density(artifacts: dict) -> list[Finding]:
                     "deck_plan",
                 )
             )
+    # A long paragraph with a callout is still a text page. Flag repeated text-only
+    # bodies for human review without prescribing a quota or inventing evidence.
+    streak = []
+    for page in deck.get("deck", {}).get("pages", []) + [{}]:
+        visual = page.get("visual") or {}
+        text_only = (
+            bool(page)
+            and page.get("page_role", "content") == "content"
+            and not any(visual.get(k) for k in ("chart", "diagram", "asset_refs", "table"))
+            and visual.get("arrangement") != "columns"
+        )
+        if text_only:
+            streak.append(page["id"])
+        else:
+            if len(streak) >= 3:
+                findings.append(
+                    Finding(
+                        "deck_plan",
+                        "presentation:text-only-sequence",
+                        "warn",
+                        "fail",
+                        f"pages {', '.join(streak)} repeat text-only bodies; "
+                        "review whether comparison, mechanism or experimental evidence "
+                        "needs a table, diagram or chart. Do not add decoration to clear "
+                        "this warning.",
+                        "deck_plan",
+                    )
+                )
+            streak = []
     return findings
+
+
+def presentation_structure_errors(page: dict) -> list[str]:
+    """Check consumed layout combinations, not whether a reading path is persuasive."""
+    visual = page.get("visual") or {}
+    carriers = [k for k in ("chart", "diagram", "asset_refs", "table") if visual.get(k)]
+    errors = []
+    if len(carriers) > 1:
+        errors.append("choose one primary visual carrier; competing carriers would be dropped")
+    arrangement = visual.get("arrangement", "split")
+    if arrangement == "full" and page.get("support_points"):
+        errors.append(
+            "full arrangement cannot also contain support_points; use a callout or split layout"
+        )
+    if arrangement == "columns" and (
+        carriers or page.get("metric_cards") or not 2 <= len(page.get("support_points") or []) <= 3
+    ):
+        errors.append(
+            "columns requires two or three support_points and no separate visual/metric cards"
+        )
+    role = page.get("page_role", "content")
+    if (visual.get("table") or visual.get("diagram")) and role in {
+        "cover",
+        "agenda",
+        "section_divider",
+        "closing",
+        "timeline",
+        "versus",
+        "fullscreen_backdrop",
+    }:
+        errors.append("this page_role does not render tables/diagrams; use content or hero_split")
+    if arrangement != "split" and role != "content":
+        errors.append("full/columns arrangement requires content page_role")
+    table = visual.get("table") or {}
+    columns = table.get("columns", [])
+    if any(len(row) != len(columns) for row in table.get("rows", [])):
+        errors.append("every table row must match its column count")
+    weights = table.get("column_weights")
+    if weights is not None and (len(weights) != len(columns) or any(v <= 0 for v in weights)):
+        errors.append("table column_weights must be positive and match columns")
+    return errors

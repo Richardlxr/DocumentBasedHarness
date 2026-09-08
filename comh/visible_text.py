@@ -32,6 +32,14 @@ def page_texts(page: dict) -> list[tuple[str, str]]:
         pairs.append((f"metric_cards[{index}].label", str(card.get("label", ""))))
     pairs.append(("callout", str((page.get("callout") or {}).get("text", ""))))
     visual = page.get("visual") or {}
+    pairs.append(("visual.chart.title", str((visual.get("chart") or {}).get("title", ""))))
+    table = visual.get("table") or {}
+    for i, label in enumerate(table.get("columns", [])):
+        pairs.append((f"visual.table.columns[{i}]", label))
+    for i, row in enumerate(table.get("rows", [])):
+        for j, cell in enumerate(row):
+            value = cell.get("text", "") if isinstance(cell, dict) else cell
+            pairs.append((f"visual.table.rows[{i}][{j}]", value))
     for index, label in enumerate(visual.get("columns") or []):
         pairs.append((f"visual.columns[{index}]", str(label)))
     for index, series in enumerate((visual.get("chart") or {}).get("series") or []):

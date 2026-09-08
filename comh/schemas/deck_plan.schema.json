@@ -221,7 +221,7 @@
                   },
                   "diagram": {
                     "type": "object",
-                    "description": "Native diagram compiled from mermaid through the deterministic layout chain (measured glyphs, collision-checked) into PNG. Currently the flowchart/graph subset; subgraph and non-flowchart types fail loudly at validation time.",
+                    "description": "Editable PPTX shapes and routed lines, inline SVG in HTML, compiled from the supported Mermaid flowchart/graph subset. Unsupported syntax fails; no bitmap fallback.",
                     "required": [
                       "mermaid"
                     ],
@@ -269,6 +269,83 @@
                           }
                         }
                       ]
+                    }
+                  },
+                  "arrangement": {
+                    "enum": [
+                      "split",
+                      "full",
+                      "columns"
+                    ],
+                    "description": "split: points beside evidence; full: evidence occupies body with no support_points; columns: two or three ordered point/detail groups without a separate visual."
+                  },
+                  "table": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "columns",
+                      "rows"
+                    ],
+                    "properties": {
+                      "columns": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 6,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "column_weights": {
+                        "type": "array",
+                        "minItems": 2,
+                        "items": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        }
+                      },
+                      "rows": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "array",
+                          "minItems": 2,
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "text"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "text": {
+                                    "type": "string"
+                                  },
+                                  "evidence": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "value_from"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "value_from": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
                     }
                   }
                 }

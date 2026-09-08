@@ -420,6 +420,20 @@ def test_pack_contains_all_direct_and_transitive_refs(tmp_path):
         "E002",
         "E003",
     }
+    page = deck["deck"]["pages"][0]
+    del page["metric_cards"]
+    page["visual"] = {
+        "table": {
+            "columns": ["Description", "Measurement"],
+            "rows": [[{"text": "Observation", "evidence": "E002"}, {"value_from": "E003"}]],
+        }
+    }
+    write(root, "projection/deck_plan.yaml", deck)
+    assert {i["id"] for i in build_pack(root, "deck", "P01")["evidence"]} == {
+        "E001",
+        "E002",
+        "E003",
+    }
     plan = deepcopy(REPORT_PLAN)
     plan["sections"][0]["evidence"] = ["E003"]
     write(root, "projection/report_plan.yaml", plan)
@@ -533,3 +547,24 @@ def test_content_page_cannot_omit_its_beat(tmp_path):
     del deck["deck"]["pages"][0]["beat"]
     write(root, "projection/deck_plan.yaml", deck)
     assert cli(root, "save", "deck_plan") == 2
+
+
+def test_render_exception_before_first_output_records_failure(tmp_path, monkeypatch, capsys):
+    root = pipeline(tmp_path)
+    write(root, "projection/deck_plan.yaml", DECK)
+    assert cli(root, "save", "deck_plan") == 0
+    assert approve(root, "deck_outline") == 0
+
+    def fail(*args, **kwargs):
+        raise ValueError("table does not fit at the required font size")
+
+    monkeypatch.setattr("comh.cli.render_deck", fail)
+    assert cli(root, "render", "deck") == 2
+    assert "table does not fit" in capsys.readouterr().err
+    manifest = Manifest.load(root)
+    record = manifest.data["build_records"]["deck"]
+    assert record["success"] is False and record["output"] is None
+    report = yaml.safe_load((root / record["qa_path"]).read_text(encoding="utf-8"))
+    assert report["published"] is False and report["count"]["error"] == 1
+    with pytest.raises(Exception, match="no successful build receipt"):
+        manifest.require_build("deck")

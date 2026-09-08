@@ -1,5 +1,37 @@
 # Stage: Deck Projection（幻灯片投影）
 
+## 原生载体与阅读布局
+
+先读 [研究与技术汇报](research-presentations.md)，按信息关系选载体。
+`visual.table` 渲染原生 PPTX 表格和 HTML 表格；文本单元格引用 evidence，测量值用
+`value_from`，派生数字先进入 evidence。行列数量必须一致，列宽权重可调，固定字号
+放不下时拆表；不自动缩小文字或截断行。
+
+```yaml
+visual:
+  arrangement: full
+  table:
+    columns: [方案, 能力边界, 耗时]
+    column_weights: [1, 2, 1]
+    rows:
+      - [基线, {text: 固定平台配置, evidence: E001}, {value_from: E002}]
+      - [适配方案, {text: 分离硬件描述, evidence: E003}, {value_from: E004}]
+```
+
+`content` 页支持：
+- `split`（默认）：左侧要点，右侧一个主要图表；没有要点时图表自动占主体宽度。
+- `full`：图表占主体宽度，不再放 support_points；可用 callout 强化同一结论。
+- `columns`：两至三个 support_points 按顺序横排，使用 `{point, detail}`；每栏标题
+  对齐，解释就近，无独立 chart/diagram/table/asset_refs 或 metric_cards。适合连续解释，
+  不适合长段落或大量比较维度。字号固定，放不下先改写或拆页。
+
+一次选择一个主要载体，不能同时配置图、表和图片让 renderer 静默丢弃。表格和机制图
+支持 content / hero_split；full / columns 只用于 content。任意未知 page_role 仍按原有
+开放词汇规则处理。`visual.intent` 是规划说明，不执行任意布局指令。
+`visual.diagram` 的 Mermaid 支持子集直接生成原生 PPTX 节点/连线与 HTML SVG，
+无需 draw.io CLI。落地文字低于17pt时失败并提示扩大主体或拆图，不自动截图兜底。
+任意 `.drawio` 文件的无损导入尚未支持；报告的 Mermaid 导出继续使用 draw.io CLI。
+
 ## 输入
 
 - `narrative/narrative.yaml`（已过 Gate 2）。
@@ -12,10 +44,10 @@
 
 页面规则：
 
-- **语域：deck 是说出口的话。**短句、可念、口语节奏——和报告的书面语不是一档；
+- **语域：deck 服务现场理解。**准确、可读、可讲；正式汇报使用规范的专业表述，避免照抄口语承诺；
   brief.voice.deck 可覆盖全局风格。听的人只有一次机会，读的人可以回头。
-- 一页 ≈ 一个主要沟通信息。内容页 `title` 写**观众该记住的那句话**，不写话题所属。
-  反例："实验结果"。正例："Cache Partitioning 将 P99 latency 降低 18.2%"。
+- 一页 ≈ 一个主要沟通信息。结果页标题写有证据的结论；机制、背景、架构页可用准确的主题标题，
+  如“硬件领域模型分层架构”。避免无信息的“实验结果”，也不要硬造结论。
 - **说人话（默认规则，最大的质量问题）**：标题和要点用"做了什么 / 观察到什么 /
   结果是什么"的直白句式，念出来要像在会议上说话。诊断密码句的信号：一句话里
   只有术语和抽象标签，却省略对象、动作、条件或读者必需的解释。不要按术语数量
@@ -43,7 +75,7 @@
 "三个短 bullet 孤悬一页"就是太空。页面主体区至少要有一种展开结构或视觉块：
 
 - **`support_points` 支持 `{point, detail}`**：point 是加粗导语，detail 是下面一行浅色
-  展开。这是首选的充实手段——比加第四第五个 bullet 好，信息有层次。
+  展开。这是文本展开手段；先检索适合比较、架构、流程或数据展示的材料，再选择载体。
 - **`metric_cards`**：数据页的大数字卡片，`{label, value_from: Exxx}`，数值渲染时从
   evidence 取（不会漂移）。适合 2-4 个关键数字。卡片和图表同时用会很挤，二选一。
 - **`callout`**：底部"so what"结论条 `{text, evidence?}`。**强化本页信息，不许引入
@@ -53,10 +85,8 @@
     value_from: Exxx}]}`。数值在渲染时直接从 evidence 的 `value.number` 取——图上的
     数字物理上不可能和证据库漂移。前提：被引用的 evidence 条目必须有 `value`。
   - **示意图用 `visual.diagram`**：`{mermaid: <flowchart 源>, caption, evidence?}`。
-    mermaid 经编译器的确定性布局链（真实字体测量、碰撞校验）编译成 PNG，按内容哈希
-    缓存。当前只支持 flowchart/graph 子集（subgraph、sequence 等会失败）——
-    `comh validate` 会干跑图语法，错误在验证期就报出来。渲染需要 draw.io CLI
-    （`DRAWIO_CLI` 指向 draw.io Desktop）。
+    mermaid 经编译器的确定性布局链（真实字体测量、碰撞校验）生成原生 PPTX 对象与 HTML 内联 SVG。当前只支持 flowchart/graph 子集（subgraph、sequence 等会失败）——
+    `comh validate` 会干跑图语法，错误在验证期就报出来。演示稿此路径不需要 draw.io CLI。
   - 已有图片用 `asset_refs`，**引用图片时用对象形式 `{ref, caption, evidence}`**——
     caption 随图渲染，evidence 把图挂进溯源链。图不是溯源的盲区。
 

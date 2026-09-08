@@ -123,3 +123,35 @@ def test_html_deck_line_chart_falls_back_to_table(tmp_path: Path):
     doc = (tmp_path / "line.html").read_text(encoding="utf-8")
     assert "chart-table" in doc
     assert any("renders as a table" in f.detail for f in result.findings)
+
+
+def test_layout_guard_checks_later_table_without_navigating(tmp_path):
+    import pytest
+
+    from comh.cli import _headless_layout_check
+    from comh.render.icons import _chrome
+
+    if _chrome() is None:
+        pytest.skip("Chrome/Edge unavailable")
+    plan = {
+        "deck": {
+            "title": "Guard fixture",
+            "pages": [
+                {"id": "P01", "page_role": "cover", "title": "Cover"},
+                {
+                    "id": "P02",
+                    "page_role": "content",
+                    "title": "Long table",
+                    "visual": {
+                        "table": {
+                            "columns": ["Case", "Observation"],
+                            "rows": [["Baseline", "Measured value"]] * 80,
+                        }
+                    },
+                },
+            ],
+        }
+    }
+    result = render_html_deck(plan, tmp_path, tmp_path / "overflow.html")
+    _headless_layout_check(result.output, result)
+    assert any("slide 2: evidence-table overflows" in f.detail for f in result.findings)

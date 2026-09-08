@@ -8,6 +8,9 @@
 演示稿使用 context 中的 presentation_profile。学术默认充分展开，同一主旨可有多组
 证据和解释；先对齐内容职责，再参考分组、主图配解释、结论与条件相邻等布局建议。
 不把字数目标、卡片位置或 preset 字段写入 narrative。大纲阶段不按正式正文密度评判草案。
+研究/技术汇报先按 [研究展示](../references/research-presentations.md) 检索来源中的架构、
+对照、实验过程与故障成因，确认哪些进入正文。用页面职责连接目的、机制与证据，
+不把“验证通过”当成所有页面的主旨；机制页允许准确的主题标题。
 
 保存对应计划，执行 `comh present deck_outline` 或 `comh present report_outline`。
 用人类可读的结构给用户看，附重要取舍，等待回复。按 [对话协议](../references/dialogue-protocol.md)

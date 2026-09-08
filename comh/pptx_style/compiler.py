@@ -206,6 +206,15 @@ def compile_deck(
             ids = [shape.shape_id for shape in slide.shapes]
             if len(ids) != len(set(ids)):
                 raise StyleError(f"{page.page_id}: duplicate output shape IDs")
+            for shape in slide.shapes:
+                if shape.name.startswith(("diagram-node:", "diagram-label:")):
+                    for paragraph in shape.text_frame.paragraphs:
+                        for run in paragraph.runs:
+                            if run.font.size is not None and run.font.size.pt < 17:
+                                raise StyleError(
+                                    f"{page.page_id}: native diagram text falls below 17pt "
+                                    "on the template canvas; simplify or split the diagram"
+                                )
         result.metadata = {
             "compiler": "comh/pptx-style/v1",
             "style": ir.template.name,
@@ -234,6 +243,13 @@ def compile_deck(
             ),
             "visual_verification": "not performed here; inspect actual PPTX renders",
         }
+        from ..render.editability import audit_editability
+
+        result.metadata["editability"], edit_findings = audit_editability(
+            parsed, [p.page_id for p in ir.pages]
+        )
+        result.findings = [f for f in result.findings if not f.check.startswith("editability:")]
+        result.findings.extend(edit_findings)
         result.shape_map = {
             pid: {
                 address: [

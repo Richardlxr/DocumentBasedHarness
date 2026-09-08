@@ -119,6 +119,10 @@ def render_deck(
     total = len(plan["deck"]["pages"])
 
     for slide_number, page in enumerate(plan["deck"]["pages"]):
+        from ..presentation_profile import presentation_structure_errors
+
+        if errors := presentation_structure_errors(page):
+            raise ValueError(f"page {page.get('id')}: {'; '.join(errors)}")
         if _appearance_themes:
             theme = _appearance_themes[slide_number]
         role = page.get("page_role", "content")
@@ -150,6 +154,12 @@ def render_deck(
         _add_notes(slide, page)
 
     _check_geometry(prs, result)
+    from .editability import audit_editability
+
+    result.metadata["editability"], edit_findings = audit_editability(
+        prs, [p["id"] for p in plan["deck"]["pages"]]
+    )
+    result.findings.extend(edit_findings)
     _apply_transition(prs, plan, result)
     _apply_animations(prs, plan, result)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -540,6 +550,7 @@ def _render_content(
     chart_spec = visual.get("chart")
     diagram_spec = visual.get("diagram")
     cards = page.get("metric_cards") or []
+    arrangement = visual.get("arrangement", "split")
 
     title_top = 0.42
     kicker = str(page.get("kicker") or "")
@@ -620,7 +631,25 @@ def _render_content(
         content_top += 1.8
 
     body_width = _BODY_W
-    if chart_spec is not None:
+    full_visual = arrangement == "full" or not page.get("support_points")
+    vx, vw = (_MARGIN_X, _BODY_W) if full_visual else (6.55, 5.9)
+    if visual.get("table") is not None:
+        from .table import render_table
+
+        frame = render_table(
+            slide,
+            visual["table"],
+            evidence,
+            page_id,
+            theme,
+            x=vx,
+            y=content_top,
+            w=vw,
+            h=content_bottom - content_top,
+        )
+        shapes["visual"] = [frame.shape_id]
+        body_width = 5.35
+    elif chart_spec is not None:
         _add_chart(
             slide,
             page_id,
@@ -628,9 +657,9 @@ def _render_content(
             t,
             result,
             evidence,
-            x=6.55,
+            x=vx,
             y=content_top,
-            w=5.9,
+            w=vw,
             h=content_bottom - content_top,
             shapes=shapes,
         )
@@ -645,14 +674,31 @@ def _render_content(
             run_root,
             shapes,
             has_callout=bool(page.get("callout")),
+            x=vx,
+            y=content_top,
+            w=vw,
+            h=content_bottom - content_top,
         )
         body_width = 5.35
     else:
-        _add_figure(slide, page, run_root, theme, result, shapes)
+        _add_figure(
+            slide,
+            page,
+            run_root,
+            theme,
+            result,
+            shapes,
+            x=vx,
+            y=content_top,
+            w=vw,
+            h=content_bottom - content_top,
+        )
         body_width = 5.35 if _has_figure(page, run_root) else _BODY_W
 
     points = page.get("support_points", [])
-    if points:
+    if points and arrangement == "columns":
+        _render_reading_columns(slide, page, theme, shapes, content_top, content_bottom)
+    elif points:
         _render_points(
             slide,
             points,
@@ -706,23 +752,23 @@ def _add_diagram(
     shapes: dict,
     *,
     has_callout: bool = False,
+    x: float = 6.55,
+    y: float = _BODY_TOP,
+    w: float = 5.9,
+    h: float | None = None,
 ) -> None:
-    from docx_harness.errors import DocumentError
+    from .native_diagram import diagram_scene, render_native_diagram
 
-    from .diagrams import diagram_png
-
-    mermaid = str(spec.get("mermaid", ""))
-    try:
-        png = diagram_png(mermaid, run_root)
-    except DocumentError as error:
-        raise RuntimeError(f"page {page_id} diagram failed to compile: {error}") from error
-    max_h = _visual_max_h(has_callout)
-    picture = _fit_image(slide, png, x=6.55, y=_BODY_TOP, max_w=5.9, max_h=max_h)
-    shapes["visual"] = picture.shape_id
+    height = h if h is not None else _visual_max_h(has_callout)
     caption = spec.get("caption")
+    scene = diagram_scene(str(spec.get("mermaid", "")), theme.body_font)
+    objects = render_native_diagram(
+        slide, scene, theme, x=x, y=y, w=w, h=height - (0.5 if caption else 0)
+    )
+    shapes["visual"] = [obj.shape_id for obj in objects]
     if caption:
-        bottom = (picture.top + picture.height) / _EMU_PER_IN
-        box = _textbox(slide, Inches(6.55), Inches(bottom + 0.06), Inches(5.9), Inches(0.4))
+        box = _textbox(slide, Inches(x), Inches(y + height - 0.4), Inches(w), Inches(0.4))
+        shapes["visual"].append(box.shape_id)
         paragraph = box.text_frame.paragraphs[0]
         paragraph.alignment = PP_ALIGN.CENTER
         _set(
@@ -734,6 +780,48 @@ def _add_diagram(
         )
 
 
+def _render_reading_columns(slide, page, theme, shapes, top, bottom):
+    """Aligned stages with local explanations; no repeated full-width scan."""
+    points = page["support_points"]
+    if not 2 <= len(points) <= 3:
+        raise ValueError(f"page {page['id']}: reading columns require two or three points")
+    gap = 0.45
+    width = (_BODY_W - gap * (len(points) - 1)) / len(points)
+    for i, entry in enumerate(points):
+        point, detail = _point_parts(entry)
+        x = _MARGIN_X + i * (width + gap)
+        ids = []
+        for text, y, height, size, bold in (
+            (point, top, 0.85, theme.theme.body_size, True),
+            (detail or "", top + 1.05, bottom - top - 1.05, theme.theme.body_size, False),
+        ):
+            fit = fit_box(
+                text,
+                width_pt=width * 72 - 8,
+                height_pt=height * 72 - 8,
+                max_size=size,
+                min_size=size,
+                family=theme.body_font,
+            )
+            if fit.overflows:
+                raise ValueError(
+                    f"page {page['id']}: reading column {i + 1} does not fit at {size}pt"
+                )
+            box = _textbox(slide, Inches(x), Inches(y), Inches(width), Inches(height))
+            box.text_frame.margin_left = box.text_frame.margin_right = Pt(4)
+            box.text_frame.margin_top = box.text_frame.margin_bottom = Pt(4)
+            _set(
+                box.text_frame.paragraphs[0],
+                text,
+                size=size,
+                font=theme.body_font,
+                color=theme.theme.accent if bold else theme.theme.text,
+                bold=bold,
+            )
+            ids.append(box.shape_id)
+        shapes[f"support_points[{i}]"] = ids
+
+
 def _add_figure(
     slide,
     page: dict,
@@ -741,6 +829,11 @@ def _add_figure(
     theme: RenderTheme,
     result: RenderResult,
     shapes: dict,
+    *,
+    x: float = 6.55,
+    y: float = _BODY_TOP,
+    w: float = 5.9,
+    h: float | None = None,
 ) -> None:
     for entry in _asset_entries(page):
         image = run_root / entry["ref"]
@@ -756,13 +849,15 @@ def _add_figure(
                 )
             )
             continue
-        max_h = _visual_max_h(bool(page.get("callout")))
-        picture = _fit_image(slide, image, x=6.55, y=_BODY_TOP, max_w=5.9, max_h=max_h)
+        max_h = h if h is not None else _visual_max_h(bool(page.get("callout")))
+        if entry.get("caption"):
+            max_h -= 0.5
+        picture = _fit_image(slide, image, x=x, y=y, max_w=w, max_h=max_h)
         shapes["visual"] = [picture.shape_id]
         caption = entry.get("caption")
         if caption:
             bottom = (picture.top + picture.height) / _EMU_PER_IN
-            box = _textbox(slide, Inches(6.55), Inches(bottom + 0.06), Inches(5.9), Inches(0.4))
+            box = _textbox(slide, Inches(x), Inches(bottom + 0.06), Inches(w), Inches(0.4))
             paragraph = box.text_frame.paragraphs[0]
             paragraph.alignment = PP_ALIGN.CENTER
             _set(
@@ -1157,7 +1252,22 @@ def _render_hero_split(
 
     # Hero visual on right
     visual = page.get("visual") or {}
-    if visual.get("chart"):
+    if visual.get("table"):
+        from .table import render_table
+
+        frame = render_table(
+            slide,
+            visual["table"],
+            evidence,
+            page_id,
+            theme,
+            x=7.1,
+            y=_BODY_TOP,
+            w=5.3,
+            h=_BODY_BOTTOM - _BODY_TOP,
+        )
+        shapes["visual"] = [frame.shape_id]
+    elif visual.get("chart"):
         _add_chart(
             slide,
             page_id,
@@ -1172,7 +1282,18 @@ def _render_hero_split(
             shapes=shapes,
         )
     elif visual.get("diagram"):
-        _add_diagram(slide, page_id, visual["diagram"], theme, result, run_root, shapes)
+        _add_diagram(
+            slide,
+            page_id,
+            visual["diagram"],
+            theme,
+            result,
+            run_root,
+            shapes,
+            x=7.1,
+            w=5.3,
+            h=_BODY_BOTTOM - _BODY_TOP,
+        )
     else:
         _add_figure(slide, page, run_root, theme, result, shapes)
 
@@ -1847,7 +1968,7 @@ def _check_geometry(prs: Presentation, result: RenderResult) -> None:
                         "deck_plan",
                     )
                 )
-            if name != "decor":
+            if name != "decor" and not name.startswith("diagram-edge:"):
                 boxes.append((name, bbox))
         for i in range(len(boxes)):
             for j in range(i + 1, len(boxes)):

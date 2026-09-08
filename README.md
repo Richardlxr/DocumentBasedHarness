@@ -20,9 +20,13 @@
 
 | 成品 | 长什么样 |
 |---|---|
-| `deck.pptx` | 幻灯片：正文页围绕一个主要问题或结论；数据卡片、原生图表绑定事实库中的数值，其他文案和图中数字也需有证据支持 |
+| `deck.pptx` | 幻灯片：正文页围绕一个主要问题或结论；文字、对照表、图表和支持子集内的机制图默认可编辑；数值绑定证据，其他文案和图中数字也需有证据支持 |
 | `deck.html` | 网页版：单文件、离线双击可开，带出场动画（先结论、再证据、最后 so-what）、数字跳动和演讲者备注 |
 | `report.md` + `report.docx` | 详版报告：书面语完整展开，Markdown 是正主，Word 是一键编译的排版成品 |
+
+科研与技术汇报按信息关系选择对照表、架构图或数据图，同时检查正文入口、阅读顺序和图文邻接。
+具体规则见[研究展示指南](comh/instructions/references/research-presentations.md)，
+当前工程评估见[发布审查](docs/reviews/2026-09-08-release-audit.md)。
 
 两个硬承诺：
 
@@ -411,7 +415,8 @@ py -3.11 -m venv .venv
 不会替宿主注册技能，需按宿主约定接入入口。恢复任务先 `comh next --json`、`comh context`，
 单页工作用 `comh context --stage deck --node P01`。
 
-图形（mermaid 示意图）渲染需要 draw.io Desktop；Linux x86_64 可运行
+PPTX / HTML 的 Mermaid 流程图支持子集直接生成原生对象 / SVG，无需 draw.io。
+报告中的 Mermaid 图形导出仍需要 draw.io Desktop；Linux x86_64 可运行
 `docx-harness install-drawio`，macOS 上：
 `export DRAWIO_CLI="/Applications/draw.io.app/Contents/MacOS/draw.io"`
 Windows 会自动查找标准安装位置，也可设置

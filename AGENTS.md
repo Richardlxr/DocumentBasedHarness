@@ -78,7 +78,10 @@ upstream by replacing the package directory and re-running `tests/compiler/`.
   images/charts may support extracted facts, with visual estimates labeled explicitly.
   Attach semantic evidence links through `asset_refs` caption/evidence.
 - Mermaid flowchart/graph compilation is supported in deck and report authoring.
-  Validate syntax before rendering; actual diagram export requires the configured draw.io CLI.
+  Validate syntax before rendering. The deck's supported flowcharts become native PPTX
+  objects and inline HTML SVG; report diagram export requires the configured draw.io CLI.
+  Native tables use `visual.table`; reject incompatible carrier/layout combinations rather
+  than dropping content. Check editability and readability after template composition.
 
 ## Engineering
 

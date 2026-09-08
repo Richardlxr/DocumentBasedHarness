@@ -5,7 +5,8 @@ Communication Harness 的 Python 核心、HTML、DOCX 和 PPTX 生成链路支�
 或记录字体测量回退，不会静默联网安装。
 
 完整开发与渲染环境需要 Python 3.11+、Git，以及至少一套实际交付使用的字体。带 Mermaid
-图形时需要 Draw.io Desktop；PPTX 使用图标或执行 HTML 布局检查时需要 Chrome、Edge 或
+图形的报告需要 Draw.io Desktop；PPTX / HTML 的流程图支持子集使用原生对象 / SVG，
+不需要该外部程序。PPTX 使用图标或执行 HTML 布局检查时需要 Chrome、Edge 或
 Chromium。只安装 Python 依赖的极简容器不等于完整运行环境。
 
 ## 支持矩阵

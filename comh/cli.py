@@ -27,6 +27,8 @@ from pathlib import Path
 
 import yaml
 
+from docx_harness.errors import DocumentError
+
 from .artifacts import ARTIFACT_KEYS, Finding, load_artifact, load_yaml, validate_schema
 from .context import STAGE_FILES, context_pack, instructions, next_action
 from .contracts import forbids_dark, required_artifacts
@@ -356,11 +358,17 @@ def cmd_render(args: argparse.Namespace) -> int:
                 evidence=evidence,
                 allow_dark=not forbids_dark(brief),
             )
-        except StyleError as error:
+        except (StyleError, ValueError, RuntimeError, DocumentError) as error:
             metadata.update(
                 count={"error": 1, "warn": 0, "info": 0},
                 findings=[
-                    Finding("deck_plan", "pptx-style", "error", "fail", str(error)).as_dict()
+                    Finding(
+                        "deck_plan",
+                        "pptx-style" if isinstance(error, StyleError) else "render",
+                        "error",
+                        "fail",
+                        str(error),
+                    ).as_dict()
                 ],
                 published=False,
             )
@@ -722,6 +730,8 @@ def main(argv: list[str] | None = None) -> int:
         FileExistsError,
         KeyError,
         RuntimeError,
+        ValueError,
+        DocumentError,
         yaml.YAMLError,
     ) as error:
         print(f"error: {error}", file=sys.stderr)

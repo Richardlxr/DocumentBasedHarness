@@ -93,7 +93,12 @@ def _scale_content(tree, scale: float, dy: int, font_sizes: dict[int, int]) -> N
                 for attr in ("x", "y", "cx", "cy"):
                     if node.get(attr) is not None:
                         node.set(attr, str(round(int(node.get(attr)) * scale)))
-            for attr in ("marL", "marR", "indent", "lIns", "rIns", "tIns", "bIns"):
+            # A table's grid has its own dimensions; scaling only the graphic frame
+            # leaves editable cells at the original canvas size in Office players.
+            dimension = {"gridCol": "w", "tr": "h"}.get(local)
+            if dimension and node.get(dimension) is not None:
+                node.set(dimension, str(round(int(node.get(dimension)) * scale)))
+            for attr in ("marL", "marR", "marT", "marB", "indent", "lIns", "rIns", "tIns", "bIns"):
                 if node.get(attr) is not None:
                     node.set(attr, str(round(int(node.get(attr)) * scale)))
             if local in {"rPr", "defRPr", "endParaRPr"} and node.get("sz"):

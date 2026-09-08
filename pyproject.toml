@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "communication-harness"
-version = "1.2.0"
+version = "1.3.0"
 description = "Evidence -> narrative -> projections. A communication harness that turns source material into reports and presentations through explicit, traceable artifacts."
 readme = "README.md"
 requires-python = ">=3.11"

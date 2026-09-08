@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import platform
+import sys
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -268,6 +269,9 @@ class Manifest:
         snapshot["engine"] = hash_bytes(
             "\n".join(f"{p.relative_to(repo)}:{hash_file(p)}" for p in files).encode()
         )
+        if getattr(sys, "frozen", False):
+            # PyInstaller stores implementation bytecode inside its executable.
+            snapshot["frozen-engine"] = hash_file(Path(sys.executable))
         snapshot["runtime"] = {
             "python": platform.python_version(),
             "platform": platform.platform(),
@@ -337,7 +341,7 @@ class Manifest:
         self.data.setdefault("build_records", {})[key] = {
             "generation": self.data["build_generation"],
             "inputs": inputs,
-            "output": hash_file(self.output_path(key)),
+            "output": hash_file(self.output_path(key)) if self.output_path(key).is_file() else None,
             "qa_path": qa_path.relative_to(self.root).as_posix(),
             "qa_hash": hash_file(qa_path),
             "success": success,

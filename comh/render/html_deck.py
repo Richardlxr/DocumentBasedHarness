@@ -10,7 +10,8 @@ Mapping:
 - verbs: appear -> "fragment", fade_in -> "fragment fade-in",
   emphasize/highlight -> "fragment highlight-current"
 - charts: bar/column render as deterministic CSS bars from evidence values
-- diagrams/figures: inlined as data URIs from the PNG cache
+- diagrams: inline SVG from the same measured scene as editable PPTX objects
+- figures: inlined local image data
 - backgrounds: downsampled (<=1920px) and inlined with empirical PIL scrim
 - micro-animations: count-up on KPI cards + bar growth transition
 - layout archetypes: content, hero_split, fullscreen_backdrop, timeline, versus
@@ -238,6 +239,10 @@ def _section(
     run_root: Path,
     evidence: dict | None,
 ) -> str:
+    from ..presentation_profile import presentation_structure_errors
+
+    if errors := presentation_structure_errors(page):
+        raise ValueError(f"page {page.get('id')}: {'; '.join(errors)}")
     role = page.get("page_role", "content")
     orders = _fragment_orders(page)
     if role == "cover":
@@ -369,7 +374,15 @@ def _content(
 
     visual = page.get("visual") or {}
     visual_html = ""
-    if visual.get("chart"):
+    if visual.get("table"):
+        from .table import table_html
+
+        visual_html = (
+            f"<div{_fragment_attrs('visual', orders)}>"
+            + table_html(visual["table"], evidence, page["id"])
+            + "</div>"
+        )
+    elif visual.get("chart"):
         chart_html = _css_chart(visual["chart"], evidence, result, page["id"], theme)
         if chart_html:
             visual_html = f"<div{_fragment_attrs('visual', orders)}>{chart_html}</div>"
@@ -393,11 +406,15 @@ def _content(
             )
 
     points_html = _points(page, orders, bool(visual_html))
-    if visual_html:
+    if visual_html and (visual.get("arrangement") == "full" or not page.get("support_points")):
+        parts.append(visual_html)
+    elif visual_html:
         parts.append(
             f'<div class="columns"><div class="col">{points_html}</div>'
             f'<div class="col">{visual_html}</div></div>'
         )
+    elif points_html and visual.get("arrangement") == "columns":
+        parts.append(f'<div class="reading-columns">{points_html}</div>')
     elif points_html:
         parts.append(points_html)
 
@@ -422,7 +439,15 @@ def _hero_split(
     """Hero Split: full-height hero visual on one side, title/points on the other."""
     visual = page.get("visual") or {}
     visual_html = ""
-    if visual.get("asset_refs"):
+    if visual.get("table"):
+        from .table import table_html
+
+        visual_html = (
+            f"<div{_fragment_attrs('visual', orders)}>"
+            + table_html(visual["table"], evidence, page["id"])
+            + "</div>"
+        )
+    elif visual.get("asset_refs"):
         entries = [e if isinstance(e, dict) else {"ref": e} for e in visual["asset_refs"]]
         existing = next((e for e in entries if (run_root / e["ref"]).is_file()), None)
         if existing:
@@ -715,7 +740,15 @@ def _css_chart(spec: dict, evidence: dict | None, result: HtmlResult, page_id: s
 
 
 def _image_block(run_root: Path, address: str, entry: dict, theme, orders: dict) -> str:
-    del theme
+    if entry.get("mermaid"):
+        from .native_diagram import diagram_scene, diagram_svg
+
+        svg = diagram_svg(diagram_scene(entry["mermaid"], theme.body_font))
+        caption = html.escape(str(entry.get("caption", "")))
+        return (
+            f"<figure{_fragment_attrs(address, orders)}>{svg}"
+            f'<figcaption class="caption muted">{caption}</figcaption></figure>'
+        )
     ref = entry.get("ref")
     path = run_root / str(ref) if ref else _diagram_png_path(entry, run_root)
     if not path.is_file():
@@ -813,6 +846,7 @@ html, body { margin:0; padding:0; background:var(--bg); color:var(--text);
   justify-content:space-between; gap:14px;
 }
 .points.narrow { max-width:46%; }
+.columns .points.narrow { max-width:none; }
 .point {
   background:var(--card-fill); border:1px solid var(--card-line);
   border-radius:12px; padding:12px 16px;
@@ -858,6 +892,15 @@ figure img { max-width:100%; max-height:58vh; }
 .bar-value { width:16%; font-size:17px; }
 .chart-table { border-collapse:collapse; margin:0 auto; }
 .chart-table td { border:1px solid var(--card-line); padding:6px 16px; }
+.evidence-table { border-collapse:collapse; table-layout:fixed; width:100%;
+  font-size:var(--body-size); }
+.evidence-table th,.evidence-table td { border-bottom:1px solid var(--card-line);
+  padding:8px 10px; text-align:left; white-space:pre-line; overflow-wrap:anywhere; }
+.evidence-table th { background:var(--accent-soft); }
+.reading-columns .points { display:flex; flex-direction:row; align-items:flex-start; gap:32px; }
+.reading-columns .point { flex:1; min-width:0; }
+.reading-columns .point { display:block; background:none; border:0; padding:0; }
+.reading-columns .detail { margin-top:20px; font-size:var(--body-size); }
 .reveal .fragment.highlight-current.visible { color:var(--accent); }
 
 /* Layout archetypes */
@@ -998,22 +1041,37 @@ Reveal.initialize({{
   function check() {{
     var findings = [];
     var slides = document.querySelectorAll('.slides > section');
-    slides.forEach(function (slide, idx) {{
+    // Reveal hides noncurrent slides. Measure inert clones at the presentation's
+    // logical canvas size, without navigating or consuming reveal animations.
+    var measure = document.createElement('div');
+    measure.className = 'slides';
+    measure.setAttribute('aria-hidden', 'true');
+    measure.style.cssText = 'position:absolute;left:-100000px;top:0;width:1280px;' +
+      'height:720px;transform:none;visibility:hidden;pointer-events:none;';
+    document.querySelector('.reveal').appendChild(measure);
+    slides.forEach(function (original, idx) {{
+      var slide = original.cloneNode(true);
+      slide.style.cssText += ';display:block;position:absolute;left:0;top:0;' +
+        'width:1280px;height:720px;transform:none;opacity:1;';
+      measure.appendChild(slide);
       var sr = slide.getBoundingClientRect();
       var blocks = [];
-      slide.querySelectorAll('h1,h2,.kicker,.point,.card,.callout,figure,.chart,.agenda-row,.footer,.hero-col,.hero-text,.timeline,.milestone,.versus,.versus-col,.backdrop-card')
+      slide.querySelectorAll('h1,h2,.kicker,.point,.card,.callout,figure,.chart,.evidence-table,.agenda-row,.footer,.hero-col,.hero-text,.timeline,.milestone,.versus,.versus-col,.backdrop-card')
         .forEach(function (el) {{
           var r = el.getBoundingClientRect();
           if (r.width < 2 || r.height < 2) return;
           blocks.push({{el: el, r: r}});
-          var over = r.bottom - sr.bottom, overR = r.right - sr.right;
-          if (over > 4 || overR > 4)
+          var over = Math.max(r.bottom - sr.bottom, r.right - sr.right,
+            sr.top - r.top, sr.left - r.left);
+          if (over > 4)
             findings.push('slide ' + (idx + 1) + ': ' +
               (el.className.split(' ')[0] || el.tagName) + ' overflows the slide by ' +
-              Math.max(over, overR).toFixed(0) + 'px');
+              over.toFixed(0) + 'px');
         }});
       for (var i = 0; i < blocks.length; i++)
         for (var j = i + 1; j < blocks.length; j++) {{
+          if (blocks[i].el.contains(blocks[j].el) || blocks[j].el.contains(blocks[i].el))
+            continue; // nested semantic containers intentionally enclose their contents
           var a = blocks[i].r, b = blocks[j].r;
           var w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
           var h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
@@ -1026,7 +1084,9 @@ Reveal.initialize({{
                 (blocks[j].el.className.split(' ')[0] || blocks[j].el.tagName));
           }}
         }}
+      slide.remove();
     }});
+    measure.remove();
     document.body.setAttribute('data-layout-findings', JSON.stringify(findings));
     if (findings.length) console.warn('[layout-guard] ' + findings.length + ' issue(s):', findings);
   }}

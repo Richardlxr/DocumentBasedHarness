@@ -11,7 +11,7 @@ macOS / Linux：
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -e '.[dev]'
-# 图形渲染（可选，mermaid 示意图需要）：
+# 报告图形导出（可选；PPTX / HTML 原生流程图无需 draw.io）：
 export DRAWIO_CLI="/Applications/draw.io.app/Contents/MacOS/draw.io"
 export DRAWIO_ACCEPT_VERSION=30.0.4   # 仅当你的 draw.io 版本与上游 pin 不一致
 ```
@@ -117,12 +117,18 @@ Gate 后内容或证据依据改变会作废确认，需要重新对齐。以上
 
 ## 5. projection：同一故事的两种组装
 
-- **deck_plan**：message 式标题（"P99 降低 18.2%"而不是"实验结果"）、
-  展开式要点（`{point, detail}` 加粗导语+浅色展开）、大数字卡片与图表
+- **deck_plan**：结果页用证据支持的结论标题（如 "P99 降低 18.2%"）；机制、背景或
+  架构页可用准确的主题标题。展开式要点（`{point, detail}`）、原生对照表、机制图、
+  大数字卡片与图表
   （`value_from` 渲染时从证据取数）、底部结论条、`reveal`/`emphasis` 动画步骤、
   被裁掉内容的去向登记（demotions）。
 - **report_plan**：写作契约——分节、每节展开哪些 claims/evidence、深度。
   报告可以方法前置、合并拆分 beats，与 deck 顺序不同是正当的。
+
+学术场景默认 academic-rich，但不按字数填充页面。先判断证据中的比较、机制和实验关系，
+再选表格、图示或正文；细化时检查首个注视点、阅读顺序和图文邻接。原生表格的
+`visual.table` 与 `split/full/columns` 布局见[研究展示指南](../comh/instructions/references/research-presentations.md)
+及[字段示例](../comh/instructions/references/deck-authoring.md)。
 
 先保存计划并 `comh present deck_outline` / `report_outline`，展示结构及取舍，收到实际回复
 后记录 accepted 或明确的 delegated。粗大纲直接来自计划结构字段，无重复的大纲文件。

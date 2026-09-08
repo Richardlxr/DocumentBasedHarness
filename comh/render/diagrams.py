@@ -1,4 +1,7 @@
-"""Deck diagrams: visual.diagram (mermaid) → PNG via the vendored compiler.
+"""Legacy PNG export helper and validation for diagram syntax.
+
+Deck rendering now uses native_diagram for editable PPTX and inline HTML SVG.
+The PNG helper remains available to callers that explicitly need a bitmap.
 
 Reuses docx-harness's deterministic chain — Mermaid source → native mxGraph
 nodes with measured, collision-checked layout → draw.io CLI export. The PNG is
@@ -25,7 +28,7 @@ def dry_convert(mermaid: str) -> str | None:
     (used by validators so bad diagram syntax fails at `comh validate`,
     not at render time).
     """
-    from docx_harness.diagrams import default_diagram_registry
+    from docx_harness import default_diagram_registry
 
     try:
         default_diagram_registry().convert(

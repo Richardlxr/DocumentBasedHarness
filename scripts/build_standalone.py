@@ -10,9 +10,13 @@ import platform
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import tomllib
+import zipfile
 from pathlib import Path
+
+from smoke_standalone import smoke_render
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -119,6 +123,8 @@ def build(output: Path, version: str | None) -> Path:
             "docx_harness",
             "--collect-data",
             "latex2mathml",
+            "--recursive-copy-metadata",
+            "communication-harness",
             "--add-data",
             f"{ROOT / 'assets'}{separator}assets",
             "--add-data",
@@ -141,7 +147,8 @@ def build(output: Path, version: str | None) -> Path:
 This standalone bundle includes Python {platform.python_version()} and its runtime dependencies.
 
 Run `comh{suffix} --help` or `docx-harness{suffix} --help` from this directory. Optional
-Mermaid/draw.io export still needs draw.io Desktop; PPTX icon rasterization needs Chrome,
+Report Mermaid/draw.io export still needs draw.io Desktop; deck flowcharts are native.
+PPTX icon rasterization needs Chrome,
 Chromium, or Edge. See `PROJECT_README.md` for the full workflow and platform notes.
 
 Build commit: `{commit}`
@@ -151,7 +158,20 @@ Build commit: `{commit}`
     if any("runs" in path.parts for path in bundle.rglob("*")):
         raise RuntimeError("release bundle unexpectedly contains a runs directory")
     smoke_test(bundle)
-    return archive_bundle(bundle, output)
+    archive = archive_bundle(bundle, output)
+    # Test what the recipient extracts, not only the staging directory.
+    with tempfile.TemporaryDirectory(prefix="release-extracted-") as temporary:
+        destination = Path(temporary)
+        if archive.suffix == ".zip":
+            with zipfile.ZipFile(archive) as zipped:
+                zipped.extractall(destination)
+        else:
+            with tarfile.open(archive) as tar:
+                tar.extractall(destination, filter="data")
+        extracted = destination / bundle.name
+        smoke_test(extracted)
+        smoke_render(extracted)
+    return archive
 
 
 def main() -> int:
