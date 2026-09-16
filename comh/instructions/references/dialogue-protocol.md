@@ -11,6 +11,9 @@
 1. 写好并 `comh save` 当前 artifact。
 2. `comh present brief|narrative|deck_outline|deck_appearance|report_outline`，可用 `--summary <markdown文件路径>` 附短摘要。
 3. 将返回的 view、推断、关键未知和取舍以自然语言展示给用户，保留请求 ID；停止相依的下游动作。
+   展示必须落在用户看得见的通道：宿主提供交互提问机制（如选择题对话框）时，展示内容与
+   确认选项用该机制一起提交；没有该机制时，把完整内容放进回合末消息再等待。禁止只把
+   Gate 内容放在工具调用之间的中间文本里——那不是展示。
 4. 收到回复后 `comh respond D0001 --decision accepted --reply '实际原话' --source '消息引用'`。
    修改意见用 changes_requested；大纲/细化的明确委托用 delegated。brief、narrative 和 delivery 需要接受。
 5. 运行 `comh next --json`。新会话、压缩后以及接到修改要求时也从这里恢复。
@@ -42,8 +45,11 @@ status 为 provided/confirmed/proposed/delegated/deferred/not_applicable/unresol
 provided、confirmed、delegated 需要用户依据；proposed 是等待本次 Gate 接受的建议。
 非核心字段允许 not_applicable 并写 basis；视觉材料可 deferred 并写 due: projection，届时必须处理。
 核心方向、受众、语言、媒介和目标不能延期。constraints 无额外要求可显式写空列表。
-presentation 记录场合与密度预设：学术默认充实，用户指定优先。建议默认可随 Gate 1 一起接受，
-不必强制用户另行选档；不能把默认值写成用户已明确要求。报告单独交付时无需此字段。
+presentation 记录场合与密度预设：学术默认充实，用户指定优先。密度档位是 Gate 1 的
+显式问题项：用三档的人话描述（学术充实/均衡/精简，附字数与分块参考和推荐档）问用户，
+用户选档、接受建议档或明确委托（"你定"）。alignment.presentation 不能停在 proposed——
+接受建议记 confirmed、委托记 delegated，都写用户依据。仍并入本次契约确认，不另开一轮。
+不能把默认值写成用户已明确要求。报告单独交付时无需此字段。
 appearance 的 selection 可为 deferred：Gate 1 接受“稍后选”的安排，粗大纲之后必须用
 deck_appearance 解决，不用把整个 brief 改写并重走故事线。appearance 本身不能省略处置。
 

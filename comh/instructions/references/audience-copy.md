@@ -36,6 +36,8 @@
 - `audience:compressed-boundary` / `audience:abstract-assurance`：过度压缩或抽象背书，warn。
   按受众和上下文改写，或在 QA 给出合理保留依据，不能把“可复现”升级成“真实有效”。
 - `copy:duplicate`：同页较长文字重复，warn；检查第二处是否增加了信息。
+- `density:packed-detail`：单条 detail 分号串联四个及以上事实片段，warn；回应方式是
+  拆成多组 point/detail 或改用列表/表格/图载体，不是删事实或压缩措辞。草案期同样检查。
 - 检查覆盖 narrative 的 message/statement、deck 的可见标题/页眉/要点/卡片标签/图注/
   图表标签/支持的 Mermaid 标签，以及报告正文/标题/表格。notes、visual.intent、
   purpose、demotions 和原始证据不当作成品文案扫描。

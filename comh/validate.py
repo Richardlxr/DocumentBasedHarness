@@ -1131,12 +1131,13 @@ def run_all(run_root: Path, keys: set[str] | None = None) -> list[Finding]:
                 Finding("report_md", "schema", "error", "fail", "report source missing")
             )
     from .audience_lint import validate_audience_copy
-    from .presentation_profile import validate_density
+    from .presentation_profile import validate_density, validate_packing
     from .style_lint import validate_style
 
     findings += validate_style(artifacts, report_md_text)
     findings += validate_audience_copy(artifacts, report_md_text)
     findings += validate_density(artifacts)
+    findings += validate_packing(artifacts)
     if artifacts.get("evidence") is not None:
         findings += validate_sources(artifacts, run_root)
     if all(artifacts.get(k) is not None for k in ("evidence", "narrative")):

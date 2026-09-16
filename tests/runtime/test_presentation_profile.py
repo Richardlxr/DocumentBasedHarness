@@ -9,7 +9,12 @@ from comh.cli import main
 from comh.context import context_pack
 from comh.decision_checks import brief_errors
 from comh.manifest import Manifest
-from comh.presentation_profile import policy_errors, resolve_profile, validate_density
+from comh.presentation_profile import (
+    policy_errors,
+    resolve_profile,
+    validate_density,
+    validate_packing,
+)
 from comh.render.deck import render_deck
 from comh.render.metrics import fixed_text_sizes
 from comh.visible_text import page_texts
@@ -48,21 +53,62 @@ def test_overrides_do_not_mutate_other_runs_or_interpret_open_dimensions():
     assert policy_errors(brief)
 
 
-def test_intent_is_aligned_at_gate_one_without_an_extra_approval_round(tmp_path):
+def test_density_profile_is_asked_at_gate_one_in_the_same_round(tmp_path):
     brief = academic()
     brief["alignment"]["presentation"].update(
         source="default", status="proposed", basis="学术汇报采用充实预设"
     )
     root = until_brief(tmp_path, brief)
-    assert approve(root, "brief") == 0
+    assert approve(root, "brief") == 2  # A silently proposed default no longer passes Gate 1.
+    brief["alignment"]["presentation"].update(
+        source="user", status="confirmed", basis="用户接受建议的学术充实档"
+    )
+    write(root, "brief/brief.yaml", brief)
+    assert cli(root, "save", "brief") == 0
+    assert approve(root, "brief") == 0  # Confirmed inside the same Gate 1 round, no extra round.
     brief["presentation"] = {"setting": "academic", "profile": "concise"}
     assert brief_errors(brief)  # Actual value and accepted proposed value must agree.
+    delegated = academic()
+    delegated["alignment"]["presentation"].update(
+        source="user", status="delegated", basis="用户委托选择密度档"
+    )
+    assert not brief_errors(delegated)
     no_policy = academic()
     del no_policy["presentation"], no_policy["alignment"]["presentation"]
     assert any("presentation" in e for e in brief_errors(no_policy))
     no_policy["media"] = [{"medium": "markdown", "surface": "report"}]
     no_policy["alignment"]["media"]["value"] = no_policy["media"]
     assert not any("presentation" in e for e in brief_errors(no_policy))
+
+
+def test_packed_detail_is_flagged_in_drafts_and_split_or_carrier_is_the_fix():
+    plan = deepcopy(DECK)
+    page = plan["deck"]["pages"][0]
+    page["support_points"] = [
+        {
+            "point": "决策先行",
+            "detail": (
+                "剥离调度职责；单一 ELF 按核组织入口；统一物理编址；"
+                "FPGA 中断作节拍源；期限超时上报；看门狗移出本期。"
+            ),
+        },
+        {
+            "point": "解释观察结果",
+            "detail": (
+                "解释结果时先描述基线与改动后出现了什么差别，再讨论哪些机制可能解释这一差别。"
+                "相同设置下重复得到相同输出可以支持实验可复现，但不能单独证明模型与实际设备一致。"
+            ),
+        },
+    ]
+    artifacts = {"brief": academic(), "deck_plan": plan}
+    flagged = [f for f in validate_packing(artifacts) if f.check == "density:packed-detail"]
+    assert len(flagged) == 1
+    assert "support_points[0].detail" in flagged[0].detail
+    assert flagged[0].severity == "warn"
+    plan["draft"] = True
+    assert validate_packing(artifacts)  # Drafts are still checked: the outline already packs.
+    page["support_points"][0]["detail"] = "剥离调度职责，运行时收敛为纯服务层加静态调度。"
+    assert not validate_packing(artifacts)
 
 
 def test_profile_is_progressively_disclosed_and_available_without_run(tmp_path, capsys):
@@ -140,6 +186,8 @@ def test_rich_page_fits_existing_renderer_without_shrinking_type(tmp_path):
     count = len("".join(t for _, t in page_texts(page)))
     assert 400 <= count <= 550
     assert not validate_density({"brief": academic(), "deck_plan": plan})
+    # Flowing multi-sentence prose is rich content, not semicolon-chained packing.
+    assert not validate_packing({"brief": academic(), "deck_plan": plan})
     with fixed_text_sizes():
         result = render_deck(plan, tmp_path, tmp_path / "rich.pptx", language="zh-CN")
     assert not [f for f in result.findings if f.verdict == "fail"], result.findings

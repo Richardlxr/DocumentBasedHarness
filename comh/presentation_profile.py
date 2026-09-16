@@ -138,6 +138,48 @@ def validate_density(artifacts: dict) -> list[Finding]:
     return findings
 
 
+_CLAUSE_SPLIT = re.compile(r"[；;]")
+
+
+def validate_packing(artifacts: dict) -> list[Finding]:
+    """Signal overloaded slide copy: one detail line that semicolon-chains a
+    list of facts ("did A; did B; did C; did D") instead of being one
+    elaborated point. Flowing explanatory prose with full sentences is rich
+    content, not packing — only semicolon chains count.
+
+    Unlike validate_density this runs on drafts too — packing is a structural
+    problem visible while the outline is still being aligned, not a
+    completeness signal that waits for finished copy.
+    """
+    brief = artifacts.get("brief") or {}
+    if not applicable(brief) or policy_errors(brief):
+        return []
+    deck = artifacts.get("deck_plan") or {}
+    findings = []
+    for page in deck.get("deck", {}).get("pages", []):
+        if page.get("page_role") in {"cover", "agenda", "section_divider", "closing", "appendix"}:
+            continue
+        for element, text in page_texts(page):
+            if not element.endswith(".detail"):
+                continue
+            parts = [part for part in _CLAUSE_SPLIT.split(text or "") if part.strip()]
+            if len(parts) >= 4:
+                findings.append(
+                    Finding(
+                        "deck_plan",
+                        "density:packed-detail",
+                        "warn",
+                        "fail",
+                        f"page {page['id']} {element} semicolon-chains {len(parts)} facts "
+                        "into one line; it is a structure, not a sentence — split it into "
+                        "more point/detail pairs or a richer carrier (list, table, diagram). "
+                        "Do not delete facts or shrink type to clear this warning.",
+                        "deck_plan",
+                    )
+                )
+    return findings
+
+
 def presentation_structure_errors(page: dict) -> list[str]:
     """Check consumed layout combinations, not whether a reading path is persuasive."""
     visual = page.get("visual") or {}

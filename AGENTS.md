@@ -22,7 +22,9 @@ render stage.
 - Use `comh next --json` and `comh context` on entry and after context recovery. Load only the
   current stage and relevant node; keep global constraints, unresolved claims and counterevidence.
 - `comh present` creates a version-bound request. Show its view and blockers to the user,
-  then wait. `comh respond` records the actual reply and its source; never invent acceptance.
+  then wait; the presentation must land in a user-visible channel (host question dialog when
+  available, otherwise the end-of-turn message — never only text between tool calls).
+  `comh respond` records the actual reply and its source; never invent acceptance.
   Bare `comh confirm` is unsupported. Legacy gates without decision receipts remain untrusted.
   Brief and narrative require acceptance; outlines/details may be explicitly delegated.
   Collaborative mode requires per-node decisions before formal render or report prose save.
@@ -119,7 +121,9 @@ upstream by replacing the package directory and re-running `tests/compiler/`.
   from source/font/player behavior. Single-line repairs are explicit, measured and checked
   for new collisions; never apply no-wrap to all template text or promise universal fidelity.
 - Presentation contracts record academic/general setting and optional density overrides.
-  Academic settings default to academic-rich unless the user requests otherwise. Density
+  The density profile is an explicit Gate 1 question: the user picks a profile, accepts the
+  suggested default, or delegates it; a silently proposed default blocks Gate 1 acceptance.
+  Academic settings suggest academic-rich. Density
   and layout advice are authoring guidance, never word quotas or permission to invent facts,
   shrink type, or import source content panels. Keep this independent of appearance/voice.
 - Audience copy checks cover all known visible fields, including labels and captions.

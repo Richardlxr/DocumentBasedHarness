@@ -253,6 +253,29 @@ def test_draft_can_present_outline_but_cannot_render(tmp_path):
     assert cli(root, "render", "deck") == 0
 
 
+def test_present_views_expose_density_question_and_carrier_mix(tmp_path):
+    deck = deepcopy(DECK)
+    deck["deck"]["pages"].append(
+        {
+            "id": "P02",
+            "page_role": "content",
+            "beat": "S01",
+            "title": "方案对照",
+            "visual": {"table": {"columns": ["方案", "耗时"], "rows": [["基线", "220 ms"]]}},
+        }
+    )
+    root = until_outline(tmp_path, deck=deck)
+    assert cli(root, "present", "brief") == 0
+    effective = latest(Manifest.load(root), "brief")["view"]["presentation_effective"]
+    assert effective["profile"] == "balanced"
+    assert effective["selection"] == "default"
+    assert effective["text_budget"]["zh_chars"]
+    assert cli(root, "present", "deck_outline") == 0
+    view = latest(Manifest.load(root), "deck_outline")["view"]
+    assert [node["carrier"] for node in view["nodes"]] == ["text", "table"]
+    assert view["carrier_summary"] == {"text": 1, "table": 1}
+
+
 def test_collaborative_mode_requires_each_page_but_user_can_change_mode(tmp_path):
     deck = deepcopy(DECK)
     deck["deck"]["pages"].append({**deck["deck"]["pages"][0], "id": "P02"})

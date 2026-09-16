@@ -109,6 +109,14 @@ def brief_errors(brief: dict, stage: str = "brief") -> list[str]:
             field
         ):
             errors.append(f"brief.{field} cannot be empty")
+    if has_presentation(brief):
+        entry = alignment.get("presentation") or {}
+        if entry.get("status") == "proposed":
+            errors.append(
+                "alignment.presentation cannot stay proposed: the density profile is a "
+                "Gate 1 question — the user picks a profile, accepts the suggested "
+                "default, or explicitly delegates it"
+            )
     return errors
 
 

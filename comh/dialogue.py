@@ -91,10 +91,51 @@ def set_mode(manifest: Manifest, mode: str, reply: str, source: str) -> None:
     manifest.save()
 
 
+def _brief_view(brief: dict) -> dict:
+    """Brief view carries the resolved density profile, so the Gate 1 density
+    question quotes concrete budgets instead of a silent default."""
+    from .presentation_profile import applicable, resolve_profile
+
+    if not applicable(brief):
+        return brief
+    try:
+        profile = resolve_profile(brief)
+    except ValueError:
+        return brief  # malformed presentation config surfaces via policy_errors blockers
+    effective = {
+        key: profile[key]
+        for key in (
+            "profile",
+            "label",
+            "setting",
+            "selection",
+            "text_budget",
+            "substantive_blocks",
+        )
+        if key in profile
+    }
+    return {**brief, "presentation_effective": effective}
+
+
+def _page_carrier(page: dict) -> str:
+    visual = page.get("visual") or {}
+    for key, carrier in (
+        ("chart", "chart"),
+        ("table", "table"),
+        ("diagram", "diagram"),
+        ("asset_refs", "image"),
+    ):
+        if visual.get(key):
+            return carrier
+    return "text"
+
+
 def view(manifest: Manifest, target: str, node: str | None = None) -> dict:
     if target not in TARGETS:
         raise RunError(f"unknown decision target: {target}")
-    if target in {"brief", "narrative"}:
+    if target == "brief":
+        return _brief_view(read(manifest, target))
+    if target == "narrative":
         return read(manifest, target)
     if target == "deck_appearance":
         from .appearance import view as appearance_view
@@ -128,9 +169,24 @@ def view(manifest: Manifest, target: str, node: str | None = None) -> dict:
         if deck
         else ("id", "heading", "beats", "merge_rationale")
     )
+    if deck:
+        summary: dict[str, int] = {}
+        nodes_out = []
+        for page in nodes:
+            carrier = _page_carrier(page)
+            summary[carrier] = summary.get(carrier, 0) + 1
+            row = {key: page[key] for key in fields if key in page}
+            row["carrier"] = carrier
+            nodes_out.append(row)
+        return {
+            "title": plan.get("deck", {}).get("title"),
+            "nodes": nodes_out,
+            "carrier_summary": summary,
+            "omissions": plan.get("omissions", []),
+        }
     return {
-        "title": plan.get("deck", {}).get("title") if deck else plan.get("title"),
-        "nodes": [{k: n[k] for k in fields if k in n} for n in nodes],
+        "title": plan.get("title"),
+        "nodes": [{key: n[key] for key in fields if key in n} for n in nodes],
         "omissions": plan.get("omissions", []),
     }
 
