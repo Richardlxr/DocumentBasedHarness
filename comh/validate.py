@@ -1171,19 +1171,39 @@ def run_all(run_root: Path, keys: set[str] | None = None) -> list[Finding]:
     return findings
 
 
-def write_findings(run_root: Path, findings: list[Finding]) -> Path:
+def write_findings(
+    run_root: Path, findings: list[Finding], keys: set[str] | None = None
+) -> Path:
+    """Write the aggregate report.
+
+    A scoped run (``comh validate deck_plan``) checked only part of the run, so
+    it may only replace the part it checked: findings recorded for artifacts
+    outside ``keys`` are carried over. Overwriting them would silently turn a
+    partial check into a clean bill of health for the whole run.
+    """
     from .qa import preserve_legacy_review
 
     preserve_legacy_review(run_root)
     qa_dir = run_root / "qa"
     qa_dir.mkdir(parents=True, exist_ok=True)
     path = qa_dir / "findings.yaml"
-    payload = {
-        "count": {"error": 0, "warn": 0, "info": 0},
-        "findings": [f.as_dict() for f in findings],
-    }
-    for f in findings:
-        payload["count"][f.severity] += 1
+    entries = [f.as_dict() for f in findings]
+    if keys is not None and path.is_file():
+        checked = keys | {"qa"}
+        try:
+            previous = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            carried = [
+                e
+                for e in (previous.get("findings") or [])
+                if isinstance(e, dict) and e.get("artifact") not in checked
+            ]
+        except yaml.YAMLError:
+            carried = []  # an unreadable report is replaced, not trusted
+        entries = carried + entries
+    payload = {"count": {"error": 0, "warn": 0, "info": 0}, "findings": entries}
+    for entry in entries:
+        if entry.get("severity") in payload["count"]:
+            payload["count"][entry["severity"]] += 1
     path.write_text(yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8")
     return path
 

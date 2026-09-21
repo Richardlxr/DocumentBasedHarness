@@ -295,14 +295,15 @@ def cmd_validate(args: argparse.Namespace) -> int:
         manifest = Manifest.load(run_root)
         findings += review_findings(manifest)
         findings += render_findings(manifest)
-    path = write_findings(run_root, findings)
+    path = write_findings(run_root, findings, keys)
     errors = [f for f in findings if f.severity == "error"]
     warns = [f for f in findings if f.severity == "warn"]
     for finding in findings:
         marker = {"error": "✗", "warn": "△", "info": "·"}[finding.severity]
-        owner = ""
-        if finding.owning_artifact != finding.artifact:
-            owner = f" → fix: {finding.owning_artifact}"
+        # The empty default means "the artifact owns its own finding"; compare
+        # the normalized value, never the raw field.
+        owning = finding.as_dict()["owning_artifact"]
+        owner = f" → fix: {owning}" if owning != finding.artifact else ""
         print(f"  [{marker}] {finding.artifact}/{finding.check}: {finding.detail}{owner}")
     print(f"findings: {len(errors)} error(s), {len(warns)} warn(s) → {path}")
     return 1 if errors else 0
