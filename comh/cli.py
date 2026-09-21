@@ -437,21 +437,37 @@ def _headless_layout_check(html_path: Path, result) -> None:
             )
         )
         return
-    completed = subprocess_module.run(
-        [
-            chrome,
-            "--headless=new",
-            "--disable-gpu",
-            "--virtual-time-budget=4000",
-            "--window-size=1600,900",
-            "--dump-dom",
-            html_path.as_uri(),
-        ],
-        capture_output=True,
-        text=True,
-        timeout=120,
-        check=False,
-    )
+    try:
+        completed = subprocess_module.run(
+            [
+                chrome,
+                "--headless=new",
+                "--disable-gpu",
+                "--virtual-time-budget=4000",
+                "--window-size=1600,900",
+                "--dump-dom",
+                html_path.as_uri(),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except (subprocess_module.SubprocessError, OSError) as error:
+        # An unusable browser leaves geometry unverified; it does not abort the
+        # render, which would also lose the build receipt for this generation.
+        result.findings.append(
+            Finding(
+                "deck_plan",
+                "layout",
+                "warn",
+                "fail",
+                f"[html] layout check could not run ({error}); "
+                "geometry findings are not guaranteed for this output",
+                "deck_plan",
+            )
+        )
+        return
     match = re_module.search(r'data-layout-findings="(.*?)"', completed.stdout or "")
     if not match:
         result.findings.append(

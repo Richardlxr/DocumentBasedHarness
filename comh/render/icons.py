@@ -186,6 +186,19 @@ def icon_png(name: str, *, color, background, px: int, run_root: Path) -> Path:
             check=True,
             timeout=60,
         )
+    # A browser that is present but unusable (sandbox refusal, locked profile,
+    # crash, hang) is a missing icon, not a failed render: callers downgrade
+    # RuntimeError to a finding, so never let a subprocess error escape.
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(f"Chrome timed out rasterizing icon '{name}'") from error
+    except subprocess.CalledProcessError as error:
+        detail = (error.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+        raise RuntimeError(
+            f"Chrome failed to rasterize icon '{name}' (exit {error.returncode})"
+            + (f": {detail[-1]}" if detail else "")
+        ) from error
+    except OSError as error:
+        raise RuntimeError(f"Chrome could not be executed for icon '{name}': {error}") from error
     finally:
         html_path.unlink(missing_ok=True)
     if not png.is_file():

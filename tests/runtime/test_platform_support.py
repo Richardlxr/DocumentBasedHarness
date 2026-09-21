@@ -115,3 +115,36 @@ def test_diagram_metrics_keep_cjk_width_conservative(monkeypatch) -> None:
     width, _height = font_metrics.measure("中国", 20)
 
     assert width >= 40 * 1.06
+
+
+def _stub_browser(tmp_path: Path, script: str) -> Path:
+    fake = tmp_path / "chrome"
+    fake.write_text(script, encoding="utf-8")
+    fake.chmod(0o755)
+    return fake
+
+
+def test_unusable_browser_is_a_missing_icon_not_a_failed_render(tmp_path, monkeypatch) -> None:
+    """The deck renderer downgrades RuntimeError to a finding. A browser that
+    exists but exits nonzero must arrive as one, or the whole render aborts and
+    loses its build receipt."""
+    import pytest
+
+    monkeypatch.setattr(icons, "_chrome", lambda: _stub_browser(tmp_path, "#!/bin/sh\nexit 3\n"))
+    with pytest.raises(RuntimeError, match="exit 3"):
+        icons.icon_png("bolt", color="#000000", background="#ffffff", px=64, run_root=tmp_path)
+
+
+def test_hanging_browser_is_a_missing_icon_not_a_hang(tmp_path, monkeypatch) -> None:
+    import subprocess
+
+    import pytest
+
+    monkeypatch.setattr(icons, "_chrome", lambda: _stub_browser(tmp_path, "#!/bin/sh\nsleep 5\n"))
+    monkeypatch.setattr(
+        icons.subprocess,
+        "run",
+        lambda *a, **k: (_ for _ in ()).throw(subprocess.TimeoutExpired("chrome", 60)),
+    )
+    with pytest.raises(RuntimeError, match="timed out"):
+        icons.icon_png("bolt", color="#000000", background="#ffffff", px=64, run_root=tmp_path)
