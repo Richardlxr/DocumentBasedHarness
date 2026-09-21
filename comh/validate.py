@@ -398,6 +398,19 @@ def validate_claims(artifacts: dict[str, dict | None]) -> list[Finding]:
     return findings
 
 
+_ENUMERATION_LABEL = re.compile(r"\D*?\s*\d{1,2}\s*$")
+
+
+def _is_enumeration_label(text: str) -> bool:
+    """True for diagram node labels like "节点 1", "Node 2", "Step 10".
+
+    The only numeral is a small trailing integer with no unit and no decimal, so
+    it identifies a box in a picture rather than stating a quantity. A label with
+    a unit ("220ms"), a decimal, or numerals elsewhere ("P99 180") stays checked.
+    """
+    return bool(_ENUMERATION_LABEL.fullmatch(text.strip()))
+
+
 def validate_numbers(
     artifacts: dict[str, dict | None], report_md_text: str | None
 ) -> list[Finding]:
@@ -461,7 +474,13 @@ def validate_numbers(
     for page in deck.get("deck", {}).get("pages", []):
         from .visible_text import page_texts
 
-        parts = [text for _, text in page_texts(page)]
+        parts = [
+            text
+            for element, text in page_texts(page)
+            if not (
+                element.startswith("visual.diagram.labels") and _is_enumeration_label(text)
+            )
+        ]
         text = " ".join(parts)
         for number in sorted(_numbers_in(text)):
             if number not in pool:
@@ -1131,13 +1150,18 @@ def run_all(run_root: Path, keys: set[str] | None = None) -> list[Finding]:
                 Finding("report_md", "schema", "error", "fail", "report source missing")
             )
     from .audience_lint import validate_audience_copy
+    from .locale_support import coverage_findings
     from .presentation_profile import validate_density, validate_packing
     from .style_lint import validate_style
 
     findings += validate_style(artifacts, report_md_text)
     findings += validate_audience_copy(artifacts, report_md_text)
-    findings += validate_density(artifacts)
-    findings += validate_packing(artifacts)
+    findings += validate_density(artifacts, run_root)
+    findings += validate_packing(artifacts, run_root)
+    # Say which pattern checks this run's language leaves unchecked, so a clean
+    # report is never mistaken for a checked one.
+    if artifacts.get("brief") is not None:
+        findings += coverage_findings(artifacts["brief"])
     if artifacts.get("evidence") is not None:
         findings += validate_sources(artifacts, run_root)
     if all(artifacts.get(k) is not None for k in ("evidence", "narrative")):

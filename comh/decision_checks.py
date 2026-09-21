@@ -53,13 +53,13 @@ def question_errors(questions: list, stage: str) -> list[str]:
     return errors
 
 
-def brief_errors(brief: dict, stage: str = "brief") -> list[str]:
+def brief_errors(brief: dict, stage: str = "brief", run_root: Path | None = None) -> list[str]:
     from .appearance import applicable, policy_errors
     from .presentation_profile import applicable as has_presentation
     from .presentation_profile import policy_errors as presentation_errors
 
     errors = question_errors(brief.get("open_questions", []), stage) + policy_errors(brief)
-    errors += presentation_errors(brief)
+    errors += presentation_errors(brief, run_root)
     if not has_text(brief.get("audience", {}).get("description")):
         errors.append("brief.audience.description cannot be blank")
     for field in ("language", "objective"):

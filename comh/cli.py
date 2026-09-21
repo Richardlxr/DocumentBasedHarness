@@ -279,7 +279,9 @@ def cmd_context(args: argparse.Namespace) -> int:
 def cmd_presentation_profiles(args: argparse.Namespace) -> int:
     from .presentation_profile import profiles
 
-    data = profiles()
+    # Inside a run, list what that run can actually select: built-ins plus its own.
+    root = find_run_root(Path(args.run).resolve() if getattr(args, "run", None) else Path.cwd())
+    data = profiles(root)
     if args.name:
         if args.name not in data:
             raise RunError(f"unknown presentation profile: {args.name}")

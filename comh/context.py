@@ -210,12 +210,14 @@ def context_pack(manifest: Manifest, stage: str | None = None, node: str | None 
         pack["evidence_omitted"] = max(0, len(items) - 20)
         pack["evidence_path"] = str(evidence_path)
     if stage in {"deck", "projection"}:
+        from .presentation_profile import applicable as has_presentation
         from .presentation_profile import resolve_profile
 
-        try:
-            pack["presentation_profile"] = resolve_profile(brief)
-        except ValueError as error:
-            pack["presentation_profile"] = {"error": str(error)}
+        if has_presentation(brief):
+            try:
+                pack["presentation_profile"] = resolve_profile(brief, manifest.root)
+            except ValueError as error:
+                pack["presentation_profile"] = {"error": str(error)}
         pack["copy_contract"] = {
             "audience": brief.get("audience"),
             "rules": "Visible copy addresses the actual audience. "

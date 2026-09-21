@@ -425,7 +425,7 @@
       "required": [
         "setting"
       ],
-      "description": "Presentation content density and layout guidance. Academic settings default to academic-rich; an explicit profile or overrides win. Independent of visual appearance and voice.",
+      "description": "Presentation content density and layout guidance. Academic settings default to academic-rich; an explicit profile or overrides win. Profiles are data: a run may add its own under profiles/presentation/. Independent of visual appearance and voice.",
       "properties": {
         "setting": {
           "enum": [
@@ -434,11 +434,10 @@
           ]
         },
         "profile": {
-          "enum": [
-            "academic-rich",
-            "balanced",
-            "concise"
-          ]
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Built-in: academic-rich | balanced | concise. A run may define its own under profiles/presentation/<name>.yaml (optionally extends: a built-in) and name it here."
         },
         "overrides": {
           "type": "object",
@@ -484,6 +483,15 @@
                 "type": "string",
                 "minLength": 1
               }
+            },
+            "content_guidance": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "Replace the profile's authoring guidance for this run."
             }
           }
         }

@@ -104,7 +104,7 @@ def set_mode(manifest: Manifest, mode: str, reply: str, source: str) -> None:
     manifest.save()
 
 
-def _brief_view(brief: dict) -> dict:
+def _brief_view(brief: dict, run_root=None) -> dict:
     """Brief view carries the resolved density profile, so the Gate 1 density
     question quotes concrete budgets instead of a silent default."""
     from .presentation_profile import applicable, resolve_profile
@@ -112,7 +112,7 @@ def _brief_view(brief: dict) -> dict:
     if not applicable(brief):
         return brief
     try:
-        profile = resolve_profile(brief)
+        profile = resolve_profile(brief, run_root)
     except ValueError:
         return brief  # malformed presentation config surfaces via policy_errors blockers
     effective = {
@@ -124,6 +124,11 @@ def _brief_view(brief: dict) -> dict:
             "selection",
             "text_budget",
             "substantive_blocks",
+            # Guidance prose is part of what Gate 1 accepts: once profiles are
+            # user-editable, a changed instruction must invalidate acceptance
+            # exactly as a changed budget does.
+            "content_guidance",
+            "layout_patterns",
         )
         if key in profile
     }
@@ -147,7 +152,7 @@ def view(manifest: Manifest, target: str, node: str | None = None) -> dict:
     if target not in TARGETS:
         raise RunError(f"unknown decision target: {target}")
     if target == "brief":
-        return _brief_view(read(manifest, target))
+        return _brief_view(read(manifest, target), manifest.root)
     if target == "narrative":
         return read(manifest, target)
     if target == "deck_appearance":
@@ -256,7 +261,7 @@ def readiness(manifest: Manifest, target: str) -> list[str]:
     )
     if target.endswith("detail"):
         stage = "authoring"
-    errors = brief_errors(read(manifest, "brief"), stage)
+    errors = brief_errors(read(manifest, "brief"), stage, manifest.root)
     questions = {
         q.get("question"): q
         for q in state(manifest)["intake"].get("open_questions", [])
@@ -420,8 +425,9 @@ def accepted_receipts(manifest: Manifest) -> dict:
     """Only decisions governing selected content; pending chat does not dirty builds."""
     result = {"intake": state(manifest).get("intake"), "mode": state(manifest)["mode"]}
     keys = required_artifacts(manifest.brief())
-    for target in TARGETS[:-1]:
-        if ARTIFACT[target] not in keys:
+    for target in TARGETS:
+        artifact = ARTIFACT.get(target)  # "delivery" governs no single artifact
+        if artifact is None or artifact not in keys:
             continue
         nodes = {r.get("node") for r in state(manifest)["requests"] if r["target"] == target}
         for node in sorted(nodes, key=lambda n: n or ""):
