@@ -920,6 +920,7 @@ def _render_metric_cards(
         shape.line.width = Pt(1)
         shape.shadow.inherit = False
         card_icon = str(card.get("icon") or "")
+        icon_placed = False
         if card_icon:
             from .icons import icon_exists, icon_png
 
@@ -939,6 +940,7 @@ def _render_metric_cards(
                         height=Inches(0.34),
                     )
                     icon_shape.name = f"icon:{card_icon}"
+                    icon_placed = True
                 except RuntimeError as error:
                     result.findings.append(
                         Finding(
@@ -971,7 +973,10 @@ def _render_metric_cards(
             top_bar.fill.fore_color.rgb = t.accent
             top_bar.line.fill.background()
         value_text = _fmt(number) + (f" {unit}" if unit else "")
-        value_box = _textbox(slide, Inches(left), Inches(top + 0.34), Inches(width), Inches(0.8))
+        value_top, value_height = (top + 0.52, 0.62) if icon_placed else (top + 0.34, 0.8)
+        value_box = _textbox(
+            slide, Inches(left), Inches(value_top), Inches(width), Inches(value_height)
+        )
         _set(
             value_box.text_frame.paragraphs[0],
             value_text,
