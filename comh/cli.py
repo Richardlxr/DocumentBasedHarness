@@ -97,6 +97,11 @@ def cmd_init_run(args: argparse.Namespace) -> int:
 
 def cmd_status(args: argparse.Namespace) -> int:
     manifest = Manifest.load(_resolve_run(args))
+    with manifest.reading():  # one consistent snapshot; nothing here writes
+        return _print_status(manifest)
+
+
+def _print_status(manifest: Manifest) -> int:
     name = manifest.data["name"]
     print(f"run: {name}  ({manifest.root})")
     print("artifacts:")
@@ -251,12 +256,16 @@ def cmd_respond(args: argparse.Namespace) -> int:
 
 
 def cmd_next(args: argparse.Namespace) -> int:
-    _print_data(next_action(Manifest.load(_resolve_run(args))), args.json)
+    manifest = Manifest.load(_resolve_run(args))
+    with manifest.reading():
+        _print_data(next_action(manifest), args.json)
     return 0
 
 
 def cmd_context(args: argparse.Namespace) -> int:
-    data = context_pack(Manifest.load(_resolve_run(args)), args.stage, args.node)
+    manifest = Manifest.load(_resolve_run(args))
+    with manifest.reading():
+        data = context_pack(manifest, args.stage, args.node)
     encoded = json.dumps(data, ensure_ascii=False, indent=2)
     if len(encoded) > args.max_chars:
         raise RunError(

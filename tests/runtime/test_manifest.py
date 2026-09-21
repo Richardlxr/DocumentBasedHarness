@@ -133,3 +133,18 @@ def test_validate_output_never_prints_an_empty_fix_hint(run_root, capsys):
     out = capsys.readouterr().out
     assert "derived-calculation" in out  # the test would be vacuous otherwise
     assert "→ fix: \n" not in out
+
+
+def test_reading_scope_hashes_once_without_hiding_a_later_edit(run_root):
+    """The snapshot scope is a read-only optimization: identical answers, and a
+    write inside it drops the cache so no check acts on a pre-write hash."""
+    manifest = _confirmed_through_narrative(run_root)
+    live = {k: manifest.artifact_state(k).state for k in manifest.data["artifacts"]}
+    with manifest.reading():
+        assert {k: manifest.artifact_state(k).state for k in manifest.data["artifacts"]} == live
+        manifest.mark_saved("narrative")  # save() drops the snapshot
+        assert manifest.artifact_state("narrative").state in ("saved", "confirmed")
+
+    # Outside the scope, staleness stays live: an external edit is seen at once.
+    (run_root / "sources" / "data.csv").write_text("a,b\n9,9\n", encoding="utf-8")
+    assert manifest.artifact_state("evidence").state == "stale"
