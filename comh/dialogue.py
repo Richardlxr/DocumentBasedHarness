@@ -220,7 +220,9 @@ def binding(manifest: Manifest, target: str, node: str | None = None) -> dict:
     key = ARTIFACT.get(target)
     upstream = upstream_chain(key) - {key} if key else set()
     coverage = manifest.root / "evidence/coverage.yaml"
-    return {
+    from .guidance import overlay_digest
+
+    binding_data = {
         "run": run_identity(manifest),
         "view": digest(view(manifest, target, node)),
         "artifact": manifest._current_hash(target) if target in {"brief", "narrative"} else None,
@@ -230,6 +232,11 @@ def binding(manifest: Manifest, target: str, node: str | None = None) -> dict:
         "intake": digest(state(manifest).get("intake")),
         "parents": {k: manifest.data["gates"][k].get("request_id") for k in parents},
     }
+    # Runs without scenario guidance keep byte-identical bindings.
+    guidance = overlay_digest(manifest.root)
+    if guidance:
+        binding_data["guidance"] = guidance
+    return binding_data
 
 
 def latest(manifest: Manifest, target: str, node: str | None = None) -> dict | None:

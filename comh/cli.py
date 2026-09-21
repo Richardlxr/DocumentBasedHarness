@@ -291,7 +291,10 @@ def cmd_presentation_profiles(args: argparse.Namespace) -> int:
 
 
 def cmd_instructions(args: argparse.Namespace) -> int:
-    _print_data(instructions(args.stage), args.json)
+    # Without a run this prints the packaged text; inside one it shows what that
+    # run's agent actually reads, overlay included.
+    root = find_run_root(Path(args.run).resolve() if getattr(args, "run", None) else Path.cwd())
+    _print_data(instructions(args.stage, root), args.json)
     return 0
 
 

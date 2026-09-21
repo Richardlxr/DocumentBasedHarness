@@ -32,15 +32,27 @@ STAGE_FILES = {
 }
 
 
-def instructions(stage: str) -> dict:
+def instructions(stage: str, run_root=None) -> dict:
+    """Packaged stage instructions, with this run's scenario overlay appended.
+
+    The hash covers the composed text: what the agent actually read is what a
+    decision receipt refers to.
+    """
+    from .guidance import compose
+
     if stage == "skill":
         path = files("comh").joinpath("instructions/skill/SKILL.md")
+        stage_file = "SKILL"
     elif stage in STAGE_FILES:
-        path = files("comh").joinpath(f"instructions/stages/{STAGE_FILES[stage]}.md")
+        stage_file = STAGE_FILES[stage]
+        path = files("comh").joinpath(f"instructions/stages/{stage_file}.md")
     else:
         raise RunError(f"unknown stage: {stage}")
-    text = path.read_text(encoding="utf-8")
-    return {"path": str(path), "hash": hash_bytes(text.encode()), "text": text}
+    text, overlays = compose(path.read_text(encoding="utf-8"), run_root, stage_file)
+    result = {"path": str(path), "hash": hash_bytes(text.encode()), "text": text}
+    if overlays:
+        result["overlays"] = overlays
+    return result
 
 
 def _decision(manifest: Manifest, target: str, node: str | None = None) -> dict:
@@ -155,7 +167,7 @@ def context_pack(manifest: Manifest, stage: str | None = None, node: str | None 
         "generated_at": now_iso(),
         "run": str(manifest.root),
         "next": next_step,
-        "instructions": instructions(stage),
+        "instructions": instructions(stage, manifest.root),
         "mode": state(manifest)["mode"],
         "intake": state(manifest).get("intake"),
         "load_errors": load_errors,
