@@ -15,5 +15,9 @@ runs/*/.workspace/
 runs/*
 !runs/sample-cache-latency/
 
+# agent/tool scratch state (session-local, never part of the harness)
+.playwright-mcp/
+.zcode/
+
 # macOS noise
 .DS_Store
