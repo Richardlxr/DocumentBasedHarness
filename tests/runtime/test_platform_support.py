@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
+
+import pytest
 
 from comh.render import icons, metrics
 from docx_harness.diagrams import metrics as diagram_metrics
@@ -117,34 +120,35 @@ def test_diagram_metrics_keep_cjk_width_conservative(monkeypatch) -> None:
     assert width >= 40 * 1.06
 
 
-def _stub_browser(tmp_path: Path, script: str) -> Path:
-    fake = tmp_path / "chrome"
-    fake.write_text(script, encoding="utf-8")
-    fake.chmod(0o755)
-    return fake
+def _browser_that_fails(monkeypatch, error: BaseException):
+    """A browser that is found but cannot produce a PNG.
 
-
-def test_unusable_browser_is_a_missing_icon_not_a_failed_render(tmp_path, monkeypatch) -> None:
-    """The deck renderer downgrades RuntimeError to a finding. A browser that
-    exists but exits nonzero must arrive as one, or the whole render aborts and
-    loses its build receipt."""
-    import pytest
-
-    monkeypatch.setattr(icons, "_chrome", lambda: _stub_browser(tmp_path, "#!/bin/sh\nexit 3\n"))
-    with pytest.raises(RuntimeError, match="exit 3"):
-        icons.icon_png("bolt", color="#000000", background="#ffffff", px=64, run_root=tmp_path)
-
-
-def test_hanging_browser_is_a_missing_icon_not_a_hang(tmp_path, monkeypatch) -> None:
-    import subprocess
-
-    import pytest
-
-    monkeypatch.setattr(icons, "_chrome", lambda: _stub_browser(tmp_path, "#!/bin/sh\nsleep 5\n"))
+    The failure is injected at subprocess.run rather than by planting an
+    executable: a POSIX shell stub is not runnable on Windows, where it fails
+    as an OSError and so proves nothing about the exit-code path.
+    """
+    monkeypatch.setattr(icons, "_chrome", lambda: "chrome")
     monkeypatch.setattr(
-        icons.subprocess,
-        "run",
-        lambda *a, **k: (_ for _ in ()).throw(subprocess.TimeoutExpired("chrome", 60)),
+        icons.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(error)
     )
-    with pytest.raises(RuntimeError, match="timed out"):
+
+
+@pytest.mark.parametrize(
+    "error, expected",
+    [
+        (subprocess.CalledProcessError(3, "chrome", stderr=b"sandbox refused"), "exit 3"),
+        (subprocess.TimeoutExpired("chrome", 60), "timed out"),
+        (OSError("not executable"), "could not be executed"),
+    ],
+    ids=["nonzero-exit", "hang", "not-executable"],
+)
+def test_unusable_browser_is_a_missing_icon_not_a_failed_render(
+    tmp_path: Path, monkeypatch, error, expected
+) -> None:
+    """The deck renderers downgrade RuntimeError to a finding and cmd_render
+    only catches RuntimeError, so every way a present-but-unusable browser can
+    fail must arrive as one — otherwise the whole render aborts and loses its
+    build receipt."""
+    _browser_that_fails(monkeypatch, error)
+    with pytest.raises(RuntimeError, match=expected):
         icons.icon_png("bolt", color="#000000", background="#ffffff", px=64, run_root=tmp_path)
