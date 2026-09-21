@@ -1,0 +1,14 @@
+# Read/partial/unread disposition for every file under sources/.
+sources:
+  - file: sources/results.csv
+    status: read
+    locator: 全表 12 行，标准负载与高负载两组 baseline/partitioned 配置
+  - file: sources/notes.md
+    status: read
+    locator: 全文，测试床与轮次说明
+  - file: sources/README.md
+    status: read
+    locator: 全文，材料来源说明
+  - file: sources/p99-trend.png
+    status: partial
+    reason: 趋势图仅用于视觉印证；具体数值以 results.csv 为准，未从图像估读

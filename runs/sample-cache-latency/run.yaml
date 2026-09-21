@@ -4,53 +4,783 @@ created: '2026-09-01T06:30:28+00:00'
 artifacts:
   evidence:
     path: evidence/evidence.yaml
-    hash: sha256:fefe8f6cafb991639a93dc10ecf395c2905d210c8b5e4d0aec64f30dd797fdf8
-    saved_at: '2026-09-01T07:54:09+00:00'
+    hash: sha256:ba604513bce381aa0374134fbed30370febfb56e04555057566ea3d550e6e142
+    saved_at: '2026-09-21T08:31:51+00:00'
     upstream:
       sources: sha256-dir:cd12f555177f8f2a7a48e646ecc62f8e751429ae90e63a57cb58e3ce0662d943
   brief:
     path: brief/brief.yaml
-    hash: sha256:35f69bb6b2b0b34b2d68ff4edfd48284d119fb22fdd3091d7e2bdeeca2577f99
-    saved_at: '2026-09-01T11:54:49+00:00'
+    hash: sha256:1f04b95f9b93e65bbf77e9811834a9d7aff1aa641a143d966b094f75630716dc
+    saved_at: '2026-09-21T08:31:51+00:00'
     upstream:
-      evidence: sha256:fefe8f6cafb991639a93dc10ecf395c2905d210c8b5e4d0aec64f30dd797fdf8
+      evidence: sha256:ba604513bce381aa0374134fbed30370febfb56e04555057566ea3d550e6e142
   narrative:
     path: narrative/narrative.yaml
-    hash: sha256:b6425d66f20fcfd9b8092b420c29e3dd0555304fa20d0d05b1ab3e3b3f76fe0a
-    saved_at: '2026-09-01T11:54:58+00:00'
+    hash: sha256:2fe40a3d9b87570c16fcebfb81d6025acf3152ecf739756a3e920be7f3eb7afa
+    saved_at: '2026-09-21T08:32:56+00:00'
     upstream:
-      brief: sha256:35f69bb6b2b0b34b2d68ff4edfd48284d119fb22fdd3091d7e2bdeeca2577f99
-      evidence: sha256:fefe8f6cafb991639a93dc10ecf395c2905d210c8b5e4d0aec64f30dd797fdf8
+      brief: sha256:1f04b95f9b93e65bbf77e9811834a9d7aff1aa641a143d966b094f75630716dc
+      evidence: sha256:ba604513bce381aa0374134fbed30370febfb56e04555057566ea3d550e6e142
   deck_plan:
     path: projection/deck_plan.yaml
-    hash: sha256:0c975769baee844ae4ce796a7662bb5cb7fd34e49a650a7c50786132c0edfe28
-    saved_at: '2026-09-02T02:51:38+00:00'
+    hash: sha256:05d4182d9257acf0d5b676de3d64649e730b5b9a93ae7118f91ba2567d4e7507
+    saved_at: '2026-09-21T08:40:53+00:00'
     upstream:
-      narrative: sha256:b6425d66f20fcfd9b8092b420c29e3dd0555304fa20d0d05b1ab3e3b3f76fe0a
-      brief: sha256:35f69bb6b2b0b34b2d68ff4edfd48284d119fb22fdd3091d7e2bdeeca2577f99
+      narrative: sha256:2fe40a3d9b87570c16fcebfb81d6025acf3152ecf739756a3e920be7f3eb7afa
+      brief: sha256:1f04b95f9b93e65bbf77e9811834a9d7aff1aa641a143d966b094f75630716dc
   report_plan:
     path: projection/report_plan.yaml
     hash: sha256:4f63ad85741e7a1ea8a65fc9114b364239544a315eff77de2ca7461cd24101a2
-    saved_at: '2026-09-03T05:47:38+00:00'
+    saved_at: '2026-09-21T08:33:03+00:00'
     upstream:
-      narrative: sha256:b6425d66f20fcfd9b8092b420c29e3dd0555304fa20d0d05b1ab3e3b3f76fe0a
-      brief: sha256:35f69bb6b2b0b34b2d68ff4edfd48284d119fb22fdd3091d7e2bdeeca2577f99
+      narrative: sha256:2fe40a3d9b87570c16fcebfb81d6025acf3152ecf739756a3e920be7f3eb7afa
+      brief: sha256:1f04b95f9b93e65bbf77e9811834a9d7aff1aa641a143d966b094f75630716dc
   report_md:
     path: documents/report.md
     hash: sha256:ceeb0654ff4ec68785d550f34f49a45f6765339f1da563c902dec431c07b6d7a
-    saved_at: '2026-09-03T05:47:39+00:00'
+    saved_at: '2026-09-21T08:33:05+00:00'
     upstream:
       report_plan: sha256:4f63ad85741e7a1ea8a65fc9114b364239544a315eff77de2ca7461cd24101a2
-      narrative: sha256:b6425d66f20fcfd9b8092b420c29e3dd0555304fa20d0d05b1ab3e3b3f76fe0a
+      narrative: sha256:2fe40a3d9b87570c16fcebfb81d6025acf3152ecf739756a3e920be7f3eb7afa
 gates:
   brief:
     confirmed: true
-    at: '2026-09-01T11:54:49+00:00'
-    hash: sha256:35f69bb6b2b0b34b2d68ff4edfd48284d119fb22fdd3091d7e2bdeeca2577f99
+    at: '2026-09-21T08:35:19+00:00'
+    hash: sha256:1f04b95f9b93e65bbf77e9811834a9d7aff1aa641a143d966b094f75630716dc
+    request_id: D0001
   narrative:
     confirmed: true
-    at: '2026-09-01T06:32:49+00:00'
-    hash: sha256:b6425d66f20fcfd9b8092b420c29e3dd0555304fa20d0d05b1ab3e3b3f76fe0a
+    at: '2026-09-21T08:35:19+00:00'
+    hash: sha256:2fe40a3d9b87570c16fcebfb81d6025acf3152ecf739756a3e920be7f3eb7afa
+    request_id: D0002
 build:
   deck: build/deck.pptx
   report_docx: build/report.docx
+  deck_html: build/deck.html
+interaction:
+  version: 1
+  mode: checkpoints
+  requests:
+  - id: D0001
+    target: brief
+    node: null
+    state: accepted
+    binding:
+      run: sample-cache-latency
+      view: sha256:9316b3416741809c14b82f512398ab81a6f94b0bece06d957d38e145f3ff056b
+      artifact: sha256:1f04b95f9b93e65bbf77e9811834a9d7aff1aa641a143d966b094f75630716dc
+      upstream:
+        evidence: sha256:ba604513bce381aa0374134fbed30370febfb56e04555057566ea3d550e6e142
+      sources: sha256-dir:cd12f555177f8f2a7a48e646ecc62f8e751429ae90e63a57cb58e3ce0662d943
+      coverage: sha256:af32f65a8a29b23f637c0e5f67883eadac5a48fe11f859b8827db2ccabf4e706
+      intake: sha256:e97fd60109825b3dec4f80b285487b171be75728c063a2f4b469b7a0aad622a6
+      parents: {}
+    view:
+      version: 1
+      language: zh-CN
+      audience:
+        description: 客户方技术负责人与架构师，熟悉存储系统但不了解我们的缓存分区实现
+        expertise: senior-infrastructure
+        prior_knowledge: 理解通用缓存概念与分位数指标；不了解该集群的分区方案
+      objective: 让客户认可 cache partitioning 已验证的收益与边界，并批准进入 staging 灰度
+      delivery_context: 45 分钟线上客户评审会宣讲，会后 deck 与报告邮件转发给未到场者
+      media:
+      - medium: pptx
+        surface: presentation
+      - medium: markdown
+        surface: report
+      takeaways:
+      - cache partitioning 在标准负载下把 P99 latency 降低 18.2%，吞吐不受影响
+      - 高负载下改善有限（约 3.2%），瓶颈推测在磁盘 IO——这是下一阶段要验证的假设，不是结论
+      - 建议进入 staging 灰度，同时立高负载瓶颈专项
+      constraints:
+        hard:
+        - 不要黑底
+        - 必须包含:局限性
+        soft:
+        - 数据页专业一点，但开场希望有一点故事感
+      visual_materials:
+        direction: 排版为主，数据卡片与要点用图标点缀；不使用照片
+        icons: tabler-outline
+        photos: none
+      spec:
+        dimensions:
+          technical_rigor: high
+          storytelling: medium
+          evidence_density: high
+          visual_creativity: low
+          honesty_tone: explicit-about-limits
+      open_questions:
+      - question: 客户是否在意硬件成本影响？
+        answer: 本阶段改动纯软件，不涉及硬件变更，无需展开
+      - question: 高负载场景在客户环境占比多少？
+        answer: 用户不清楚，按"少数但关键"处理，在局限性中说明
+      voice:
+        style: plain
+        description: 技术同行之间的平实陈述：先给结论和数字，再给条件和限制，不用比喻堆叠
+        samples:
+        - 标准负载下 P99 从 220ms 降到 180ms，吞吐没有变化。
+        - 高负载只改善了 3.2%，瓶颈我们怀疑在磁盘 IO，但这一轮没有验证。
+      appearance:
+        selection: default
+        review: sample
+      presentation:
+        setting: general
+        profile: balanced
+      alignment:
+        language:
+          status: provided
+          source: user
+          basis: sample:fixture — 客户与团队的工作语言
+          value: zh-CN
+        audience:
+          status: provided
+          source: user
+          basis: sample:fixture — 用户说明了到场角色与既有认知
+          value:
+            description: 客户方技术负责人与架构师，熟悉存储系统但不了解我们的缓存分区实现
+            expertise: senior-infrastructure
+            prior_knowledge: 理解通用缓存概念与分位数指标；不了解该集群的分区方案
+        objective:
+          status: provided
+          source: user
+          basis: sample:fixture — 用户原话：让客户批准进 staging 灰度
+          value: 让客户认可 cache partitioning 已验证的收益与边界，并批准进入 staging 灰度
+        delivery_context:
+          status: provided
+          source: user
+          basis: sample:fixture — 45 分钟线上评审，会后转发
+          value: 45 分钟线上客户评审会宣讲，会后 deck 与报告邮件转发给未到场者
+        media:
+          status: provided
+          source: user
+          basis: sample:fixture — 宣讲用 deck，转发用报告
+          value:
+          - medium: pptx
+            surface: presentation
+          - medium: markdown
+            surface: report
+        takeaways:
+          status: confirmed
+          source: user
+          basis: sample:fixture — 三条结论经用户确认，含高负载限制
+          value:
+          - cache partitioning 在标准负载下把 P99 latency 降低 18.2%，吞吐不受影响
+          - 高负载下改善有限（约 3.2%），瓶颈推测在磁盘 IO——这是下一阶段要验证的假设，不是结论
+          - 建议进入 staging 灰度，同时立高负载瓶颈专项
+        constraints:
+          status: provided
+          source: user
+          basis: sample:fixture — 用户明确不要黑底，并要求写清局限性
+          value:
+            hard:
+            - 不要黑底
+            - 必须包含:局限性
+            soft:
+            - 数据页专业一点，但开场希望有一点故事感
+        voice:
+          status: confirmed
+          source: user
+          basis: sample:fixture — 用户从三个语气候选中选了平实陈述
+          value:
+            style: plain
+            description: 技术同行之间的平实陈述：先给结论和数字，再给条件和限制，不用比喻堆叠
+            samples:
+            - 标准负载下 P99 从 220ms 降到 180ms，吞吐没有变化。
+            - 高负载只改善了 3.2%，瓶颈我们怀疑在磁盘 IO，但这一轮没有验证。
+        visual_materials:
+          status: provided
+          source: user
+          basis: sample:fixture — 用户要求不用照片，排版为主
+          value:
+            direction: 排版为主，数据卡片与要点用图标点缀；不使用照片
+            icons: tabler-outline
+            photos: none
+        appearance:
+          status: delegated
+          source: user
+          basis: sample:fixture — 用户把模板外观交给我们，样稿仍要看一眼
+          value:
+            selection: default
+            review: sample
+        presentation:
+          status: confirmed
+          source: user
+          basis: sample:fixture — 用户看了 balanced 的字数与结构参考后确认
+          value:
+            setting: general
+            profile: balanced
+      presentation_effective:
+        profile: balanced
+        label: 均衡
+        setting: general
+        selection: explicit
+        text_budget:
+          zh_chars:
+          - 160
+          - 320
+          words:
+          - 80
+          - 160
+        substantive_blocks:
+        - 2
+        - 3
+        content_guidance:
+        - 每页一个主要结论，保留关键证据、解释和必要限制。
+        layout_patterns:
+        - 结论 + 图表/对照 + 简短解释；按内容选择现有 page_role。
+    summary: ''
+    summary_hash: sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126
+    presented_at: '2026-09-21T08:35:19+00:00'
+    recording: agent_attested
+    blockers: []
+    response:
+      decision: accepted
+      reply: 样例固定数据：接受此版本
+      source: sample:fixture — 仓库样例，非真实用户回复
+    responded_at: '2026-09-21T08:35:19+00:00'
+  - id: D0002
+    target: narrative
+    node: null
+    state: accepted
+    binding:
+      run: sample-cache-latency
+      view: sha256:3b61347a4efa21ab1e6f2f117129c6a2ee7dc97d84682322ca7bcdf485103ea8
+      artifact: sha256:2fe40a3d9b87570c16fcebfb81d6025acf3152ecf739756a3e920be7f3eb7afa
+      upstream:
+        brief: sha256:1f04b95f9b93e65bbf77e9811834a9d7aff1aa641a143d966b094f75630716dc
+        evidence: sha256:ba604513bce381aa0374134fbed30370febfb56e04555057566ea3d550e6e142
+      sources: sha256-dir:cd12f555177f8f2a7a48e646ecc62f8e751429ae90e63a57cb58e3ce0662d943
+      coverage: sha256:af32f65a8a29b23f637c0e5f67883eadac5a48fe11f859b8827db2ccabf4e706
+      intake: sha256:e97fd60109825b3dec4f80b285487b171be75728c063a2f4b469b7a0aad622a6
+      parents:
+        brief: D0001
+    view:
+      version: 1
+      claims:
+      - id: C01
+        statement: cache partitioning 将标准负载下的 P99 latency 从 220ms 降至 180ms，降幅 18.2%
+        evidence:
+        - E001
+        - E002
+        - E003
+        status: supported
+        importance: primary
+      - id: C02
+        statement: 标准负载吞吐不受影响（12400 → 12300 QPS，差异在噪声区间内）
+        evidence:
+        - E004
+        status: supported
+        importance: supporting
+      - id: C03
+        statement: 高负载下 P99 改善有限（约 3.2%），瓶颈推测在磁盘 IO 而非缓存命中率
+        evidence:
+        - E005
+        - E008
+        status: partial
+        importance: primary
+        resolution:
+          action: qualify
+          reason: 改善幅度已测得，但"瓶颈在磁盘 IO"这一归因本轮没有做隔离实验验证
+          boundary: 3.2% 的改善是本次高负载 6 轮的实测结果；磁盘 IO 只是待验证的假设，讲述与书写时必须标明为下一阶段的验证项，不得作为结论陈述
+      - id: C04
+        statement: 实验结论可信——同硬件、固定负载生成器回放线上流量模型、标准负载 12 轮与高负载 6 轮重复
+        evidence:
+        - E006
+        status: supported
+        importance: supporting
+      - id: C05
+        statement: 按租户哈希的缓存分区隔离了热租户对缓存份额的挤占，这是标准负载下尾延迟改善的机制
+        evidence:
+        - E007
+        status: supported
+        importance: supporting
+      story:
+      - id: S01
+        purpose: establish_problem
+        message: 尾延迟（P99）抖动是客户当前线上体验的第一痛点
+      - id: S02
+        purpose: establish_credibility
+        message: 我们在受控环境用固定负载与多轮重复实验验证了 cache partitioning
+        claims:
+        - C04
+      - id: S03
+        purpose: demonstrate_effect
+        message: 标准负载下 P99 latency 降低 18.2%，吞吐不受影响
+        claims:
+        - C01
+        - C02
+      - id: S04
+        purpose: concede_limit
+        message: 高负载下改善有限，瓶颈可能在磁盘 IO 而非缓存
+        claims:
+        - C03
+      - id: S05
+        purpose: explain_mechanism
+        message: 租户级分区隔离了缓存挤占，这正是标准负载见效的原因
+        claims:
+        - C05
+      - id: S06
+        purpose: recommend
+        message: 建议进入 staging 灰度，同时立高负载瓶颈专项验证磁盘 IO 假设
+        claims:
+        - C03
+    summary: ''
+    summary_hash: sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126
+    presented_at: '2026-09-21T08:35:19+00:00'
+    recording: agent_attested
+    blockers: []
+    response:
+      decision: accepted
+      reply: 样例固定数据：接受此版本
+      source: sample:fixture — 仓库样例，非真实用户回复
+    responded_at: '2026-09-21T08:35:19+00:00'
+  - id: D0003
+    target: deck_outline
+    node: null
+    state: accepted
+    binding:
+      run: sample-cache-latency
+      view: sha256:213f125fb47213bc712bee5d5ae0aab224a368f567f1c5a74eb77e0f760de47a
+      artifact: null
+      upstream:
+        brief: sha256:1f04b95f9b93e65bbf77e9811834a9d7aff1aa641a143d966b094f75630716dc
+        evidence: sha256:ba604513bce381aa0374134fbed30370febfb56e04555057566ea3d550e6e142
+        narrative: sha256:2fe40a3d9b87570c16fcebfb81d6025acf3152ecf739756a3e920be7f3eb7afa
+      sources: sha256-dir:cd12f555177f8f2a7a48e646ecc62f8e751429ae90e63a57cb58e3ce0662d943
+      coverage: sha256:af32f65a8a29b23f637c0e5f67883eadac5a48fe11f859b8827db2ccabf4e706
+      intake: sha256:e97fd60109825b3dec4f80b285487b171be75728c063a2f4b469b7a0aad622a6
+      parents:
+        brief: D0001
+        narrative: D0002
+    view:
+      title: Cache Partitioning 实验汇报
+      nodes:
+      - id: P01
+        page_role: cover
+        title: Cache Partitioning 实验汇报
+        carrier: text
+      - id: P02
+        page_role: agenda
+        title: 今天讲四件事
+        carrier: text
+      - id: P03
+        page_role: content
+        title: 尾延迟抖动是客户线上体验的第一痛点
+        beat: S01
+        carrier: text
+      - id: P04
+        page_role: content
+        title: 受控环境、固定负载、标准负载 12 轮与高负载 6 轮重复
+        beat: S02
+        carrier: diagram
+      - id: P05
+        page_role: content
+        title: 标准负载下 P99 降低 18.2%，吞吐不受影响
+        beat: S03
+        carrier: chart
+      - id: P06
+        page_role: content
+        title: 高负载下改善有限：瓶颈可能在磁盘 IO，不在缓存
+        beat: S04
+        carrier: text
+      - id: P07
+        page_role: content
+        title: 租户级分区隔离了缓存挤占，这就是标准负载见效的原因
+        beat: S05
+        carrier: diagram
+      - id: P08
+        page_role: closing
+        title: 建议：进入 staging 灰度，同时立高负载瓶颈专项
+        beat: S06
+        carrier: text
+      - id: P09
+        page_role: appendix
+        title: 附录：实验配置明细
+        carrier: text
+      carrier_summary:
+        text: 6
+        diagram: 2
+        chart: 1
+      omissions: []
+    summary: ''
+    summary_hash: sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126
+    presented_at: '2026-09-21T08:35:19+00:00'
+    recording: agent_attested
+    blockers: []
+    response:
+      decision: accepted
+      reply: 样例固定数据：接受此版本
+      source: sample:fixture — 仓库样例，非真实用户回复
+    responded_at: '2026-09-21T08:35:20+00:00'
+  - id: D0004
+    target: report_outline
+    node: null
+    state: accepted
+    binding:
+      run: sample-cache-latency
+      view: sha256:4c380e2cc33e1ae004aa8e96c12f99c59e2b9b055a307383f99ae69a2a5b6ed4
+      artifact: null
+      upstream:
+        brief: sha256:1f04b95f9b93e65bbf77e9811834a9d7aff1aa641a143d966b094f75630716dc
+        evidence: sha256:ba604513bce381aa0374134fbed30370febfb56e04555057566ea3d550e6e142
+        narrative: sha256:2fe40a3d9b87570c16fcebfb81d6025acf3152ecf739756a3e920be7f3eb7afa
+      sources: sha256-dir:cd12f555177f8f2a7a48e646ecc62f8e751429ae90e63a57cb58e3ce0662d943
+      coverage: sha256:af32f65a8a29b23f637c0e5f67883eadac5a48fe11f859b8827db2ccabf4e706
+      intake: sha256:e97fd60109825b3dec4f80b285487b171be75728c063a2f4b469b7a0aad622a6
+      parents:
+        brief: D0001
+        narrative: D0002
+    view:
+      title: null
+      nodes:
+      - id: R01
+        heading: 背景与问题
+        beats:
+        - S01
+      - id: R02
+        heading: 实验方法
+        beats:
+        - S02
+      - id: R03
+        heading: 实验结果
+        beats:
+        - S03
+        - S05
+        merge_rationale: 结果与机制合并呈现——证据相邻，读者需要"数字 + 为什么"一起读
+      - id: R04
+        heading: 局限性
+        beats:
+        - S04
+      - id: R05
+        heading: 建议与下一步
+        beats:
+        - S06
+      omissions: []
+    summary: ''
+    summary_hash: sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126
+    presented_at: '2026-09-21T08:35:20+00:00'
+    recording: agent_attested
+    blockers: []
+    response:
+      decision: accepted
+      reply: 样例固定数据：接受此版本
+      source: sample:fixture — 仓库样例，非真实用户回复
+    responded_at: '2026-09-21T08:35:20+00:00'
+  - id: D0005
+    target: deck_appearance
+    node: null
+    state: superseded
+    binding:
+      run: sample-cache-latency
+      appearance: sha256:42a7888428840a2ed56aba7a44ebc510beb4dd4692f4e37e4ccf8942d434929c
+    view:
+      policy:
+        selection: default
+        review: sample
+      selection:
+        template: slate-tech
+      review: {}
+      changes_from_brief: []
+      effective_theme:
+        name: slate-tech
+        is_light: true
+        background:
+        - 241
+        - 245
+        - 249
+        text:
+        - 15
+        - 23
+        - 42
+        muted:
+        - 100
+        - 116
+        - 139
+        accent:
+        - 79
+        - 70
+        - 229
+        accent_soft:
+        - 165
+        - 180
+        - 252
+        card_fill:
+        - 255
+        - 255
+        - 255
+        card_line:
+        - 203
+        - 213
+        - 225
+        cover_title_size: 44
+        banner_title_size: 36
+        content_title_size: 32
+        body_size: 22
+        body_size_wide: 24
+        detail_size: 17
+        caption_size: 13
+        card_value_size: 34
+        card_label_size: 13
+        callout_size: 18
+        kicker_size: 13
+        footer_size: 11
+        index_number_size: 26
+        latin_fonts:
+        - Segoe UI
+        - Segoe UI
+        cjk_fonts:
+        - Microsoft YaHei
+        - Microsoft YaHei
+        title_text: null
+        title_bold: true
+        title_italic: false
+        body_bold: true
+        body_italic: false
+      sample:
+        path: .workspace/preview-deck.pptx
+        sha256: null
+      scope: 'Appearance only: backgrounds, branding/icons and typography; not outline
+        or density.'
+    summary: ''
+    summary_hash: sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126
+    presented_at: '2026-09-21T08:35:30+00:00'
+    recording: agent_attested
+    blockers:
+    - render deck --preview before presenting the appearance sample
+    reason: new presentation
+  - id: D0006
+    target: deck_appearance
+    node: null
+    state: superseded
+    binding:
+      run: sample-cache-latency
+      appearance: sha256:42a7888428840a2ed56aba7a44ebc510beb4dd4692f4e37e4ccf8942d434929c
+    view:
+      policy:
+        selection: default
+        review: sample
+      selection:
+        template: slate-tech
+      review: {}
+      changes_from_brief: []
+      effective_theme:
+        name: slate-tech
+        is_light: true
+        background:
+        - 241
+        - 245
+        - 249
+        text:
+        - 15
+        - 23
+        - 42
+        muted:
+        - 100
+        - 116
+        - 139
+        accent:
+        - 79
+        - 70
+        - 229
+        accent_soft:
+        - 165
+        - 180
+        - 252
+        card_fill:
+        - 255
+        - 255
+        - 255
+        card_line:
+        - 203
+        - 213
+        - 225
+        cover_title_size: 44
+        banner_title_size: 36
+        content_title_size: 32
+        body_size: 22
+        body_size_wide: 24
+        detail_size: 17
+        caption_size: 13
+        card_value_size: 34
+        card_label_size: 13
+        callout_size: 18
+        kicker_size: 13
+        footer_size: 11
+        index_number_size: 26
+        latin_fonts:
+        - Segoe UI
+        - Segoe UI
+        cjk_fonts:
+        - Microsoft YaHei
+        - Microsoft YaHei
+        title_text: null
+        title_bold: true
+        title_italic: false
+        body_bold: true
+        body_italic: false
+      sample:
+        path: .workspace/preview-deck.pptx
+        sha256: sha256:163986f95ca55286e041deeb0bb1435f35cff97e6b3fffbf89fb91b43b08e043
+      scope: 'Appearance only: backgrounds, branding/icons and typography; not outline
+        or density.'
+    summary: ''
+    summary_hash: sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126
+    presented_at: '2026-09-21T08:38:25+00:00'
+    recording: agent_attested
+    blockers:
+    - appearance preview is stale, changed or failed; render deck --preview before
+      presenting the appearance sample
+    reason: new presentation
+  - id: D0007
+    target: deck_appearance
+    node: null
+    state: accepted
+    binding:
+      run: sample-cache-latency
+      appearance: sha256:42a7888428840a2ed56aba7a44ebc510beb4dd4692f4e37e4ccf8942d434929c
+    view:
+      policy:
+        selection: default
+        review: sample
+      selection:
+        template: slate-tech
+      review: {}
+      changes_from_brief: []
+      effective_theme:
+        name: slate-tech
+        is_light: true
+        background:
+        - 241
+        - 245
+        - 249
+        text:
+        - 15
+        - 23
+        - 42
+        muted:
+        - 100
+        - 116
+        - 139
+        accent:
+        - 79
+        - 70
+        - 229
+        accent_soft:
+        - 165
+        - 180
+        - 252
+        card_fill:
+        - 255
+        - 255
+        - 255
+        card_line:
+        - 203
+        - 213
+        - 225
+        cover_title_size: 44
+        banner_title_size: 36
+        content_title_size: 32
+        body_size: 22
+        body_size_wide: 24
+        detail_size: 17
+        caption_size: 13
+        card_value_size: 34
+        card_label_size: 13
+        callout_size: 18
+        kicker_size: 13
+        footer_size: 11
+        index_number_size: 26
+        latin_fonts:
+        - Segoe UI
+        - Segoe UI
+        cjk_fonts:
+        - Microsoft YaHei
+        - Microsoft YaHei
+        title_text: null
+        title_bold: true
+        title_italic: false
+        body_bold: true
+        body_italic: false
+      sample:
+        path: .workspace/preview-deck.pptx
+        sha256: sha256:f2adef098b007b20412381397bbd9086759fbe5e2630963e659c59bad8277b36
+      scope: 'Appearance only: backgrounds, branding/icons and typography; not outline
+        or density.'
+    summary: ''
+    summary_hash: sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126
+    presented_at: '2026-09-21T08:40:08+00:00'
+    recording: agent_attested
+    blockers: []
+    response:
+      decision: accepted
+      reply: 样例固定数据：接受此版本
+      source: sample:fixture — 仓库样例，非真实用户回复
+    responded_at: '2026-09-21T08:40:08+00:00'
+  intake:
+    goal: 让客户技术负责人认可 cache partitioning 的已验证收益与边界，并批准进入 staging 灰度
+    source_scope: 以 results.csv 的分位数与吞吐为主，notes.md 提供测试床条件；趋势图只作视觉印证
+    basis: sample:fixture — 仓库样例，不是真实客户会话
+    open_questions: []
+build_records:
+  deck:
+    generation: 6
+    inputs:
+      brief: sha256:1f04b95f9b93e65bbf77e9811834a9d7aff1aa641a143d966b094f75630716dc
+      deck_plan: sha256:05d4182d9257acf0d5b676de3d64649e730b5b9a93ae7118f91ba2567d4e7507
+      evidence: sha256:ba604513bce381aa0374134fbed30370febfb56e04555057566ea3d550e6e142
+      narrative: sha256:2fe40a3d9b87570c16fcebfb81d6025acf3152ecf739756a3e920be7f3eb7afa
+      directory:sources: sha256-dir:cd12f555177f8f2a7a48e646ecc62f8e751429ae90e63a57cb58e3ce0662d943
+      directory:assets: sha256-dir:142df176d75d0ac3da3619d732c95a1ec2dca11d2eaa4bd8f06cfb3db8a8f47b
+      directory:themes: sha256-dir:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      directory:templates: sha256-dir:8d4bd67894958865ec2d03766cafef5e3597ca89351d21a499ad71b150183322
+      shared-themes: sha256-dir:aa6c043ee7cc7e830130ef0e58f6c55ed5b33dcf11877ebc9d650d3a6f15f49f
+      engine: sha256:a264ddcf64fd42fd0d279b419e1849a078689bdac76ce3586cf23251af95e2ac
+      runtime:
+        python: 3.13.12
+        platform: macOS-27.0-arm64-arm-64bit-Mach-O
+        packages:
+          python-pptx: 1.0.2
+          python-docx: 1.2.0
+          myst-parser: 4.0.1
+          markdown-it-py: 3.0.0
+          Pillow: 12.3.0
+        tools:
+          DRAWIO_CLI: null
+          DRAWIO_ACCEPT_VERSION: null
+          COMH_CHROME: null
+    output: sha256:241f834cfa1acf4fbcfe33c684bf775752c8f7bc2f8e92b8624cb6c883ebc95b
+    qa_path: qa/render-deck.yaml
+    qa_hash: sha256:69e81e76829291bfbd83c62ba4949f6c826b5fbb3c2e68cf805ae33c295b7be4
+    success: true
+  deck_html:
+    generation: 7
+    inputs:
+      brief: sha256:1f04b95f9b93e65bbf77e9811834a9d7aff1aa641a143d966b094f75630716dc
+      deck_plan: sha256:05d4182d9257acf0d5b676de3d64649e730b5b9a93ae7118f91ba2567d4e7507
+      evidence: sha256:ba604513bce381aa0374134fbed30370febfb56e04555057566ea3d550e6e142
+      narrative: sha256:2fe40a3d9b87570c16fcebfb81d6025acf3152ecf739756a3e920be7f3eb7afa
+      directory:sources: sha256-dir:cd12f555177f8f2a7a48e646ecc62f8e751429ae90e63a57cb58e3ce0662d943
+      directory:assets: sha256-dir:142df176d75d0ac3da3619d732c95a1ec2dca11d2eaa4bd8f06cfb3db8a8f47b
+      directory:themes: sha256-dir:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      directory:templates: sha256-dir:8d4bd67894958865ec2d03766cafef5e3597ca89351d21a499ad71b150183322
+      shared-themes: sha256-dir:aa6c043ee7cc7e830130ef0e58f6c55ed5b33dcf11877ebc9d650d3a6f15f49f
+      engine: sha256:a264ddcf64fd42fd0d279b419e1849a078689bdac76ce3586cf23251af95e2ac
+      runtime:
+        python: 3.13.12
+        platform: macOS-27.0-arm64-arm-64bit-Mach-O
+        packages:
+          python-pptx: 1.0.2
+          python-docx: 1.2.0
+          myst-parser: 4.0.1
+          markdown-it-py: 3.0.0
+          Pillow: 12.3.0
+        tools:
+          DRAWIO_CLI: null
+          DRAWIO_ACCEPT_VERSION: null
+          COMH_CHROME: null
+    output: sha256:758a71d86dd57d06c3d5d25bdd2960a5bdd081f09fe4e84ba27ad099a6216f9a
+    qa_path: qa/render-deck-html.yaml
+    qa_hash: sha256:96fee01d517d1eaba2aee75adcbbd9f19bcc753f614413fddf56d520eda92880
+    success: true
+build_generation: 7

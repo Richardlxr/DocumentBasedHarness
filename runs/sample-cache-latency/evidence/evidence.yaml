@@ -36,6 +36,7 @@ items:
     content: cache partitioning 使标准负载 P99 latency 从 220ms 降至 180ms，降幅 18.2%
     value: {number: 18.2, unit: "%", label: P99 降幅（标准负载）}
     source: {source: derived, locator: "derived:(E001,E002)"}
+    derived: {formula: "(E001 - E002) / E001 * 100", precision: 1}
     tags: [derived]
 
   - id: E004
@@ -79,6 +80,7 @@ items:
     content: 高负载下 P99 从 940ms 到 910ms，改善约 3.2%
     value: {number: 3.2, unit: "%", label: P99 改善（高负载）}
     source: {source: derived, locator: "derived:(E005,E011)"}
+    derived: {formula: "(E005 - E011) / E005 * 100", precision: 1}
     tags: [derived]
 
   - id: E006

@@ -16,6 +16,10 @@ claims:
     evidence: [E005, E008]
     status: partial
     importance: primary
+    resolution:
+      action: qualify
+      reason: 改善幅度已测得，但"瓶颈在磁盘 IO"这一归因本轮没有做隔离实验验证
+      boundary: 3.2% 的改善是本次高负载 6 轮的实测结果；磁盘 IO 只是待验证的假设，讲述与书写时必须标明为下一阶段的验证项，不得作为结论陈述
   - id: C04
     statement: 实验结论可信——同硬件、固定负载生成器回放线上流量模型、标准负载 12 轮与高负载 6 轮重复
     evidence: [E006]
