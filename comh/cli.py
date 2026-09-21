@@ -348,7 +348,13 @@ def cmd_render(args: argparse.Namespace) -> int:
         inputs = manifest.begin_build(key)
         output = manifest.output_path(key)
         report_path = run_root / "qa" / f"render-{args.target}.yaml"
-    metadata = {"output": str(output), "inputs": inputs, "preview": args.preview}
+    # Run-relative, like a decision binding: a render receipt must not carry the
+    # author's directory layout, and must still read correctly in a clone.
+    metadata = {
+        "output": output.relative_to(run_root).as_posix(),
+        "inputs": inputs,
+        "preview": args.preview,
+    }
     findings = []
     if key == "report_docx":
         render_report(manifest.artifact_path("report_md"), run_root / "templates/base.docx", output)

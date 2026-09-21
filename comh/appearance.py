@@ -51,7 +51,7 @@ def selection_errors(manifest: Manifest) -> list[str]:
 
 
 def needs_review(manifest: Manifest) -> bool:
-    from .dialogue import latest
+    from .dialogue import latest, run_identity
 
     brief = manifest.brief()
     if not applicable(brief):
@@ -60,7 +60,7 @@ def needs_review(manifest: Manifest) -> bool:
     # rejected current proposal cannot be bypassed by the original default policy.
     request = latest(manifest, "deck_appearance")
     if request and request.get("binding") == {
-        "run": str(manifest.root.resolve()),
+        "run": run_identity(manifest),
         "appearance": signature(manifest),
     }:
         return True
@@ -154,7 +154,7 @@ def view(manifest: Manifest) -> dict:
     return {
         **specification(manifest),
         "sample": {
-            "path": str(output),
+            "path": output.relative_to(manifest.root).as_posix(),
             "sha256": hash_file(output) if output.is_file() else None,
         },
         "scope": (

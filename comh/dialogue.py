@@ -45,6 +45,19 @@ def digest(value) -> str:
     return hash_bytes(json.dumps(value, ensure_ascii=False, sort_keys=True).encode())
 
 
+
+def run_identity(manifest: Manifest) -> str:
+    """What a decision was made *about*, for binding purposes.
+
+    The run's name, never its absolute path: a receipt must survive the run
+    being moved, cloned or checked out elsewhere, and a shared run must not
+    carry the author's home directory into a committed file. Receipts live
+    inside their own run.yaml, so the name only has to distinguish a run from
+    a differently-named one, not to be globally unique.
+    """
+    return str(manifest.data.get("name") or manifest.root.name)
+
+
 def state(manifest: Manifest) -> dict:
     return manifest.data.setdefault(
         "interaction", {"version": 1, "mode": "checkpoints", "requests": []}
@@ -195,7 +208,7 @@ def binding(manifest: Manifest, target: str, node: str | None = None) -> dict:
     if target == "deck_appearance":
         from .appearance import signature
 
-        return {"run": str(manifest.root.resolve()), "appearance": signature(manifest)}
+        return {"run": run_identity(manifest), "appearance": signature(manifest)}
     parents = (
         [] if target == "brief" else ["brief"] if target == "narrative" else ["brief", "narrative"]
     )
@@ -203,7 +216,7 @@ def binding(manifest: Manifest, target: str, node: str | None = None) -> dict:
     upstream = upstream_chain(key) - {key} if key else set()
     coverage = manifest.root / "evidence/coverage.yaml"
     return {
-        "run": str(manifest.root.resolve()),
+        "run": run_identity(manifest),
         "view": digest(view(manifest, target, node)),
         "artifact": manifest._current_hash(target) if target in {"brief", "narrative"} else None,
         "upstream": {k: manifest._current_hash(k) for k in sorted(upstream)},
