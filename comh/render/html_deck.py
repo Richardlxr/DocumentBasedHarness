@@ -258,6 +258,9 @@ def _section(
     elif role == "versus":
         body = _versus(page, theme, result, run_root, evidence, orders)
     else:
+        from .deck import _unknown_role_finding
+
+        _unknown_role_finding(str(page.get("id", "")), role, result)
         body = _content(page, theme, result, run_root, evidence, orders)
 
     notes = page.get("notes")
