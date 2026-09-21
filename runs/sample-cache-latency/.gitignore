@@ -1,2 +1,6 @@
 build/
 .workspace/
+# Render receipts describe a local build/ that is never committed, and only a
+# real gate + render can produce them. `comh validate all` regenerates
+# qa/findings.yaml from the tracked artifacts, so that one stays checked in.
+qa/render-*.yaml

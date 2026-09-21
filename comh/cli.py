@@ -97,6 +97,11 @@ def cmd_init_run(args: argparse.Namespace) -> int:
 
 def cmd_status(args: argparse.Namespace) -> int:
     manifest = Manifest.load(_resolve_run(args))
+    with manifest.reading():  # one consistent snapshot; nothing here writes
+        return _print_status(manifest)
+
+
+def _print_status(manifest: Manifest) -> int:
     name = manifest.data["name"]
     print(f"run: {name}  ({manifest.root})")
     print("artifacts:")
@@ -251,12 +256,16 @@ def cmd_respond(args: argparse.Namespace) -> int:
 
 
 def cmd_next(args: argparse.Namespace) -> int:
-    _print_data(next_action(Manifest.load(_resolve_run(args))), args.json)
+    manifest = Manifest.load(_resolve_run(args))
+    with manifest.reading():
+        _print_data(next_action(manifest), args.json)
     return 0
 
 
 def cmd_context(args: argparse.Namespace) -> int:
-    data = context_pack(Manifest.load(_resolve_run(args)), args.stage, args.node)
+    manifest = Manifest.load(_resolve_run(args))
+    with manifest.reading():
+        data = context_pack(manifest, args.stage, args.node)
     encoded = json.dumps(data, ensure_ascii=False, indent=2)
     if len(encoded) > args.max_chars:
         raise RunError(
@@ -270,7 +279,9 @@ def cmd_context(args: argparse.Namespace) -> int:
 def cmd_presentation_profiles(args: argparse.Namespace) -> int:
     from .presentation_profile import profiles
 
-    data = profiles()
+    # Inside a run, list what that run can actually select: built-ins plus its own.
+    root = find_run_root(Path(args.run).resolve() if getattr(args, "run", None) else Path.cwd())
+    data = profiles(root)
     if args.name:
         if args.name not in data:
             raise RunError(f"unknown presentation profile: {args.name}")
@@ -280,7 +291,10 @@ def cmd_presentation_profiles(args: argparse.Namespace) -> int:
 
 
 def cmd_instructions(args: argparse.Namespace) -> int:
-    _print_data(instructions(args.stage), args.json)
+    # Without a run this prints the packaged text; inside one it shows what that
+    # run's agent actually reads, overlay included.
+    root = find_run_root(Path(args.run).resolve() if getattr(args, "run", None) else Path.cwd())
+    _print_data(instructions(args.stage, root), args.json)
     return 0
 
 
@@ -295,14 +309,15 @@ def cmd_validate(args: argparse.Namespace) -> int:
         manifest = Manifest.load(run_root)
         findings += review_findings(manifest)
         findings += render_findings(manifest)
-    path = write_findings(run_root, findings)
+    path = write_findings(run_root, findings, keys)
     errors = [f for f in findings if f.severity == "error"]
     warns = [f for f in findings if f.severity == "warn"]
     for finding in findings:
         marker = {"error": "✗", "warn": "△", "info": "·"}[finding.severity]
-        owner = ""
-        if finding.owning_artifact != finding.artifact:
-            owner = f" → fix: {finding.owning_artifact}"
+        # The empty default means "the artifact owns its own finding"; compare
+        # the normalized value, never the raw field.
+        owning = finding.as_dict()["owning_artifact"]
+        owner = f" → fix: {owning}" if owning != finding.artifact else ""
         print(f"  [{marker}] {finding.artifact}/{finding.check}: {finding.detail}{owner}")
     print(f"findings: {len(errors)} error(s), {len(warns)} warn(s) → {path}")
     return 1 if errors else 0
@@ -338,7 +353,13 @@ def cmd_render(args: argparse.Namespace) -> int:
         inputs = manifest.begin_build(key)
         output = manifest.output_path(key)
         report_path = run_root / "qa" / f"render-{args.target}.yaml"
-    metadata = {"output": str(output), "inputs": inputs, "preview": args.preview}
+    # Run-relative, like a decision binding: a render receipt must not carry the
+    # author's directory layout, and must still read correctly in a clone.
+    metadata = {
+        "output": output.relative_to(run_root).as_posix(),
+        "inputs": inputs,
+        "preview": args.preview,
+    }
     findings = []
     if key == "report_docx":
         render_report(manifest.artifact_path("report_md"), run_root / "templates/base.docx", output)
@@ -437,21 +458,37 @@ def _headless_layout_check(html_path: Path, result) -> None:
             )
         )
         return
-    completed = subprocess_module.run(
-        [
-            chrome,
-            "--headless=new",
-            "--disable-gpu",
-            "--virtual-time-budget=4000",
-            "--window-size=1600,900",
-            "--dump-dom",
-            html_path.as_uri(),
-        ],
-        capture_output=True,
-        text=True,
-        timeout=120,
-        check=False,
-    )
+    try:
+        completed = subprocess_module.run(
+            [
+                chrome,
+                "--headless=new",
+                "--disable-gpu",
+                "--virtual-time-budget=4000",
+                "--window-size=1600,900",
+                "--dump-dom",
+                html_path.as_uri(),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except (subprocess_module.SubprocessError, OSError) as error:
+        # An unusable browser leaves geometry unverified; it does not abort the
+        # render, which would also lose the build receipt for this generation.
+        result.findings.append(
+            Finding(
+                "deck_plan",
+                "layout",
+                "warn",
+                "fail",
+                f"[html] layout check could not run ({error}); "
+                "geometry findings are not guaranteed for this output",
+                "deck_plan",
+            )
+        )
+        return
     match = re_module.search(r'data-layout-findings="(.*?)"', completed.stdout or "")
     if not match:
         result.findings.append(

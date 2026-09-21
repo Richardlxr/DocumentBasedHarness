@@ -3,9 +3,9 @@ count:
   warn: 0
   info: 1
 findings:
-- artifact: brief
+- artifact: deck_plan
   check: hard-constraint
   severity: info
   verdict: pass
-  detail: 'constraint ''不要黑底'' enforced: light background ''F1F5F9'' effective'
+  detail: 'constraint ''不要黑底'': effective deck background is light'
   owning_artifact: deck_plan

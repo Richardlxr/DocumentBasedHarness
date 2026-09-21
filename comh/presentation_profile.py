@@ -1,4 +1,12 @@
-"""Presentation density is an explicit authoring policy, independent of appearance."""
+"""Presentation density is an explicit authoring policy, independent of appearance.
+
+Profiles are data, like themes. The three built-ins cover the common settings;
+a run adds its own under ``profiles/presentation/<name>.yaml`` when its scenario
+(investor pitch, incident review, thesis defence) needs different budgets and
+guidance. A custom profile may extend a built-in, and it may never drop the
+boundary statement: density is authoring guidance, never a word quota nor
+permission to invent facts.
+"""
 
 from __future__ import annotations
 
@@ -7,47 +15,133 @@ import re
 from copy import deepcopy
 from functools import cache
 from importlib.resources import files
+from pathlib import Path
+
+import yaml
 
 from .artifacts import Finding
 from .visible_text import page_texts
 
+BOUNDARY = (
+    "Authoring guidance, not a quota or a semantic quality score. "
+    "Do not invent evidence, force blocks, shrink fonts or import appearance."
+)
+
+# Scripts whose readable density is measured in characters rather than words.
+# A run in one of these counted by word would be measured with the wrong ruler.
+CHARACTER_SCRIPTS = ("zh", "ja", "ko", "yue", "wuu", "nan", "hak")
+
+_PROFILE_DIR = "profiles/presentation"
+_RANGE_KEYS = ("substantive_blocks",)
+
 
 @cache
-def profiles() -> dict:
+def builtin_profiles() -> dict:
     return json.loads(
         files("comh").joinpath("presets/presentation.json").read_text(encoding="utf-8")
     )
+
+
+def counts_characters(language: str | None) -> bool:
+    return str(language or "").lower().replace("_", "-").split("-")[0] in CHARACTER_SCRIPTS
+
+
+def budget_key(language: str | None) -> str:
+    """Which text_budget range applies. ``zh_chars`` is the historical name of
+    the character budget and stays the key for every character script."""
+    return "zh_chars" if counts_characters(language) else "words"
+
+
+def _profile_errors(name: str, data: dict) -> list[str]:
+    errors = []
+    budget = data.get("text_budget")
+    if not isinstance(budget, dict) or not budget:
+        errors.append(f"presentation profile '{name}': text_budget must be an object")
+        budget = {}
+    for key, value in list(budget.items()) + [
+        (k, data.get(k)) for k in _RANGE_KEYS if k in data
+    ]:
+        if (
+            not isinstance(value, list)
+            or len(value) != 2
+            or not all(isinstance(v, int) and v >= 0 for v in value)
+        ):
+            errors.append(f"presentation profile '{name}': {key} must be two integers >= 0")
+        elif value[0] > value[1]:
+            errors.append(f"presentation {key}: lower bound must not exceed upper bound")
+    if "substantive_blocks" not in data:
+        errors.append(f"presentation profile '{name}': substantive_blocks is required")
+    return errors
+
+
+def profiles(run_root: Path | None = None) -> dict:
+    """Built-in profiles plus any the run defines. Run profiles win by name."""
+    result = deepcopy(builtin_profiles())
+    directory = (run_root / _PROFILE_DIR) if run_root else None
+    if directory is None or not directory.is_dir():
+        return result
+    for path in sorted(directory.iterdir()):
+        if path.suffix not in {".yaml", ".yml", ".json"} or not path.is_file():
+            continue
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError) as error:
+            raise ValueError(
+                f"presentation profile '{path.name}' is unreadable: {error}"
+            ) from error
+        if not isinstance(data, dict):
+            raise ValueError(f"presentation profile '{path.name}' must be a mapping")
+        base = deepcopy(result.get(data.get("extends"), {})) if data.get("extends") else {}
+        if data.get("extends") and not base:
+            raise ValueError(
+                f"presentation profile '{path.stem}' extends unknown profile "
+                f"'{data['extends']}'"
+            )
+        merged = {**base, **{k: v for k, v in data.items() if k != "extends"}}
+        if isinstance(base.get("text_budget"), dict) and isinstance(data.get("text_budget"), dict):
+            merged["text_budget"] = {**base["text_budget"], **data["text_budget"]}
+        errors = _profile_errors(path.stem, merged)
+        if errors:
+            raise ValueError("; ".join(errors))
+        merged.setdefault("label", path.stem)
+        result[path.stem] = merged
+    return result
 
 
 def applicable(brief: dict) -> bool:
     return any(m.get("surface") == "presentation" for m in brief.get("media", []))
 
 
-def resolve_profile(brief: dict) -> dict:
+def resolve_profile(brief: dict, run_root: Path | None = None) -> dict:
     config = brief.get("presentation") or {}
     if not isinstance(config, dict):
         raise ValueError("brief.presentation must be an object")
     setting = config.get("setting", "general")
+    available = profiles(run_root)
     name = config.get("profile") or ("academic-rich" if setting == "academic" else "balanced")
-    if name not in profiles():
-        raise ValueError(f"unknown presentation profile: {name}")
-    result = deepcopy(profiles()[name])
+    if name not in available:
+        raise ValueError(
+            f"unknown presentation profile: {name} "
+            f"(available: {', '.join(sorted(available))}; "
+            f"add one under {_PROFILE_DIR}/<name>.yaml)"
+        )
+    result = deepcopy(available[name])
     overrides = config.get("overrides") or {}
     result["text_budget"].update(overrides.get("text_budget") or {})
-    for key in ("substantive_blocks", "layout_patterns"):
+    for key in ("substantive_blocks", "layout_patterns", "content_guidance"):
         if key in overrides:
             result[key] = deepcopy(overrides[key])
     result.update(
-        profile=name, setting=setting, selection="explicit" if config.get("profile") else "default"
+        profile=name,
+        setting=setting,
+        selection="explicit" if config.get("profile") else "default",
+        builtin=name in builtin_profiles(),
     )
-    result["boundary"] = (
-        "Authoring guidance, not a quota or a semantic quality score. "
-        "Do not invent evidence, force blocks, shrink fonts or import appearance."
-    )
+    result["boundary"] = BOUNDARY  # never overridable, whatever a profile file says
     return result
 
 
-def policy_errors(brief: dict) -> list[str]:
+def policy_errors(brief: dict, run_root: Path | None = None) -> list[str]:
     if not applicable(brief):
         return []
     config = brief.get("presentation")
@@ -57,27 +151,21 @@ def policy_errors(brief: dict) -> list[str]:
             "explicit profile overrides its default"
         ]
     try:
-        profile = resolve_profile(brief)
+        profile = resolve_profile(brief, run_root)
     except ValueError as error:
         return [str(error)]
-    ranges = {**profile["text_budget"], "substantive_blocks": profile["substantive_blocks"]}
-    return [
-        f"presentation {key}: lower bound must not exceed upper bound"
-        for key, value in ranges.items()
-        if value[0] > value[1]
-    ]
+    return _profile_errors(profile.get("profile", "?"), profile)
 
-
-def validate_density(artifacts: dict) -> list[Finding]:
+def validate_density(artifacts: dict, run_root: Path | None = None) -> list[Finding]:
     brief = artifacts.get("brief") or {}
-    if not applicable(brief) or policy_errors(brief):
+    if not applicable(brief) or policy_errors(brief, run_root):
         return []
-    profile = resolve_profile(brief)
+    profile = resolve_profile(brief, run_root)
     deck = artifacts.get("deck_plan") or {}
     if deck.get("draft"):
         return []  # Outline scaffolding is not finished copy.
-    chinese = brief.get("language", "").lower().startswith("zh")
-    low, high = profile["text_budget"]["zh_chars" if chinese else "words"]
+    chinese = counts_characters(brief.get("language"))
+    low, high = profile["text_budget"][budget_key(brief.get("language"))]
     findings = []
     for page in deck.get("deck", {}).get("pages", []):
         if page.get("page_role") in {"cover", "agenda", "section_divider", "closing", "appendix"}:
@@ -141,7 +229,7 @@ def validate_density(artifacts: dict) -> list[Finding]:
 _CLAUSE_SPLIT = re.compile(r"[；;]")
 
 
-def validate_packing(artifacts: dict) -> list[Finding]:
+def validate_packing(artifacts: dict, run_root: Path | None = None) -> list[Finding]:
     """Signal overloaded slide copy: one detail line that semicolon-chains a
     list of facts ("did A; did B; did C; did D") instead of being one
     elaborated point. Flowing explanatory prose with full sentences is rich
@@ -152,7 +240,7 @@ def validate_packing(artifacts: dict) -> list[Finding]:
     completeness signal that waits for finished copy.
     """
     brief = artifacts.get("brief") or {}
-    if not applicable(brief) or policy_errors(brief):
+    if not applicable(brief) or policy_errors(brief, run_root):
         return []
     deck = artifacts.get("deck_plan") or {}
     findings = []

@@ -45,6 +45,19 @@ def digest(value) -> str:
     return hash_bytes(json.dumps(value, ensure_ascii=False, sort_keys=True).encode())
 
 
+
+def run_identity(manifest: Manifest) -> str:
+    """What a decision was made *about*, for binding purposes.
+
+    The run's name, never its absolute path: a receipt must survive the run
+    being moved, cloned or checked out elsewhere, and a shared run must not
+    carry the author's home directory into a committed file. Receipts live
+    inside their own run.yaml, so the name only has to distinguish a run from
+    a differently-named one, not to be globally unique.
+    """
+    return str(manifest.data.get("name") or manifest.root.name)
+
+
 def state(manifest: Manifest) -> dict:
     return manifest.data.setdefault(
         "interaction", {"version": 1, "mode": "checkpoints", "requests": []}
@@ -91,7 +104,7 @@ def set_mode(manifest: Manifest, mode: str, reply: str, source: str) -> None:
     manifest.save()
 
 
-def _brief_view(brief: dict) -> dict:
+def _brief_view(brief: dict, run_root=None) -> dict:
     """Brief view carries the resolved density profile, so the Gate 1 density
     question quotes concrete budgets instead of a silent default."""
     from .presentation_profile import applicable, resolve_profile
@@ -99,7 +112,7 @@ def _brief_view(brief: dict) -> dict:
     if not applicable(brief):
         return brief
     try:
-        profile = resolve_profile(brief)
+        profile = resolve_profile(brief, run_root)
     except ValueError:
         return brief  # malformed presentation config surfaces via policy_errors blockers
     effective = {
@@ -111,6 +124,11 @@ def _brief_view(brief: dict) -> dict:
             "selection",
             "text_budget",
             "substantive_blocks",
+            # Guidance prose is part of what Gate 1 accepts: once profiles are
+            # user-editable, a changed instruction must invalidate acceptance
+            # exactly as a changed budget does.
+            "content_guidance",
+            "layout_patterns",
         )
         if key in profile
     }
@@ -134,7 +152,7 @@ def view(manifest: Manifest, target: str, node: str | None = None) -> dict:
     if target not in TARGETS:
         raise RunError(f"unknown decision target: {target}")
     if target == "brief":
-        return _brief_view(read(manifest, target))
+        return _brief_view(read(manifest, target), manifest.root)
     if target == "narrative":
         return read(manifest, target)
     if target == "deck_appearance":
@@ -195,15 +213,17 @@ def binding(manifest: Manifest, target: str, node: str | None = None) -> dict:
     if target == "deck_appearance":
         from .appearance import signature
 
-        return {"run": str(manifest.root.resolve()), "appearance": signature(manifest)}
+        return {"run": run_identity(manifest), "appearance": signature(manifest)}
     parents = (
         [] if target == "brief" else ["brief"] if target == "narrative" else ["brief", "narrative"]
     )
     key = ARTIFACT.get(target)
     upstream = upstream_chain(key) - {key} if key else set()
     coverage = manifest.root / "evidence/coverage.yaml"
-    return {
-        "run": str(manifest.root.resolve()),
+    from .guidance import overlay_digest
+
+    binding_data = {
+        "run": run_identity(manifest),
         "view": digest(view(manifest, target, node)),
         "artifact": manifest._current_hash(target) if target in {"brief", "narrative"} else None,
         "upstream": {k: manifest._current_hash(k) for k in sorted(upstream)},
@@ -212,6 +232,11 @@ def binding(manifest: Manifest, target: str, node: str | None = None) -> dict:
         "intake": digest(state(manifest).get("intake")),
         "parents": {k: manifest.data["gates"][k].get("request_id") for k in parents},
     }
+    # Runs without scenario guidance keep byte-identical bindings.
+    guidance = overlay_digest(manifest.root)
+    if guidance:
+        binding_data["guidance"] = guidance
+    return binding_data
 
 
 def latest(manifest: Manifest, target: str, node: str | None = None) -> dict | None:
@@ -243,7 +268,7 @@ def readiness(manifest: Manifest, target: str) -> list[str]:
     )
     if target.endswith("detail"):
         stage = "authoring"
-    errors = brief_errors(read(manifest, "brief"), stage)
+    errors = brief_errors(read(manifest, "brief"), stage, manifest.root)
     questions = {
         q.get("question"): q
         for q in state(manifest)["intake"].get("open_questions", [])
@@ -407,8 +432,9 @@ def accepted_receipts(manifest: Manifest) -> dict:
     """Only decisions governing selected content; pending chat does not dirty builds."""
     result = {"intake": state(manifest).get("intake"), "mode": state(manifest)["mode"]}
     keys = required_artifacts(manifest.brief())
-    for target in TARGETS[:-1]:
-        if ARTIFACT[target] not in keys:
+    for target in TARGETS:
+        artifact = ARTIFACT.get(target)  # "delivery" governs no single artifact
+        if artifact is None or artifact not in keys:
             continue
         nodes = {r.get("node") for r in state(manifest)["requests"] if r["target"] == target}
         for node in sorted(nodes, key=lambda n: n or ""):

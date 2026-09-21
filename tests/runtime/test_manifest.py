@@ -107,3 +107,44 @@ def test_gate_invalidated_by_post_confirmation_edit(run_root):
     _write(run_root, "brief/brief.yaml", MIN_BRIEF + "# touched\n")
     with pytest.raises(RunError, match="invalidated"):
         manifest.require_gate("brief")
+
+
+def test_validate_output_never_prints_an_empty_fix_hint(run_root, capsys):
+    """Findings default owning_artifact to "", meaning "this artifact owns it".
+    The CLI must compare the normalized value or every such finding prints a
+    dangling `→ fix:`."""
+    from comh.artifacts import Finding
+    from comh.cli import main
+
+    assert Finding("evidence", "c", "warn", "fail", "d").as_dict()["owning_artifact"] == "evidence"
+    # A derived item with no formula yields a finding built without an explicit
+    # owner — exactly the shape that used to print a dangling hint.
+    _write(
+        run_root,
+        "evidence/evidence.yaml",
+        "version: 1\nitems:\n"
+        "  - {id: E001, kind: datum, content: a, value: {number: 1, unit: ms},\n"
+        "     source: {source: derived, locator: 'derived:(E002)'}}\n"
+        "  - {id: E002, kind: datum, content: b, value: {number: 1, unit: ms},\n"
+        "     source: {source: derived, locator: 'derived:()'}}\n",
+    )
+    _write(run_root, "brief/brief.yaml", MIN_BRIEF)
+    main(["validate", "evidence", "--run", str(run_root)])
+    out = capsys.readouterr().out
+    assert "derived-calculation" in out  # the test would be vacuous otherwise
+    assert "→ fix: \n" not in out
+
+
+def test_reading_scope_hashes_once_without_hiding_a_later_edit(run_root):
+    """The snapshot scope is a read-only optimization: identical answers, and a
+    write inside it drops the cache so no check acts on a pre-write hash."""
+    manifest = _confirmed_through_narrative(run_root)
+    live = {k: manifest.artifact_state(k).state for k in manifest.data["artifacts"]}
+    with manifest.reading():
+        assert {k: manifest.artifact_state(k).state for k in manifest.data["artifacts"]} == live
+        manifest.mark_saved("narrative")  # save() drops the snapshot
+        assert manifest.artifact_state("narrative").state in ("saved", "confirmed")
+
+    # Outside the scope, staleness stays live: an external edit is seen at once.
+    (run_root / "sources" / "data.csv").write_text("a,b\n9,9\n", encoding="utf-8")
+    assert manifest.artifact_state("evidence").state == "stale"

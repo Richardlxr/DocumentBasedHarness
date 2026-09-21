@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import platform
 import sys
+from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -122,6 +123,35 @@ class Manifest:
         self.root = root
         self.data = data
         self.path = root / MANIFEST_NAME
+        self._cache: dict | None = None
+
+    # -- read-only snapshot scope ---------------------------------------------
+
+    @contextmanager
+    def reading(self):
+        """Hash each file at most once for the duration of one read-only command.
+
+        Staleness is still derived from the files on disk, never from the
+        manifest — this only stops a single ``comh status`` from re-reading
+        ``sources/`` fifteen times, which dominates the command once a run
+        holds real material. Outside this scope nothing is cached, so guards
+        (`require_fresh`, `mark_saved`, `require_build`) always read live.
+
+        A mutation inside the scope drops the cache, so no check can act on a
+        hash taken before its own write.
+        """
+        outer, self._cache = self._cache, {} if self._cache is None else self._cache
+        try:
+            yield self
+        finally:
+            self._cache = outer
+
+    def _cached(self, key: tuple, compute):
+        if self._cache is None:
+            return compute()
+        if key not in self._cache:
+            self._cache[key] = compute()
+        return self._cache[key]
 
     # -- persistence ---------------------------------------------------------
 
@@ -133,6 +163,7 @@ class Manifest:
         return cls(root, yaml.safe_load(path.read_text(encoding="utf-8")))
 
     def save(self) -> None:
+        self._cache = None if self._cache is None else {}
         # A failed write must not truncate the only lifecycle record. One writer
         # owns a run; this atomic replace is not a multi-writer locking protocol.
         temporary = None
@@ -152,22 +183,28 @@ class Manifest:
     def artifact_path(self, key: str) -> Path:
         return self.root / self.data["artifacts"][key]["path"]
 
+    def _hash_file(self, path: Path) -> str:
+        return self._cached(("file", str(path)), lambda: hash_file(path))
+
     def _current_hash(self, upstream: str) -> str | None:
         if upstream == "sources":
-            return hash_dir(self.root / "sources")
+            return self._cached(("dir", "sources"), lambda: hash_dir(self.root / "sources"))
         record = self.data["artifacts"].get(upstream)
         if record is None or not (self.root / record["path"]).is_file():
             return None
-        return hash_file(self.root / record["path"])
+        return self._hash_file(self.root / record["path"])
 
     # -- state computation ---------------------------------------------------
 
     def artifact_state(self, key: str) -> ArtifactState:
+        return self._cached(("state", key), lambda: self._artifact_state(key))
+
+    def _artifact_state(self, key: str) -> ArtifactState:
         record = self.data["artifacts"][key]
         file = self.root / record["path"]
         if not file.is_file():
             return ArtifactState(key, False, "absent", "file missing")
-        current = hash_file(file)
+        current = self._hash_file(file)
         if record["hash"] is None:
             return ArtifactState(key, True, "unsaved", "never saved via `comh save`")
         if current != record["hash"]:
@@ -211,7 +248,7 @@ class Manifest:
         request = latest(self, gate)
         return (
             file.is_file()
-            and hash_file(file) == record["hash"]
+            and self._hash_file(file) == record["hash"]
             and bool(request)
             and record.get("request_id") == request["id"]
             and request["state"] == "accepted"

@@ -90,6 +90,27 @@ upstream by replacing the package directory and re-running `tests/compiler/`.
 - Model judgment lives in `stages/*.md` (prompts) and `references/*.md` (vocabulary);
   contracts and invariants live in `comh/` (code). Do not move judgment into code or
   contracts into prompts.
+- `docs/core-invariants.md` states what customization may never reach, and
+  `tests/runtime/test_core_invariants.py` enforces it under maximal customization.
+  Adding a customization surface means adding it to both, or not adding it.
+- Customization layers are data with a run-local registry, resolved packaged → run:
+  themes (`runs/<name>/themes/`), appearance profiles, density profiles
+  (`runs/<name>/profiles/presentation/<name>.yaml`, may `extends:` a built-in) and
+  scenario guidance (`runs/<name>/guidance/<stage>.md`). Guidance overlays are
+  **appended** to the packaged stage document, never substituted for it, and their
+  combined hash enters every decision binding, so editing them invalidates
+  acceptances made under the old wording. A profile may change budgets, guidance and
+  layout patterns; `resolve_profile` re-asserts the density boundary whatever the
+  file says.
+- Decision bindings identify a run by `run.yaml`'s `name`, never by filesystem path:
+  receipts must survive a run being moved or cloned, and a shared run must not carry
+  the author's directory layout. `scripts/check_release_privacy.py` enforces the
+  second half.
+- Language coverage is explicit. Pattern checkers are locale-scoped
+  (`comh/locale_support.py`); a run in a language with no rule pack gets a warn saying
+  which checks did not run. Character-counted scripts are a list, not a `zh` prefix
+  test. When a check cannot run at all — no headless browser, no draw.io CLI — say so
+  as a finding rather than passing silently.
 - Themes are data (`themes/<name>/theme.yaml`; a run may carry `runs/<name>/themes/`
   which takes precedence). Theme files change tokens only. Future per-role layout
   implementations in themes must compose the measured primitives in
@@ -133,5 +154,8 @@ upstream by replacing the package directory and re-running `tests/compiler/`.
 - Preview decks use `comh render deck|deck-html --preview`; outputs stay in `.workspace/`
   and cannot be delivered. Never remove formal guards to generate a specimen.
 - Runs carry lineage state; private runs are Git-ignored except the checked-in sample.
-  `build/` and `.workspace/` inside a run are generated/local.
+  `build/`, `.workspace/` and `qa/render-*.yaml` inside a run are generated/local;
+  `qa/findings.yaml` is reproducible from tracked artifacts and stays checked in.
+  The sample run's decision receipts are fixture data (`source: sample:fixture`) —
+  they are not, and must not be presented as, a real person's acceptance.
 - Before reporting completion: `.venv/bin/pytest` and `.venv/bin/ruff check . --no-cache`.

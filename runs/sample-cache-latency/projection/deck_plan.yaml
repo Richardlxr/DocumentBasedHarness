@@ -1,5 +1,4 @@
 version: 1
-
 deck:
   title: Cache Partitioning 实验汇报
   subtitle: P99 latency 验证结果与上线建议
@@ -8,166 +7,194 @@ deck:
     palette_hint: 石板蓝 + 靛蓝强调，低饱和，客户技术评审场合
     transition: fade
   pages:
-    - id: P01
-      page_role: cover
-      title: Cache Partitioning 实验汇报
-      support_points: [P99 latency 验证结果与上线建议]
-      notes: |
-        开场（故事感，软性要求）：从上周客户反馈的卡顿工单切入，一句话点出
-        "大家感受到的慢，主要是最慢的那 1% 请求"。然后进入正题。
+  - id: P01
+    page_role: cover
+    title: Cache Partitioning 实验汇报
+    support_points:
+    - P99 latency 验证结果与上线建议
+    notes: '开场（故事感，软性要求）：从上周客户反馈的卡顿工单切入，一句话点出
 
-    - id: P02
-      page_role: agenda
-      title: 今天讲四件事
-      support_points: [为什么做缓存分区, 怎么验证的, 发现了什么, 建议怎么走]
-      notes: 快速过，10 秒内。
+      "大家感受到的慢，主要是最慢的那 1% 请求"。然后进入正题。
 
-    - id: P03
-      page_role: content
-      kicker: "背景 · BACKGROUND"
-      beat: S01
-      title: 尾延迟抖动是客户线上体验的第一痛点
-      support_points:
-        - point: 用户感知的"慢"来自 P99 长尾，而非平均延迟
-          detail: 平均延迟指标长期健康，投诉集中在偶发卡顿——典型的长尾特征
-          icon: clock-bolt
-        - point: 缓存命中率随热租户行为波动，是主要可疑因素
-          detail: 共享缓存层无隔离，单个热租户可以挤占全集群的缓存份额
-        - point: 长尾问题直接牵动 SLA 达标与客户信任
-          detail: 偶发卡顿的投诉对应的几乎都是尾部请求，平均值解释不了体验
-      callout:
-        text: 本次改动针对的就是这个机制：把共享缓存按租户分成独立分区
-      notes: 这里不展开工单数据（本次材料未包含），口头补充一两个客户例子即可。
-      visual: {intent: 一条延迟分布示意，圈出 P99 长尾}
+      '
+  - id: P02
+    page_role: agenda
+    title: 今天讲四件事
+    support_points:
+    - 为什么做缓存分区
+    - 怎么验证的
+    - 发现了什么
+    - 建议怎么走
+    notes: 快速过，10 秒内。
+  - id: P03
+    page_role: content
+    kicker: 背景 · BACKGROUND
+    beat: S01
+    title: 尾延迟抖动是客户线上体验的第一痛点
+    support_points:
+    - point: 用户感知的"慢"来自 P99 长尾，而非平均延迟
+      detail: 平均延迟指标长期健康，投诉集中在偶发卡顿——典型的长尾特征
+      icon: clock-bolt
+    - point: 缓存命中率随热租户行为波动，是主要可疑因素
+      detail: 共享缓存层无隔离，单个热租户可以挤占全集群的缓存份额
+    - point: 长尾问题直接牵动 SLA 达标与客户信任
+      detail: 偶发卡顿的投诉对应的几乎都是尾部请求，平均值解释不了体验
+    callout:
+      text: 本次改动针对的就是这个机制：把共享缓存按租户分成独立分区
+    notes: 这里不展开工单数据（本次材料未包含），口头补充一两个客户例子即可。
+    visual:
+      intent: 一条延迟分布示意，圈出 P99 长尾
+  - id: P04
+    page_role: content
+    kicker: 方法 · METHOD
+    beat: S02
+    title: 受控环境、固定负载、标准负载 12 轮与高负载 6 轮重复
+    support_points:
+    - point: 3 节点同规格集群，负载生成器回放线上流量模型
+      detail: 回放按上周真实请求分布采样，避免合成流量的分布偏差
+    - point: 每组配置多轮重复，报告分位数取轮间稳定值
+      detail: 排除单轮冷启动与抖动的干扰，结论可复核
+    - point: 高负载单独档位，不与标准档混算
+      detail: 标准负载 12 轮、高负载 6 轮，各自口径独立汇报
+    visual:
+      intent: 实验设置示意
+      diagram:
+        mermaid: "flowchart TD\n  gen[负载生成器：回放线上流量模型] --> cluster[3 节点同规格集群]\n"
+        caption: 实验设置：回放式负载生成（条件：E006）
+        evidence: E006
+    notes: 强调与线上流量分布对齐，这是客户最容易质疑的点。
+  - id: P05
+    page_role: content
+    kicker: 结果 · RESULTS
+    beat: S03
+    title: 标准负载下 P99 降低 18.2%，吞吐不受影响
+    support_points:
+    - point: P99：220ms → 180ms
+      detail: 12 轮重复取稳定值，逐轮走势无交叉（见右侧图与报告附录）
+    - point: 吞吐：12400 → 12300 QPS
+      detail: 差异在重复轮噪声区间内，不构成回归
+    - point: 逐轮走势与 CSV 读数互相印证
+      detail: 实验方提供的走势图（E010）显示两配置全程无交叉，佐证结论稳定性
+    callout:
+      text: P50 几乎不变（85ms → 82ms），改善集中在长尾请求上
+      evidence: E009
+    visual:
+      intent: 基线 vs 分区后的 P99 双柱对比图，差异高亮
+      chart:
+        type: column
+        title: P99 latency（标准负载）
+        series:
+        - label: baseline
+          value_from: E001
+        - label: partitioned
+          value_from: E002
+    emphasis:
+    - elements:
+      - title
+      verb: highlight
+      note: 本页唯一大数字
+    reveal:
+    - elements:
+      - support_points[0]
+      verb: fade_in
+      trigger: click
+    - elements:
+      - visual
+      verb: fade_in
+      trigger: click
+    - elements:
+      - support_points[2]
+      - callout
+      verb: fade_in
+      trigger: click
+    demotions:
+    - content: 逐轮 P99 时序图与轮间波动区间
+      to: appendix
+    - content: p50 与 CPU/内存占用明细
+      to: report_only
+    notes: '讲解口径：先给结论数字，再解释对比条件（同负载、同硬件）。
 
-    - id: P04
-      page_role: content
-      kicker: "方法 · METHOD"
-      beat: S02
-      title: 受控环境、固定负载、标准负载 12 轮与高负载 6 轮重复
-      support_points:
-        - point: 3 节点同规格集群，负载生成器回放线上流量模型
-          detail: 回放按上周真实请求分布采样，避免合成流量的分布偏差
-        - point: 每组配置多轮重复，报告分位数取轮间稳定值
-          detail: 排除单轮冷启动与抖动的干扰，结论可复核
-        - point: 高负载单独档位，不与标准档混算
-          detail: 标准负载 12 轮、高负载 6 轮，各自口径独立汇报
-      visual:
-        intent: 实验设置示意
-        diagram:
-          mermaid: |
-            flowchart LR
-              gen[负载生成器] -->|线上流量模型| n1[节点 1]
-              gen --> n2[节点 2]
-              gen --> n3[节点 3]
-          caption: 实验设置：回放式负载生成（条件：E006）
-          evidence: E006
-      notes: 强调与线上流量分布对齐，这是客户最容易质疑的点。
+      被问细节时引用附录与报告的逐轮数据。
 
-    - id: P05
-      page_role: content
-      kicker: "结果 · RESULTS"
-      beat: S03
-      title: 标准负载下 P99 降低 18.2%，吞吐不受影响
-      support_points:
-        - point: "P99：220ms → 180ms"
-          detail: 12 轮重复取稳定值，逐轮走势无交叉（见右侧图与报告附录）
-        - point: "吞吐：12400 → 12300 QPS"
-          detail: 差异在重复轮噪声区间内，不构成回归
-        - point: 逐轮走势与 CSV 读数互相印证
-          detail: 实验方提供的走势图（E010）显示两配置全程无交叉，佐证结论稳定性
-      callout:
-        text: P50 几乎不变（85ms → 82ms），改善集中在长尾请求上
-        evidence: E009
-      visual:
-        intent: 基线 vs 分区后的 P99 双柱对比图，差异高亮
-        chart:
-          type: column
-          title: P99 latency（标准负载）
-          series:
-            - {label: baseline, value_from: E001}
-            - {label: partitioned, value_from: E002}
-      emphasis:
-        - {elements: [title], verb: highlight, note: 本页唯一大数字}
-      reveal:
-        - {elements: ["support_points[0]"], verb: fade_in, trigger: click}
-        - {elements: [visual], verb: fade_in, trigger: click}
-        - {elements: ["support_points[2]", callout], verb: fade_in, trigger: click}
-      demotions:
-        - content: 逐轮 P99 时序图与轮间波动区间
-          to: appendix
-        - content: p50 与 CPU/内存占用明细
-          to: report_only
-      notes: |
-        讲解口径：先给结论数字，再解释对比条件（同负载、同硬件）。
-        被问细节时引用附录与报告的逐轮数据。
+      '
+  - id: P06
+    page_role: content
+    kicker: 边界 · LIMITS
+    beat: S04
+    title: 高负载下改善有限：瓶颈可能在磁盘 IO，不在缓存
+    metric_cards:
+    - label: baseline P99（高负载）
+      value_from: E005
+      icon: clock
+    - label: partitioned P99（高负载）
+      value_from: E011
+      icon: bolt
+    - label: 改善幅度
+      value_from: E012
+      icon: trending-down
+    support_points:
+    - point: 两配置缓存命中率已接近饱和，分区收益空间受限
+      detail: 高负载下缓存不再是瓶颈，分区的机制收益无从发挥
+    - point: 磁盘 IO 假设尚未单独验证，是下一阶段专项的内容
+      detail: 明确标注为推测——诚实呈现比硬撑更能建立信任
+    visual:
+      intent: 双场景对比：标准负载 vs 高负载的改善幅度并排
+    emphasis:
+    - elements:
+      - metric_cards[2]
+      verb: highlight
+      note: 改善幅度是本页锚点
+    reveal:
+    - elements:
+      - metric_cards[0]
+      - metric_cards[1]
+      verb: appear
+      trigger: click
+    - elements:
+      - metric_cards[2]
+      verb: fade_in
+      trigger: click
+    notes: '明确说这是推测（E008 为 assumption）：磁盘 IO 假设尚未单独验证，
 
-    - id: P06
-      page_role: content
-      kicker: "边界 · LIMITS"
-      beat: S04
-      title: 高负载下改善有限：瓶颈可能在磁盘 IO，不在缓存
-      metric_cards:
-        - {label: "baseline P99（高负载）", value_from: E005, icon: clock}
-        - {label: "partitioned P99（高负载）", value_from: E011, icon: bolt}
-        - {label: 改善幅度, value_from: E012, icon: trending-down}
-      support_points:
-        - point: 两配置缓存命中率已接近饱和，分区收益空间受限
-          detail: 高负载下缓存不再是瓶颈，分区的机制收益无从发挥
-        - point: 磁盘 IO 假设尚未单独验证，是下一阶段专项的内容
-          detail: 明确标注为推测——诚实呈现比硬撑更能建立信任
-      visual: {intent: 双场景对比：标准负载 vs 高负载的改善幅度并排}
-      emphasis:
-        - {elements: ["metric_cards[2]"], verb: highlight, note: 改善幅度是本页锚点}
-      reveal:
-        - {elements: ["metric_cards[0]", "metric_cards[1]"], verb: appear, trigger: click}
-        - {elements: ["metric_cards[2]"], verb: fade_in, trigger: click}
-      notes: |
-        明确说这是推测（E008 为 assumption）：磁盘 IO 假设尚未单独验证，
-        是下一阶段专项的内容。
-      demotions:
-        - content: 高负载下命中率与 IO 等待的原始观测记录
-          to: report_only
+      是下一阶段专项的内容。
 
-    - id: P07
-      page_role: content
-      kicker: "机制 · MECHANISM"
-      beat: S05
-      title: 租户级分区隔离了缓存挤占，这就是标准负载见效的原因
-      support_points:
-        - point: 按租户哈希划分独立分区，热租户无法挤占他人份额
-          detail: 无跨区回收，实现简单、无热点路由开销
-        - point: 机制与观察一致：命中率波动被消除，长尾随之收敛
-          detail: 这也解释了为什么收益集中在 P99 而 P50 几乎不变
-      visual:
-        intent: 分区前后的缓存结构对比
-        diagram:
-          mermaid: |
-            flowchart LR
-              ta[租户 A] --> pool[(共享缓存池)]
-              tb[租户 B] --> pool
-              tc[租户 C] --> pool
-              pool -.->|热租户挤占| wave[命中率波动]
-          caption: 分区前：共享池无隔离（机制：E007）
-          evidence: E007
-      notes: 如果客户问"为什么高负载没用"，回到 P06 的机制边界解释。
-
-    - id: P08
-      page_role: closing
-      kicker: "建议 · RECOMMENDATION"
-      beat: S06
-      title: 建议：进入 staging 灰度，同时立高负载瓶颈专项
-      support_points:
-        - 灰度验证真实流量下的 P99 收益与回归风险
-        - 专项验证磁盘 IO 假设（当前明确标注为推测）
-      notes: 结束语回到开场痛点，形成闭环。
-      visual: {intent: 两步走时间线：灰度 → 专项结论 → 全量决策}
-
-    - id: P09
-      page_role: appendix
-      kicker: "附录 · APPENDIX"
-      title: 附录：实验配置明细
-      support_points:
-        - 标准负载 12 轮 / 高负载 6 轮，同硬件与负载生成器
-        - 逐轮时序与波动区间见报告"实验结果"一节
-      notes: 备查页，正常不讲。
+      '
+    demotions:
+    - content: 高负载下命中率与 IO 等待的原始观测记录
+      to: report_only
+  - id: P07
+    page_role: content
+    kicker: 机制 · MECHANISM
+    beat: S05
+    title: 租户级分区隔离了缓存挤占，这就是标准负载见效的原因
+    support_points:
+    - point: 按租户哈希划分独立分区，热租户无法挤占他人份额
+      detail: 无跨区回收，实现简单、无热点路由开销
+    - point: 机制与观察一致：命中率波动被消除，长尾随之收敛
+      detail: 这也解释了为什么收益集中在 P99 而 P50 几乎不变
+    visual:
+      intent: 分区前后的缓存结构对比
+      diagram:
+        mermaid: "flowchart TD\n  pool[(共享缓存池：租户混用)] -->|热租户挤占份额| wave[命中率波动，长尾变长]\n"
+        caption: 分区前：共享池无隔离（机制：E007）
+        evidence: E007
+    notes: 如果客户问"为什么高负载没用"，回到 P06 的机制边界解释。
+  - id: P08
+    page_role: closing
+    kicker: 建议 · RECOMMENDATION
+    beat: S06
+    title: 建议：进入 staging 灰度，同时立高负载瓶颈专项
+    support_points:
+    - 灰度验证真实流量下的 P99 收益与回归风险
+    - 专项验证磁盘 IO 假设（当前明确标注为推测）
+    notes: 结束语回到开场痛点，形成闭环。
+    visual:
+      intent: 两步走时间线：灰度 → 专项结论 → 全量决策
+  - id: P09
+    page_role: appendix
+    kicker: 附录 · APPENDIX
+    title: 附录：实验配置明细
+    support_points:
+    - 标准负载 12 轮 / 高负载 6 轮，同硬件与负载生成器
+    - 逐轮时序与波动区间见报告"实验结果"一节
+    notes: 备查页，正常不讲。

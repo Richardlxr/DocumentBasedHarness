@@ -37,6 +37,28 @@ from .ooxml import set_east_asian_font, set_shape_translucent_fill
 from .scrim import solve_scrim
 from .theme import RenderTheme, render_theme
 
+
+def _unknown_role_finding(page_id: str, role: str, result) -> None:
+    """A custom page_role renders as a plain content page. The open vocabulary
+    lets the model invent roles; it must not let a renderer silently drop the
+    layout the author asked for."""
+    from ..artifacts import KNOWN_PAGE_ROLES
+
+    if role in KNOWN_PAGE_ROLES:
+        return
+    result.findings.append(
+        Finding(
+            "deck_plan",
+            "layout:unknown-role",
+            "warn",
+            "fail",
+            f"page {page_id}: page_role '{role}' has no layout; rendered as a content page. "
+            "Use a known role, or accept the content layout deliberately.",
+            "deck_plan",
+        )
+    )
+
+
 _CHART_TYPES = {
     "bar": XL_CHART_TYPE.BAR_CLUSTERED,
     "column": XL_CHART_TYPE.COLUMN_CLUSTERED,
@@ -146,6 +168,7 @@ def render_deck(
         elif role == "versus":
             _render_versus(slide, page, theme, result, evidence, shapes)
         else:
+            _unknown_role_finding(page_id, role, result)
             _render_content(slide, page, run_root, theme, result, evidence, shapes)
         result.shape_map[page_id] = shapes
         result.slide_index[page_id] = slide_number
@@ -920,6 +943,7 @@ def _render_metric_cards(
         shape.line.width = Pt(1)
         shape.shadow.inherit = False
         card_icon = str(card.get("icon") or "")
+        icon_placed = False
         if card_icon:
             from .icons import icon_exists, icon_png
 
@@ -939,6 +963,7 @@ def _render_metric_cards(
                         height=Inches(0.34),
                     )
                     icon_shape.name = f"icon:{card_icon}"
+                    icon_placed = True
                 except RuntimeError as error:
                     result.findings.append(
                         Finding(
@@ -971,7 +996,10 @@ def _render_metric_cards(
             top_bar.fill.fore_color.rgb = t.accent
             top_bar.line.fill.background()
         value_text = _fmt(number) + (f" {unit}" if unit else "")
-        value_box = _textbox(slide, Inches(left), Inches(top + 0.34), Inches(width), Inches(0.8))
+        value_top, value_height = (top + 0.52, 0.62) if icon_placed else (top + 0.34, 0.8)
+        value_box = _textbox(
+            slide, Inches(left), Inches(value_top), Inches(width), Inches(value_height)
+        )
         _set(
             value_box.text_frame.paragraphs[0],
             value_text,
