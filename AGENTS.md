@@ -84,6 +84,11 @@ upstream by replacing the package directory and re-running `tests/compiler/`.
   objects and inline HTML SVG; report diagram export requires the configured draw.io CLI.
   Native tables use `visual.table`; reject incompatible carrier/layout combinations rather
   than dropping content. Check editability and readability after template composition.
+- Text-only bodies choose a relation-named form (`visual.arrangement`: steps, grid,
+  statement, qa, definition, status; see `comh/render/text_forms.py`). Forms are measured
+  layouts at fixed type sizes, shared by the renderer and the validator's dry run; table
+  emphasis (`header_column`, `highlight`, status/missing cells, `note`) stays semantic.
+  Layout-variety and list-shape findings are advisory review signals, never quotas.
 
 ## Engineering
 

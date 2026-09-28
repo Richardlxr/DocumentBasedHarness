@@ -60,3 +60,33 @@ def set_shape_translucent_fill(shape, color: RGBColor, alpha: float) -> None:
                 f'val="{alpha_val}"/>'
             )
             srgbClr.append(alpha_elem)
+
+
+_CELL_BORDERS = ("lnL", "lnR", "lnT", "lnB")
+
+
+def set_cell_borders(cell, **sides) -> None:
+    """Explicit table-cell borders, overriding the table style's grid.
+
+    ``sides`` maps left/right/top/bottom to ``(RGBColor, width_pt)`` or None
+    (no line). Sides left out are also drawn as no line, so a cell never
+    inherits the default style's white inner grid. Borders precede the cell
+    fill in CT_TableCellProperties, so they are inserted first.
+    """
+    tc_pr = cell._tc.get_or_add_tcPr()
+    for child in list(tc_pr):
+        if child.tag in {qn(f"a:{tag}") for tag in _CELL_BORDERS}:
+            tc_pr.remove(child)
+    ns = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
+    sides_in_order = ("left", "right", "top", "bottom")
+    for index, (tag, side) in enumerate(zip(_CELL_BORDERS, sides_in_order, strict=True)):
+        spec = sides.get(side)
+        if spec is None:
+            xml = f'<a:{tag} {ns} w="0"><a:noFill/></a:{tag}>'
+        else:
+            color, width = spec
+            xml = (
+                f'<a:{tag} {ns} w="{int(width * 12700)}" cap="flat" cmpd="sng">'
+                f'<a:solidFill><a:srgbClr val="{color}"/></a:solidFill></a:{tag}>'
+            )
+        tc_pr.insert(index, parse_xml(xml))

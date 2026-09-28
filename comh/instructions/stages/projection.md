@@ -12,6 +12,10 @@
 对照、实验过程与故障成因，确认哪些进入正文。用页面职责连接目的、机制与证据，
 不把“验证通过”当成所有页面的主旨；机制页允许准确的主题标题。
 
+大纲阶段就为每页选载体或文字形态（`visual.arrangement` / `visual.table` 等），依据是
+页内信息关系而不是轮换样式；present 视图的 carrier 会显示 `text:steps` 等形态，整套都是
+`text` 时先自查再给用户看。
+
 保存对应计划，执行 `comh present deck_outline` 或 `comh present report_outline`。
 用人类可读的结构给用户看，附重要取舍，等待回复。按 [对话协议](../references/dialogue-protocol.md)
 记录接受、修改或委托；present 的输出只代表待确认，不能自行填回复。

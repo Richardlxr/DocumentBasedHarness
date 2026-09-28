@@ -24,9 +24,9 @@ def diagram_texts(source: str) -> list[str]:
 def page_texts(page: dict) -> list[tuple[str, str]]:
     pairs = [(key, str(page.get(key, ""))) for key in ("title", "kicker")]
     for index, entry in enumerate(page.get("support_points") or []):
-        for field in ("point", "detail") if isinstance(entry, dict) else ("point",):
+        for field in ("point", "detail", "status") if isinstance(entry, dict) else ("point",):
             text = entry.get(field, "") if isinstance(entry, dict) else entry
-            suffix = ".detail" if field == "detail" else ""
+            suffix = "" if field == "point" else f".{field}"
             pairs.append((f"support_points[{index}]{suffix}", str(text or "")))
     for index, card in enumerate(page.get("metric_cards") or []):
         pairs.append((f"metric_cards[{index}].label", str(card.get("label", ""))))
@@ -38,8 +38,13 @@ def page_texts(page: dict) -> list[tuple[str, str]]:
         pairs.append((f"visual.table.columns[{i}]", label))
     for i, row in enumerate(table.get("rows", [])):
         for j, cell in enumerate(row):
-            value = cell.get("text", "") if isinstance(cell, dict) else cell
+            value = (
+                next((str(cell[k]) for k in ("text", "status", "missing") if k in cell), "")
+                if isinstance(cell, dict)
+                else cell
+            )
             pairs.append((f"visual.table.rows[{i}][{j}]", value))
+    pairs.append(("visual.table.note", str(table.get("note", ""))))
     for index, label in enumerate(visual.get("columns") or []):
         pairs.append((f"visual.columns[{index}]", str(label)))
     for index, series in enumerate((visual.get("chart") or {}).get("series") or []):

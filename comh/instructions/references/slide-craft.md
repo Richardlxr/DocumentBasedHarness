@@ -24,8 +24,12 @@
 - 由 brief 的 spec.dimensions 决定，没有死字数。executive 场景每页 1-2 个支撑点；
   技术评审可以 3-4 个 + 图。
 - **页面主体区至少要有一个展开结构或视觉块**：`{point, detail}` 展开式要点、
-  `metric_cards` 大数字卡片、`chart` 图表、或 `callout` 结论条。"三个短 bullet 孤悬
-  一页"就是太空——要么展开，要么合并页面。
+  文字形态（steps / grid / statement / qa / definition / status）、`visual.table`
+  对照表、`metric_cards` 大数字卡片、`chart` 图表、或 `callout` 结论条。"三个短 bullet
+  孤悬一页"就是太空——要么展开，要么合并页面。
+- **排法跟着关系走，不跟着习惯走**：顺序 → steps；四/六个平行项 → grid；结论 + 条件 →
+  statement；问答 → qa；术语 → definition；进展 → status；同一组字段 → 表格。整套 deck
+  每页都是同一列卡片，说明没有判断过每页的信息关系（见 deck-authoring「文字页形态」）。
 - 展开优先加宽而不是加多：一个 point 带 detail 比五个裸 bullet 层次好。
 - **一条 detail 只干一件事**：分号串联四个及以上事实片段（"剥离A；统一B；改用C；移出D"）
   说明这块内容自己是一个结构——拆成多组 point/detail、列表，或改用表格/图当载体。
@@ -73,7 +77,7 @@ reveal:
 - `hero_split`：左图右文或左文右图，适合架构图、重大数据可视化、产品截图等 Hero 视觉。
 - `fullscreen_backdrop`：全屏图片底图 + 居中悬浮半透明卡片，适合宏观愿景、战略发布或总结升华。
 - `timeline`：横向 3-4 个里程碑节点卡片，适合阶段演进、历史回顾、路线图。
-- `versus`：双栏并列对比，适合方案评估与选型决策；列名用 `visual.columns: [左, 右]` 指定（缺失会降级成裸 A/B 并出 warning）。
+- `versus`：双栏并列对比，适合方案评估与选型决策；列名用 `visual.columns: [左, 右]` 指定（缺失会降级成裸 A/B 并出 warning）。多维度逐项对照时放 `visual.table`。
 
 ## 动画与微动效（HTML Deck）
 - **大数字跳动（Count-up）**：进入页面（或触发 fragment 时）KPI 卡片数字从 0 匀速插值跃升至目标值（800ms，带 easeOutExpo 减速缓动）。

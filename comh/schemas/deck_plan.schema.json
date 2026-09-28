@@ -102,7 +102,7 @@
               },
               "support_points": {
                 "type": "array",
-                "description": "Page body. Plain strings, or {point, detail} objects: bold lead-in phrase plus a lighter explanation line — the standard way to elaborate without piling on bullets.",
+                "description": "Page body. Plain strings, or {point, detail} objects: bold lead-in phrase plus a lighter explanation line — the standard way to elaborate without piling on bullets. visual.arrangement chooses how the items are laid out (list, columns, steps, grid, statement, qa, definition, status).",
                 "items": {
                   "anyOf": [
                     {
@@ -126,6 +126,20 @@
                         "icon": {
                           "type": "string",
                           "description": "Semantic icon name shown beside the lead-in."
+                        },
+                        "status": {
+                          "type": "string",
+                          "description": "Visible state label for the status arrangement, e.g. 已验证 / 待联合验证. The renderer never invents status wording."
+                        },
+                        "tone": {
+                          "enum": [
+                            "positive",
+                            "partial",
+                            "pending",
+                            "negative",
+                            "neutral"
+                          ],
+                          "description": "Semantic tone of the status label; the theme decides colors. The label text always carries the meaning."
                         }
                       }
                     }
@@ -275,9 +289,15 @@
                     "enum": [
                       "split",
                       "full",
-                      "columns"
+                      "columns",
+                      "steps",
+                      "grid",
+                      "statement",
+                      "qa",
+                      "definition",
+                      "status"
                     ],
-                    "description": "split: points beside evidence; full: evidence occupies body with no support_points; columns: two or three ordered point/detail groups without a separate visual."
+                    "description": "split: points beside evidence; full: evidence occupies body with no support_points; columns: two or three ordered point/detail groups. Text forms (no separate visual, named after the relation between items): steps = ordered sequence (2-5, numbered); grid = four or six parallel items (2x2 / 3x2); statement = first point is the claim, the rest its conditions or limits (2-4); qa = question→answer rows, detail required (2-4); definition = term→explanation rows, detail required (2-5); status = items with a visible status label and tone (2-6)."
                   },
                   "table": {
                     "type": "object",
@@ -341,10 +361,89 @@
                                     "type": "string"
                                   }
                                 }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "status"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "description": "Visible state label, e.g. 已验证."
+                                  },
+                                  "tone": {
+                                    "enum": [
+                                      "positive",
+                                      "partial",
+                                      "pending",
+                                      "negative",
+                                      "neutral"
+                                    ]
+                                  },
+                                  "evidence": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "missing"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "missing": {
+                                    "type": "string",
+                                    "description": "Why the value is absent, e.g. 未测 — missing values stay visible."
+                                  }
+                                }
                               }
                             ]
                           }
                         }
+                      },
+                      "header_column": {
+                        "type": "boolean",
+                        "description": "First column holds row labels (bold, shaded)."
+                      },
+                      "highlight": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "description": "Semantic emphasis on what the page is about; body-row and column indices are 0-based.",
+                        "properties": {
+                          "rows": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "columns": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "cells": {
+                            "type": "array",
+                            "items": {
+                              "type": "array",
+                              "minItems": 2,
+                              "maxItems": 2,
+                              "items": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "note": {
+                        "type": "string",
+                        "description": "Units, measurement conditions or source, shown under the table."
                       }
                     }
                   }

@@ -203,7 +203,7 @@ def validate_density(artifacts: dict, run_root: Path | None = None) -> list[Find
             bool(page)
             and page.get("page_role", "content") == "content"
             and not any(visual.get(k) for k in ("chart", "diagram", "asset_refs", "table"))
-            and visual.get("arrangement") != "columns"
+            and visual.get("arrangement", "split") in {"split", "full"}
         )
         if text_only:
             streak.append(page["id"])
@@ -227,6 +227,76 @@ def validate_density(artifacts: dict, run_root: Path | None = None) -> list[Find
 
 
 _CLAUSE_SPLIT = re.compile(r"[；;]")
+# A labeled segment inside a detail line: "优点：…", "Cost: …".
+_LABELED = re.compile(r"^\s*([^：:，,。.；;]{1,12})\s*[：:]\s*\S")
+# Ordinal openers. Digits and circled numbers are script-neutral; the word
+# markers are the zh/en pack (see locale_support.RULE_PACKS["layout-shape"]).
+_ORDINAL_NEUTRAL = re.compile(r"^\s*(?:\(?\d{1,2}[.)、．]|[①-⑩])")
+_ORDINAL_WORDS = {
+    "zh": re.compile(
+        r"^\s*(?:第[一二三四五六七八九十\d]+[步阶]|步骤\s*[一二三四五六七八九十\d]|首先|其次|然后|接着|最后)"
+    ),
+    "en": re.compile(
+        r"^\s*(?:step\s*\d+|first(?:ly)?\b|second(?:ly)?\b|then\b|next\b|finally\b)", re.I
+    ),
+}
+_QUESTION = re.compile(r"[?？]\s*$")
+
+
+def _shape_hints(page: dict, language: str) -> list[tuple[str, str]]:
+    """(check, message) for list pages whose items already carry a structure
+    one of the text forms or a table would show directly."""
+    visual = page.get("visual") or {}
+    if visual.get("arrangement", "split") not in {"split"} or any(
+        visual.get(k) for k in ("chart", "diagram", "asset_refs", "table")
+    ):
+        return []
+    points = page.get("support_points") or []
+    parts = [
+        (str(e.get("point", "")), str(e.get("detail") or ""))
+        if isinstance(e, dict)
+        else (str(e), "")
+        for e in points
+    ]
+    hints = []
+    label_sets = []
+    for _, detail in parts:
+        labels = [
+            m.group(1).strip() for c in _CLAUSE_SPLIT.split(detail) if (m := _LABELED.match(c))
+        ]
+        label_sets.append(tuple(labels))
+    shared = [labels for labels in label_sets if len(labels) >= 2]
+    if len(shared) >= 3 and len(set(shared)) == 1:
+        hints.append(
+            (
+                "layout:suggest-table",
+                f"{len(shared)} items repeat the same labeled fields "
+                f"({' / '.join(shared[0])}); that is a table — one row per item, one column "
+                "per field (visual.table).",
+            )
+        )
+    words = _ORDINAL_WORDS.get(language)
+    ordinal = sum(
+        bool(_ORDINAL_NEUTRAL.match(point) or (words and words.match(point))) for point, _ in parts
+    )
+    if len(parts) >= 3 and ordinal >= len(parts) - 1:
+        hints.append(
+            (
+                "layout:suggest-steps",
+                "the items are written as an ordered sequence; arrangement: steps numbers "
+                "them and shows the order instead of spelling it in the copy.",
+            )
+        )
+    questions = sum(bool(_QUESTION.search(point)) for point, _ in parts)
+    if len(parts) >= 2 and questions >= 2 and all(detail for _, detail in parts):
+        hints.append(
+            (
+                "layout:suggest-qa",
+                "the items are questions with answers; arrangement: qa aligns each question "
+                "with its answer.",
+            )
+        )
+    return hints
 
 
 def validate_packing(artifacts: dict, run_root: Path | None = None) -> list[Finding]:
@@ -265,6 +335,20 @@ def validate_packing(artifacts: dict, run_root: Path | None = None) -> list[Find
                         "deck_plan",
                     )
                 )
+        from .locale_support import language_tag
+
+        for check, message in _shape_hints(page, language_tag(brief)):
+            findings.append(
+                Finding(
+                    "deck_plan",
+                    check,
+                    "warn",
+                    "fail",
+                    f"page {page['id']}: {message} Keep the list if the order or pairing "
+                    "is not the point.",
+                    "deck_plan",
+                )
+            )
     return findings
 
 
@@ -287,23 +371,111 @@ def presentation_structure_errors(page: dict) -> list[str]:
             "columns requires two or three support_points and no separate visual/metric cards"
         )
     role = page.get("page_role", "content")
-    if (visual.get("table") or visual.get("diagram")) and role in {
-        "cover",
-        "agenda",
-        "section_divider",
-        "closing",
-        "timeline",
-        "versus",
-        "fullscreen_backdrop",
+    no_carrier_roles = {"cover", "agenda", "section_divider", "closing", "timeline"}
+    if (visual.get("table") or visual.get("diagram")) and role in no_carrier_roles | {
+        "fullscreen_backdrop"
     }:
         errors.append("this page_role does not render tables/diagrams; use content or hero_split")
+    if role == "versus":
+        if visual.get("diagram"):
+            errors.append("versus does not render diagrams; use content or hero_split")
+        if visual.get("table") and page.get("support_points"):
+            errors.append(
+                "a versus table replaces the two columns; move support_points into table rows"
+            )
     if arrangement != "split" and role != "content":
-        errors.append("full/columns arrangement requires content page_role")
-    table = visual.get("table") or {}
-    columns = table.get("columns", [])
-    if any(len(row) != len(columns) for row in table.get("rows", [])):
-        errors.append("every table row must match its column count")
-    weights = table.get("column_weights")
-    if weights is not None and (len(weights) != len(columns) or any(v <= 0 for v in weights)):
-        errors.append("table column_weights must be positive and match columns")
+        errors.append(f"{arrangement} arrangement requires content page_role")
+    from .render.table import table_errors
+    from .render.text_forms import form_errors
+
+    errors += form_errors(page)
+    if visual.get("table"):
+        errors += table_errors(visual["table"])
     return errors
+
+
+# Content-like roles whose body layout counts toward layout variety.
+_FRAME_ROLES = {"cover", "agenda", "section_divider", "closing", "appendix"}
+
+
+def layout_signature(page: dict) -> str:
+    """What a page's body looks like: role, text form and primary carrier.
+    The same vocabulary the outline view shows as each page's carrier."""
+    visual = page.get("visual") or {}
+    carrier = next(
+        (
+            name
+            for key, name in (
+                ("chart", "chart"),
+                ("table", "table"),
+                ("diagram", "diagram"),
+                ("asset_refs", "image"),
+            )
+            if visual.get(key)
+        ),
+        None,
+    )
+    arrangement = visual.get("arrangement", "split")
+    if carrier is None:
+        body = "text" if arrangement in {"split", "full"} else f"text:{arrangement}"
+    else:
+        body = carrier
+    role = page.get("page_role", "content")
+    return body if role == "content" else f"{role}/{body}"
+
+
+def validate_layout_variety(artifacts: dict) -> list[Finding]:
+    """Advisory: the same body layout repeated page after page, or dominating
+    the deck. Layout should follow each page's information relation; a repeat
+    that is deliberate can stay — this asks for a look, never a quota."""
+    deck = artifacts.get("deck_plan") or {}
+    if deck.get("draft"):
+        return []
+    pages = [
+        p for p in deck.get("deck", {}).get("pages", []) if p.get("page_role") not in _FRAME_ROLES
+    ]
+    findings = []
+    streak: list[str] = []
+    previous = None
+    for page in pages + [None]:
+        signature = layout_signature(page) if page else None
+        if signature is not None and signature == previous:
+            streak.append(page["id"])
+            continue
+        if len(streak) >= 3:
+            findings.append(
+                Finding(
+                    "deck_plan",
+                    "presentation:repeated-layout",
+                    "warn",
+                    "fail",
+                    f"pages {', '.join(streak)} repeat the same body layout ({previous}); "
+                    "check each page's information relation — sequence (steps), parallel "
+                    "items (grid/columns), claim with conditions (statement), questions "
+                    "(qa), terms (definition), progress (status), shared dimensions "
+                    "(table). Keep the repeat only if the relation really is the same.",
+                    "deck_plan",
+                )
+            )
+        streak = [page["id"]] if page else []
+        previous = signature
+    counts: dict[str, int] = {}
+    for page in pages:
+        signature = layout_signature(page)
+        counts[signature] = counts.get(signature, 0) + 1
+    if len(pages) >= 5:
+        signature, count = max(counts.items(), key=lambda item: item[1])
+        if count / len(pages) > 0.6:
+            findings.append(
+                Finding(
+                    "deck_plan",
+                    "presentation:layout-monotony",
+                    "warn",
+                    "fail",
+                    f"{count} of {len(pages)} body pages use the same layout ({signature}); "
+                    "review whether the content relations differ. Do not vary layout for "
+                    "its own sake or add decoration to clear this.",
+                    "deck_plan",
+                )
+            )
+    return findings

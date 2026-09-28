@@ -11,12 +11,22 @@
 visual:
   arrangement: full
   table:
-    columns: [方案, 能力边界, 耗时]
-    column_weights: [1, 2, 1]
+    columns: [方案, 能力边界, 耗时, 功能测试]
+    column_weights: [1, 2, 1, 1]
+    header_column: true            # 首列是行标签（加粗、浅底）
+    highlight: {rows: [1]}         # 本页要说的那一行/列/格：rows | columns | cells: [[行, 列]]
+    note: 耗时为 20 次测量中位数；同一板卡、同一负载。   # 单位、条件、来源
     rows:
-      - [基线, {text: 固定平台配置, evidence: E001}, {value_from: E002}]
-      - [适配方案, {text: 分离硬件描述, evidence: E003}, {value_from: E004}]
+      - [基线, {text: 固定平台配置, evidence: E001}, {value_from: E002}, {status: 通过, tone: positive}]
+      - [适配方案, {text: 分离硬件描述, evidence: E003}, {value_from: E004}, {status: 通过, tone: positive}]
+      - [第二板卡, 同一描述文件, {missing: 未测}, {status: 进行中, tone: pending}]
 ```
+
+表格语义：`value_from` 数字列自动右对齐；`{status, tone}` 是可见状态标签（文字由你写，
+tone ∈ positive|partial|pending|negative|neutral 只决定底色）；`{missing: 未测}` 让缺失值
+可见而不是留空；`highlight` 只标本页结论所在的行/列/格，不要整表高亮；`note` 写单位和
+测量条件（诚实性要求它们可见）。`versus` 页可直接放 `visual.table` 做多维度逐项对照
+（首列默认作行标签，不再同时写 support_points）。
 
 `content` 页支持：
 - `split`（默认）：左侧要点，右侧一个主要图表；没有要点时图表自动占主体宽度。
@@ -24,6 +34,40 @@ visual:
 - `columns`：两至三个 support_points 按顺序横排，使用 `{point, detail}`；每栏标题
   对齐，解释就近，无独立 chart/diagram/table/asset_refs 或 metric_cards。适合连续解释，
   不适合长段落或大量比较维度。字号固定，放不下先改写或拆页。
+
+## 文字页形态：按信息关系选排法
+
+没有图表的页面不等于只有一种排法。`visual.arrangement` 按**要点之间的关系**命名，
+renderer 负责几何排版；同一份 `support_points` 在 PPTX 与 HTML 两端地址一致
+（reveal 仍用 `support_points[i]`）。先问“这几条之间是什么关系”，再选：
+
+| 信息关系 | arrangement | 条数 | 呈现 |
+|---|---|---|---|
+| 并列要点、各自需要展开 | 默认（list） | 任意 | 卡片纵列 |
+| 连续阶段、短段落 | `columns` | 2–3 | 横排栏 |
+| 有先后顺序：流程、方法步骤、路线 | `steps` | 2–5 | 编号徽标 + 连线（≤4 横排，5 步纵排） |
+| 四/六个平行项：研究问题、维度、模块 | `grid` | 4 或 6 | 2×2 / 3×2 卡片 |
+| 一个结论 + 成立条件/限制/下一步 | `statement` | 2–4 | 首条大字主陈述，其余为下方条件栏 |
+| 问题与回答：评审问答、研究问题总结 | `qa` | 2–4 | 问题列 + 回答列（detail 必填） |
+| 术语与解释、概念定义 | `definition` | 2–5 | 标签列 + 说明（detail 必填） |
+| 已实现/已验证/待验证等进展 | `status` | 2–6 | 状态标签 + 事项（每条写 `status`，可选 `tone`） |
+| 多条要点共享同一组字段（优点/限制、条件/结果） | 改用 `visual.table` | — | 每条一行，每个字段一列 |
+
+```yaml
+visual: {arrangement: status}
+support_points:
+  - {point: 描述文件生成初始化代码, detail: 已在两块板卡上跑通。, status: 已验证, tone: positive}
+  - {point: 跨核配置, detail: 单核通过，多核待联合测试。, status: 部分验证, tone: partial}
+  - {point: 第三方芯片支持, detail: 设计已完成，尚未实现。, status: 设计目标, tone: pending}
+```
+
+规则：文字形态不再配 chart/diagram/table/asset_refs 或 metric_cards（callout 可以）；
+只用于 `content` 页；图标只在默认列表里渲染；`status/tone` 只在 `status` 形态里渲染。
+字号固定，放不下时 `comh validate` 的 `layout-fit` 直接报错——改写、拆页或把细节移到
+notes，不缩字。反例：四个步骤排成卡片列、编号靠文字“第一步”撑着；六个“优点：…；
+限制：…”塞进 detail；评审问答写成加粗问句 + 灰字回答的卡片。校验器会对这类列表给出
+`layout:suggest-table|steps|qa` 提示。形态不是装饰：关系确实是并列就保留列表，
+连续多页同一排法时 `presentation:repeated-layout` 会请你复查，而不是强制换样式。
 
 一次选择一个主要载体，不能同时配置图、表和图片让 renderer 静默丢弃。表格和机制图
 支持 content / hero_split；full / columns 只用于 content。任意未知 page_role 仍按原有
@@ -82,6 +126,8 @@ visual:
 
 - **`support_points` 支持 `{point, detail}`**：point 是加粗导语，detail 是下面一行浅色
   展开。这是文本展开手段；先检索适合比较、架构、流程或数据展示的材料，再选择载体。
+  纯文字页按关系选 `visual.arrangement`（steps / grid / statement / qa / definition /
+  status，见上文「文字页形态」），不要每页都是同一列卡片。
 - **`metric_cards`**：数据页的大数字卡片，`{label, value_from: Exxx}`，数值渲染时从
   evidence 取（不会漂移）。适合 2-4 个关键数字。卡片和图表同时用会很挤，二选一。
 - **`callout`**：底部"so what"结论条 `{text, evidence?}`。**强化本页信息，不许引入
@@ -93,6 +139,9 @@ visual:
   - **示意图用 `visual.diagram`**：`{mermaid: <flowchart 源>, caption, evidence?}`。
     mermaid 经编译器的确定性布局链（真实字体测量、碰撞校验）生成原生 PPTX 对象与 HTML 内联 SVG。当前只支持 flowchart/graph 子集（subgraph、sequence 等会失败）——
     `comh validate` 会干跑图语法，错误在验证期就报出来。演示稿此路径不需要 draw.io CLI。
+  - **共同维度的比较用 `visual.table`**：方案 × 指标、条件 × 结果、模块 × 职责。
+    数字用 `value_from`，状态用 `{status, tone}`，缺失用 `{missing}`，结论所在行/列用
+    `highlight`，单位与条件写 `note`。多条要点重复同样的“字段：值”结构时，它就是一张表。
   - 已有图片用 `asset_refs`，**引用图片时用对象形式 `{ref, caption, evidence}`**——
     caption 随图渲染，evidence 把图挂进溯源链。图不是溯源的盲区。
 
@@ -137,6 +186,7 @@ academic-rich，用户要求优先；spec.dimensions 保留补充偏好。字数
   - `fullscreen_backdrop`：全幅背景图 + 居中悬浮半透明卡片（`backdrop_card`），沉浸式叙事。
   - `timeline`：横向里程碑时间轴（推荐 3-4 节点，超出出 warning），带步骤徽标与展开要点。
   - `versus`：双栏并列对比（如基线 vs 优化）。列名由 `visual.columns: [左列名, 右列名]` 给出——渲染器不发明文案，缺失时降级为裸 A/B 并出 warning。
+    对比维度超过两三条时改用 `visual.table`（首列维度、每方案一列），逐项对齐比两栏卡片好读。
 
 - **背景图与蒙层（`visual.background`）**：
   - 语法：`visual.background: {asset: "assets/hero.jpg", opacity: 0.15, overlay: theme|frosted-glass}`

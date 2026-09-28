@@ -51,14 +51,15 @@ presentation:
 
 ## 学术充实的内容与布局
 
-- **问题总览**：简短引入 + 并列问题。每块说明要检验什么，不用“甲方关心的价值”等内部标签。
+- **问题总览**：简短引入 + 并列问题（四个问题可用 `grid`）。每块说明要检验什么，不用“甲方关心的价值”等内部标签。
 - **结果页**：主图/已有对照材料占主体，解释紧邻其对应证据，底部放结论和成立条件。
-- **机制/方法页**：步骤或分区有明确阅读顺序，参数、对照与方法说明服务于同一问题。
-- **总结页**：逐项回答先前问题，再给适用条件与下一步；不要把所有标题重复一遍充数。
+- **机制/方法页**：步骤或分区有明确阅读顺序（有先后时用 `steps`），参数、对照与方法说明服务于同一问题。
+- **总结页**：逐项回答先前问题（`qa` 或 `statement`），再给适用条件与下一步；不要把所有标题重复一遍充数。
 
 参考布局取其分组、层级、图文邻接与阅读顺序，不复制背景、配色和边框。按内容选择当前
 renderer 支持的 page_role、support_points 的 point/detail、chart/diagram/asset_refs 与 callout。
-现支持 `visual.table` 原生表格和 `visual.arrangement: full|split|columns` 的受约束布局；
+现支持 `visual.table` 原生表格和 `visual.arrangement` 的受约束布局（full|split|columns，
+以及文字形态 steps|grid|statement|qa|definition|status）；
 具体接口见 deck-authoring，阅读路径检查见 [研究与技术汇报](research-presentations.md)。
 这不是任意网格；超出引擎能力时要说明，不能写一个不会渲染的字段。
 布局建议可以调整；共同打磨时继续逐页对齐，不新增一套独立的强制密度审批流程。

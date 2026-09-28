@@ -6,7 +6,9 @@
 使用 context 的 presentation_profile 和 [受众文案规则](../references/audience-copy.md)。
 学术场合默认学术充实，用户可改档；“一页一个主旨”不等于“一页只有几个短句”。
 先按 [研究与技术汇报](../references/research-presentations.md) 检索架构、实验过程和对照证据，
-选择载体、安排连续阅读路径，并默认保持原生可编辑。丰富页面靠条件、证据和解释。参考布局时看分区与阅读顺序，不从参考稿复制空洞标签。
+选择载体、安排连续阅读路径，并默认保持原生可编辑。纯文字页按信息关系选文字形态
+（deck-authoring「文字页形态」），共同维度的比较用表格；`comh validate` 的
+`layout:suggest-*`、`presentation:repeated-layout` 是复查信号，回应方式是改排法或确认关系确实相同。丰富页面靠条件、证据和解释。参考布局时看分区与阅读顺序，不从参考稿复制空洞标签。
 用户指定 PPTX 样式模板时，再读 [样式编译](../references/pptx-style.md)：
 只继承背景、品牌元素和文字样式；密度、结构属于另行讨论的风格模板。
 若 next 指向 deck_appearance，先完成代表页预览和样式决策，再批量细化。

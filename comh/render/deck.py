@@ -12,6 +12,10 @@ short bullets floating in white space:
 - **Native charts** — ``visual.chart`` likewise plots evidence values.
 - **Callout** — a bottom "so what" band reinforcing the page's message.
 
+Text-only bodies pick a relation-named form (``visual.arrangement``: steps,
+grid, statement, qa, definition, status) laid out by ``text_forms.py``;
+tables carry semantic emphasis (row labels, highlights, status, notes).
+
 Layout is measured: real glyph metrics drive wrapping, font fitting, and
 vertical distribution of leftover space; anything that cannot fit becomes a
 layout finding in the render report instead of silent overflow.
@@ -27,7 +31,7 @@ from pathlib import Path
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.ns import qn
 from pptx.util import Inches, Pt
 
@@ -35,6 +39,8 @@ from ..artifacts import Finding
 from .metrics import FIXED_TEXT_SIZES, fit_box, wrap_lines
 from .ooxml import set_east_asian_font, set_shape_translucent_fill
 from .scrim import solve_scrim
+from .text_forms import FORMS as TEXT_FORMS
+from .text_forms import layout_form
 from .theme import RenderTheme, render_theme
 
 
@@ -635,10 +641,6 @@ def _render_content(
     strip.fill.fore_color.rgb = t.accent
     strip.line.fill.background()
 
-    content_top = _BODY_TOP if title_top < 0.5 else _BODY_TOP + 0.2
-    # Reserve the conclusion band only when it exists. Otherwise the body can
-    # use that space while staying clear of the footer (starts at 7.06in).
-    content_bottom = _BODY_BOTTOM if page.get("callout") else 6.8
     if cards:
         _render_metric_cards(
             slide,
@@ -648,10 +650,10 @@ def _render_content(
             evidence,
             page_id,
             shapes,
-            content_top,
+            _BODY_TOP if title_top < 0.5 else _BODY_TOP + 0.2,
             run_root,
         )
-        content_top += 1.8
+    content_top, content_bottom = content_zone(page)
 
     body_width = _BODY_W
     full_visual = arrangement == "full" or not page.get("support_points")
@@ -659,18 +661,9 @@ def _render_content(
     if visual.get("table") is not None:
         from .table import render_table
 
-        frame = render_table(
-            slide,
-            visual["table"],
-            evidence,
-            page_id,
-            theme,
-            x=vx,
-            y=content_top,
-            w=vw,
-            h=content_bottom - content_top,
+        shapes["visual"] = render_table(
+            slide, visual["table"], evidence, page_id, theme, **table_zone(page)
         )
-        shapes["visual"] = [frame.shape_id]
         body_width = 5.35
     elif chart_spec is not None:
         _add_chart(
@@ -721,6 +714,8 @@ def _render_content(
     points = page.get("support_points", [])
     if points and arrangement == "columns":
         _render_reading_columns(slide, page, theme, shapes, content_top, content_bottom)
+    elif points and arrangement in TEXT_FORMS:
+        _render_text_form(slide, page, theme, shapes, content_top, content_bottom)
     elif points:
         _render_points(
             slide,
@@ -739,6 +734,101 @@ def _render_content(
     callout = page.get("callout")
     if callout:
         _render_callout(slide, callout, theme, result, page_id, shapes)
+
+
+def content_zone(page: dict) -> tuple[float, float]:
+    """Body band of a content page, below the title/kicker and any metric
+    cards, above the callout band (or the footer when there is no callout).
+    Shared by the renderer and the validator's layout dry run."""
+    top = _BODY_TOP + (0.2 if str(page.get("kicker") or "") else 0.0)
+    if page.get("metric_cards"):
+        top += 1.8
+    # Reserve the conclusion band only when it exists. Otherwise the body can
+    # use that space while staying clear of the footer (starts at 7.06in).
+    return top, _BODY_BOTTOM if page.get("callout") else 6.8
+
+
+def _versus_top(page: dict) -> float:
+    return (0.78 if str(page.get("kicker") or "") else 0.42) + 1.12 + 0.25
+
+
+def table_zone(page: dict) -> dict[str, float]:
+    """Where a page's table is drawn, per page_role (x, y, w, h in inches)."""
+    role = page.get("page_role", "content")
+    if role == "hero_split":
+        return {"x": 7.1, "y": _BODY_TOP, "w": 5.3, "h": _BODY_BOTTOM - _BODY_TOP}
+    if role == "versus":
+        top = _versus_top(page)
+        bottom = _BODY_BOTTOM if page.get("callout") else 6.8
+        return {"x": _MARGIN_X, "y": top, "w": _BODY_W, "h": bottom - top}
+    top, bottom = content_zone(page)
+    visual = page.get("visual") or {}
+    if visual.get("arrangement") == "full" or not page.get("support_points"):
+        return {"x": _MARGIN_X, "y": top, "w": _BODY_W, "h": bottom - top}
+    return {"x": 6.55, "y": top, "w": 5.9, "h": bottom - top}
+
+
+def _render_text_form(slide, page, theme, shapes, top, bottom) -> None:
+    """Draw the measured pieces of a text form (see text_forms.py)."""
+    t = theme.theme
+    for piece in layout_form(page, theme, top, bottom):
+        color = getattr(t, piece.color.removeprefix("ink:"))
+        if piece.kind == "text":
+            shape = _textbox(
+                slide, Inches(piece.x), Inches(piece.y), Inches(piece.w), Inches(piece.h)
+            )
+        else:
+            kind = {"oval": 9, "rounded": _ROUNDED, "rect": 1}[piece.kind]
+            shape = slide.shapes.add_shape(
+                kind, Inches(piece.x), Inches(piece.y), Inches(piece.w), Inches(piece.h)
+            )
+            shape.shadow.inherit = False
+            if piece.fill:
+                shape.fill.solid()
+                shape.fill.fore_color.rgb = getattr(t, piece.fill)
+            else:
+                shape.fill.background()
+            if piece.line:
+                shape.line.color.rgb = getattr(t, piece.line)
+                shape.line.width = Pt(1.25)
+                if piece.dashed:
+                    from pptx.enum.dml import MSO_LINE_DASH_STYLE
+
+                    shape.line.dash_style = MSO_LINE_DASH_STYLE.DASH
+            else:
+                shape.line.fill.background()
+            if piece.kind == "rounded" and piece.text:
+                shape.adjustments[0] = 0.5  # pill
+        if piece.address is None:
+            shape.name = "decor"
+            continue
+        shape.name = f"form:{piece.kind}:{piece.address}"
+        if piece.text:
+            frame = shape.text_frame
+            frame.word_wrap = True
+            margin = Pt(0) if piece.center else Inches(0.05)
+            frame.margin_left = frame.margin_right = margin
+            frame.margin_top = frame.margin_bottom = margin
+            if piece.center:
+                frame.vertical_anchor = MSO_ANCHOR.MIDDLE
+            paragraph = frame.paragraphs[0]
+            if piece.center:
+                paragraph.alignment = PP_ALIGN.CENTER
+            _set(
+                paragraph,
+                piece.text,
+                size=piece.size,
+                font=theme.body_font,
+                color=color,
+                bold=piece.bold,
+            )
+        shapes.setdefault(piece.address, []).append(shape.shape_id)
+    count = len(page.get("support_points") or [])
+    shapes["support_points"] = [
+        shape_id
+        for index in range(count)
+        for shape_id in shapes.get(f"support_points[{index}]", [])
+    ]
 
 
 def _has_figure(page: dict, run_root: Path) -> bool:
@@ -1283,18 +1373,9 @@ def _render_hero_split(
     if visual.get("table"):
         from .table import render_table
 
-        frame = render_table(
-            slide,
-            visual["table"],
-            evidence,
-            page_id,
-            theme,
-            x=7.1,
-            y=_BODY_TOP,
-            w=5.3,
-            h=_BODY_BOTTOM - _BODY_TOP,
+        shapes["visual"] = render_table(
+            slide, visual["table"], evidence, page_id, theme, **table_zone(page)
         )
-        shapes["visual"] = [frame.shape_id]
     elif visual.get("chart"):
         _add_chart(
             slide,
@@ -1650,6 +1731,18 @@ def _render_versus(
     hair.fill.fore_color.rgb = t.card_line
     hair.line.fill.background()
 
+    callout = page.get("callout")
+    if callout:
+        _render_callout(slide, callout, theme, result, page_id, shapes)
+    table = (page.get("visual") or {}).get("table")
+    if table:
+        # A multi-dimension comparison: one aligned row per dimension.
+        from .table import render_table
+
+        spec = {"header_column": True, **table}
+        shapes["visual"] = render_table(slide, spec, evidence, page_id, theme, **table_zone(page))
+        return
+
     entries = page.get("support_points") or []
     half = (len(entries) + 1) // 2
     left_entries = entries[:half]
@@ -1657,7 +1750,7 @@ def _render_versus(
 
     card_w = (_BODY_W - 0.4) / 2
     card_y = hair_y + 0.25
-    card_h = 4.4
+    card_h = min(4.4, _BODY_BOTTOM + 0.05 - card_y) if callout else 4.4
 
     left_label, right_label = _versus_labels(page, result)
     for col_idx, (col_items, col_label) in enumerate(
@@ -1888,7 +1981,7 @@ def _apply_animations(prs: Presentation, plan: dict, result: RenderResult) -> No
             targets: list[int] = []
             for address in step.get("elements") or []:
                 address = str(address)
-                if address.startswith("support_points["):
+                if address.startswith("support_points[") and address not in shapes:
                     result.findings.append(
                         Finding(
                             "deck_plan",

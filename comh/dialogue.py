@@ -136,16 +136,11 @@ def _brief_view(brief: dict, run_root=None) -> dict:
 
 
 def _page_carrier(page: dict) -> str:
-    visual = page.get("visual") or {}
-    for key, carrier in (
-        ("chart", "chart"),
-        ("table", "table"),
-        ("diagram", "diagram"),
-        ("asset_refs", "image"),
-    ):
-        if visual.get(key):
-            return carrier
-    return "text"
+    """chart | table | diagram | image, or text / text:<form> — so an outline
+    where every page is the same text list is visible before any rendering."""
+    from .presentation_profile import layout_signature
+
+    return layout_signature(page).rsplit("/", 1)[-1]
 
 
 def view(manifest: Manifest, target: str, node: str | None = None) -> dict:

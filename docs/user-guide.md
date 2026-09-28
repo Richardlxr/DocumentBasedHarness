@@ -127,8 +127,12 @@ Gate 后内容或证据依据改变会作废确认，需要重新对齐。以上
 
 学术场景默认 academic-rich，但不按字数填充页面。先判断证据中的比较、机制和实验关系，
 再选表格、图示或正文；细化时检查首个注视点、阅读顺序和图文邻接。原生表格的
-`visual.table` 与 `split/full/columns` 布局见[研究展示指南](../comh/instructions/references/research-presentations.md)
-及[字段示例](../comh/instructions/references/deck-authoring.md)。
+`visual.table`（行标签、高亮、状态、缺失值、单位注记）与 `split/full/columns` 布局见
+[研究展示指南](../comh/instructions/references/research-presentations.md)
+及[字段示例](../comh/instructions/references/deck-authoring.md)。纯文字页按要点关系选文字形态：
+`steps`（顺序）、`grid`（四/六个并列项）、`statement`（结论 + 条件）、`qa`（问答）、
+`definition`（术语）、`status`（进展状态）；字号固定，放不下在 `comh validate` 阶段就报错。
+连续同一排法或列表里藏着表格/步骤/问答结构时，校验器给出复查提示，不强制换样式。
 
 先保存计划并 `comh present deck_outline` / `report_outline`，展示结构及取舍，收到实际回复
 后记录 accepted 或明确的 delegated。粗大纲直接来自计划结构字段，无重复的大纲文件。

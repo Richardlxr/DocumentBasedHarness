@@ -26,6 +26,8 @@ from pathlib import Path
 
 from ..artifacts import Finding
 from .scrim import solve_scrim
+from .text_forms import FORMS as TEXT_FORMS
+from .text_forms import form_css, form_html, ink_on
 from .theme import RenderTheme, render_theme
 
 _WEB_DIR = Path(__file__).parent / "web"
@@ -418,6 +420,8 @@ def _content(
         )
     elif points_html and visual.get("arrangement") == "columns":
         parts.append(f'<div class="reading-columns">{points_html}</div>')
+    elif points_html and visual.get("arrangement") in TEXT_FORMS:
+        parts.append(form_html(page, lambda address, base: _fragment_attrs(address, orders, base)))
     elif points_html:
         parts.append(points_html)
 
@@ -615,6 +619,24 @@ def _versus(
         f"<h2{_fragment_attrs('title', orders)}{override}>{html.escape(page['title'])}</h2>"
     )
 
+    callout = page.get("callout")
+    callout_html = ""
+    if callout:
+        callout_html = (
+            f"<div{_fragment_attrs('callout', orders, 'callout')}>"
+            f'<span class="callout-bar"></span>{html.escape(str(callout.get("text", "")))}</div>'
+        )
+    table = (page.get("visual") or {}).get("table")
+    if table:
+        from .table import table_html
+
+        body = (
+            f"<div{_fragment_attrs('visual', orders)}>"
+            + table_html({"header_column": True, **table}, evidence, page["id"])
+            + "</div>"
+        )
+        return f'{kicker_html}{title_html}<div class="h2-rule"></div>{body}{callout_html}'
+
     entries = page.get("support_points") or []
     half = (len(entries) + 1) // 2
     left_entries = entries[:half]
@@ -644,15 +666,6 @@ def _versus(
     left_col = col_html(left_entries, html.escape(left_label), 0)
     right_col = col_html(right_entries, html.escape(right_label), half)
     cols = f'<div class="versus">{left_col}{right_col}</div>'
-
-    callout = page.get("callout")
-    callout_html = ""
-    if callout:
-        callout_html = (
-            f"<div{_fragment_attrs('callout', orders, 'callout')}>"
-            f'<span class="callout-bar"></span>{html.escape(str(callout.get("text", "")))}</div>'
-        )
-
     return f'{kicker_html}{title_html}<div class="h2-rule"></div>{cols}{callout_html}'
 
 
@@ -790,6 +803,7 @@ def _css(theme: RenderTheme) -> str:
         f"--callout-size:{t.callout_size}px; --kicker-size:{t.kicker_size}px;"
         f"--footer-size:{t.footer_size}px; --index-size:{t.index_number_size}px;"
         f"--cover-size:{t.cover_title_size}px;"
+        f"--soft-ink:#{getattr(t, ink_on(theme, 'accent_soft'))};"
     )
     return (
         f":root{{{variables}}}"
@@ -899,7 +913,12 @@ figure img { max-width:100%; max-height:58vh; }
   font-size:var(--body-size); }
 .evidence-table th,.evidence-table td { border-bottom:1px solid var(--card-line);
   padding:8px 10px; text-align:left; white-space:pre-line; overflow-wrap:anywhere; }
-.evidence-table th { background:var(--accent-soft); }
+.evidence-table tr:first-child th { border-bottom:2px solid var(--accent); }
+.evidence-table tr:last-child th,.evidence-table tr:last-child td { border-bottom:none; }
+.evidence-table th[scope="row"] { background:var(--card-fill); }
+.evidence-table .num { text-align:right; font-variant-numeric:tabular-nums; }
+.evidence-table .hl { background:var(--accent-soft); color:var(--soft-ink); font-weight:700; }
+.table-note { font-size:13px; margin:8px 0 0 0; }
 .reading-columns .points { display:flex; flex-direction:row; align-items:flex-start; gap:32px; }
 .reading-columns .point { flex:1; min-width:0; }
 .reading-columns .point { display:block; background:none; border:0; padding:0; }
@@ -947,6 +966,7 @@ figure img { max-width:100%; max-height:58vh; }
   .bar-fill { transition: none !important; }
 }
 """
+        + form_css(theme)
     )
 
 

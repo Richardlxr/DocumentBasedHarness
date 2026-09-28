@@ -23,6 +23,11 @@ RULE_PACKS: dict[str, tuple[frozenset[str], str]] = {
         frozenset({"zh"}),
         "legacy free-text hard-constraint parsing (comh/contracts.py)",
     ),
+    "layout-shape": (
+        frozenset({"zh", "en"}),
+        "ordinal-word step detection for layout hints (comh/presentation_profile.py); "
+        "digit, question-mark and labeled-field hints still run",
+    ),
 }
 
 

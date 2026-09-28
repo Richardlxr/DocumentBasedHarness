@@ -749,6 +749,73 @@ def validate_visuals(artifacts: dict[str, dict | None]) -> list[Finding]:
     return findings
 
 
+def validate_layout_fit(artifacts: dict[str, dict | None], run_root: Path | None) -> list[Finding]:
+    """Dry-run the measured table and text-form layouts at the deck's fixed type
+    sizes, so copy that cannot fit fails at validation rather than at render.
+    Structure errors are reported by validate_visuals; this only measures."""
+    from .render.text_forms import FORMS
+
+    deck = artifacts.get("deck_plan") or {}
+    pages = [
+        p
+        for p in deck.get("deck", {}).get("pages", [])
+        if (p.get("visual") or {}).get("table")
+        or (p.get("visual") or {}).get("arrangement") in FORMS
+    ]
+    if not pages:
+        return []
+    style = deck.get("deck", {}).get("style") or {}
+    if "pptx_style" in style:
+        return [
+            Finding(
+                "deck_plan",
+                "layout-fit",
+                "info",
+                "pass",
+                "layout dry run skipped: a pptx_style template sets its own type sizes; "
+                "table and text-form fit is checked when the deck renders",
+                "deck_plan",
+            )
+        ]
+    from .contracts import forbids_dark
+    from .presentation_profile import presentation_structure_errors
+    from .render.deck import content_zone, table_zone
+    from .render.table import layout_table
+    from .render.text_forms import layout_form
+    from .render.theme import render_theme
+
+    brief = artifacts.get("brief") or {}
+    theme = render_theme(
+        style,
+        str(brief.get("language") or "en"),
+        allow_dark=not forbids_dark(brief),
+        run_root=run_root,
+    )
+    findings: list[Finding] = []
+    for page in pages:
+        if presentation_structure_errors(page):
+            continue  # already an error; measuring a broken structure adds noise
+        visual = page["visual"]
+        try:
+            if visual.get("table"):
+                zone = table_zone(page)
+                spec = visual["table"]
+                if page.get("page_role") == "versus":
+                    spec = {"header_column": True, **spec}
+                layout_table(
+                    spec, artifacts.get("evidence"), page["id"], theme, w=zone["w"], h=zone["h"]
+                )
+            else:
+                layout_form(page, theme, *content_zone(page))
+        except RuntimeError:
+            continue  # unresolved evidence reference; validate_visuals reports it
+        except ValueError as error:
+            findings.append(
+                Finding("deck_plan", "layout-fit", "error", "fail", str(error), "deck_plan")
+            )
+    return findings
+
+
 def _address_error(page: dict, address: str) -> str | None:
     """Resolve one element address against a page; None when valid."""
     match = _ADDRESS.match(address)
@@ -1120,6 +1187,7 @@ def deck_text(plan: dict) -> str:
             text
             for field, text in page_texts(page)
             if field.startswith("visual.table")
+            or field.endswith(".status")
             or field == "visual.chart.title"
             or field.startswith("visual.diagram.labels")
         ]
@@ -1151,13 +1219,18 @@ def run_all(run_root: Path, keys: set[str] | None = None) -> list[Finding]:
             )
     from .audience_lint import validate_audience_copy
     from .locale_support import coverage_findings
-    from .presentation_profile import validate_density, validate_packing
+    from .presentation_profile import (
+        validate_density,
+        validate_layout_variety,
+        validate_packing,
+    )
     from .style_lint import validate_style
 
     findings += validate_style(artifacts, report_md_text)
     findings += validate_audience_copy(artifacts, report_md_text)
     findings += validate_density(artifacts, run_root)
     findings += validate_packing(artifacts, run_root)
+    findings += validate_layout_variety(artifacts)
     # Say which pattern checks this run's language leaves unchecked, so a clean
     # report is never mistaken for a checked one.
     if artifacts.get("brief") is not None:
@@ -1170,6 +1243,7 @@ def run_all(run_root: Path, keys: set[str] | None = None) -> list[Finding]:
         findings += validate_numbers(artifacts, report_md_text)
         findings += validate_coverage(artifacts)
         findings += validate_visuals(artifacts)
+        findings += validate_layout_fit(artifacts, run_root)
         findings += validate_reveal(artifacts)
         findings += validate_report(artifacts, report_md_text)
     if artifacts.get("deck_plan") is not None:
